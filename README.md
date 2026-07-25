@@ -47,6 +47,11 @@ mitgelieferte Dashboard-Karte.
   direkt im Dashboard (siehe [Bekannte Einschränkungen](#bekannte-einschränkungen)),
   als 5. Symbol/Tab in der Kartenkopfzeile - nicht als Bereich unterhalb der
   Anrufliste.
+- **Experimentell (seit Version 1.0.5b0):** Anrufbeantworter-Nachrichten
+  lassen sich unwiderruflich löschen (optionaler Papierkorb-Button auf der
+  Karte, mit Sicherheitsabfrage) und wahlweise automatisch als gelesen
+  markieren, sobald sie über diese Integration abgespielt wurden - siehe
+  [Anrufbeantworter-Nachrichten löschen / als gelesen markieren](#anrufbeantworter-nachrichten-löschen--als-gelesen-markieren-seit-version-105b0-optional-experimentell).
 - Alternative: einfache YAML-Tabellenkarte auf Basis von `flex-table-card`
   (siehe [`examples/dashboard_flex_table.yaml`](examples/dashboard_flex_table.yaml)).
 
@@ -271,6 +276,19 @@ lassen sich jederzeit ändern:
   - *Anzahl*: Dropdown mit festen Werten 5 / 10 / 20 / 50 / 100 / 200
     (nur wirksam im Modus "Anzahl Anrufe").
   - *Tage*: Zahl zwischen 1 und 90 (nur wirksam im Modus "Anzahl Tage").
+- **Nach Wiedergabe automatisch als gelesen markieren** (`auto_mark_read`,
+  seit Version 1.0.5b0, standardmäßig **aus**, EXPERIMENTELL): Sobald eine
+  Anrufbeantworter-Nachricht über diese Integration abgespielt wird (Tab
+  oder Weiterverarbeitungs-Zeile), setzt die Integration zusätzlich den
+  "Neu"-Status der Nachricht direkt auf der FRITZ!Box selbst zurück (TR-064-
+  Aktion `MarkMessage`) - genau wie beim Abhören an einem FRITZ!Box-eigenen
+  Telefon oder in FRITZ!App Fon. Bewusst als eigener Schalter auf
+  Integrations-, nicht Karten-Ebene: die Einstellung verändert echten,
+  gemeinsam genutzten Zustand auf der FRITZ!Box selbst (wirkt sich z. B.
+  auch auf die Anzeige in FRITZ!App Fon aus), nicht nur die Darstellung
+  eines einzelnen Dashboards. Siehe
+  [Anrufbeantworter-Nachrichten löschen / als gelesen markieren](#anrufbeantworter-nachrichten-löschen--als-gelesen-markieren-seit-version-105b0-optional-experimentell)
+  für Details und den Stand der Hardware-Bestätigung.
 
 ## Dashboard-Karte
 
@@ -305,6 +323,12 @@ Funktionen:
   das die Anrufliste, es erscheint kein zusätzlicher Bereich darunter.
   Siehe [Wiedergabe der Anrufbeantworter-Nachrichten](#wiedergabe-der-anrufbeantworter-nachrichten)
   unten für Details, wie das Abspielen technisch funktioniert.
+- **Experimentell (seit Version 1.0.5b0):** optionaler Papierkorb-Button
+  (`show_delete_button`, standardmäßig aus) je Anrufbeantworter-Nachricht,
+  mit eingebauter "Wirklich löschen?"-Sicherheitsabfrage direkt in der
+  Zeile. Siehe
+  [Anrufbeantworter-Nachrichten löschen / als gelesen markieren](#anrufbeantworter-nachrichten-löschen--als-gelesen-markieren-seit-version-105b0-optional-experimentell)
+  unten.
 - Responsives Layout: auf schmalen Bildschirmen (Smartphone) werden
   Tab-Beschriftungen und die Geräte-Spalte ausgeblendet, Name/Nummer/Zeit
   bleiben immer sichtbar. Seit Version 1.0.4 reagiert die Tab-Leiste
@@ -350,6 +374,11 @@ show_processing_verpasst: false
 # aus, damit bestehende Dashboards nach einem Update optisch unverändert
 # bleiben.
 show_filter_bar: false
+# Papierkorb-Button je Anrufbeantworter-Nachricht (seit Version 1.0.5b0,
+# optional, EXPERIMENTELL) - standardmäßig aus, da Löschen unwiderruflich
+# ist und noch nicht an echter Hardware bestätigt wurde. Siehe
+# "Anrufbeantworter-Nachrichten löschen / als gelesen markieren" unten.
+show_delete_button: false
 # Farben (seit Version 1.0.4, optional) - CSS-Farbwert (Hex, rgb()/rgba(),
 # hsl(), oder eine Theme-Variable wie var(--accent-color)); leer/weggelassen
 # = bisherige Standardfarbe.
@@ -550,6 +579,70 @@ im Home-Assistant-Log erscheint eine Meldung wie *"Login attempt or request
 with invalid authentication ... /api/fritzbox_anrufe/tam_media/..."* vom
 `http.ban`-Modul - das war das Verhalten vor diesem Fix.
 
+### Anrufbeantworter-Nachrichten löschen / als gelesen markieren (seit Version 1.0.5b0, optional, experimentell)
+
+Ein Wunsch aus der Community: Anrufbeantworter-Nachrichten sollen sich
+direkt aus Home Assistant heraus löschen lassen, und der "Neu"-Status soll
+nach dem Abhören verschwinden - genau wie beim Abhören an einem
+FRITZ!Box-eigenen Telefon oder in FRITZ!App Fon. Beides ist seit Version
+1.0.5b0 möglich, über zwei neue TR-064-Aktionen desselben
+`X_AVM-DE_TAM1`-Diensts, den diese Integration bereits für die
+Nachrichtenliste und die Wiedergabe nutzt:
+
+- **Löschen (`DeleteMessage`):** ein Papierkorb-Symbol erscheint pro
+  Nachricht im Anrufbeantworter-Tab, sobald `show_delete_button: true`
+  gesetzt ist (Standard: `false`). Ein Klick darauf ersetzt das Symbol
+  inline durch "Wirklich löschen?" mit einem Bestätigen- (✓) und einem
+  Abbrechen-Symbol (✗) - bewusst **kein** natives Browser-`confirm()`-
+  Dialogfenster, da sich solche Dialoge innerhalb des WebView der
+  Companion-App erfahrungsgemäß nicht immer zuverlässig verhalten (siehe
+  auch die Hinweise zu Browser-/WebView-Eigenheiten in
+  [Bekannte Einschränkungen](#bekannte-einschränkungen)). Erst ein Klick auf
+  das Bestätigen-Symbol löst den eigentlichen `DeleteMessage`-Aufruf aus.
+  Die Zeile verschwindet dabei sofort aus der Kartenansicht (optimistisch,
+  ohne auf die FRITZ!Box zu warten); schlägt der Löschvorgang fehl (z. B.
+  Netzwerkproblem oder fehlende Berechtigung), erscheint die Zeile wieder.
+  **Löschen ist unwiderruflich** - die FRITZ!Box selbst kennt für
+  Anrufbeantworter-Nachrichten keinen Papierkorb und kein Rückgängig, laut
+  AVMs eigener TR-064-Dienstbeschreibung des `X_AVM-DE_TAM`-Diensts. Deshalb
+  ist der Button standardmäßig ausgeblendet und zusätzlich durch die
+  Sicherheitsabfrage geschützt.
+- **Automatisch als gelesen markieren (`MarkMessage`):** siehe die
+  Einstellung `auto_mark_read` unter
+  [Einstellungen (Optionen)](#einstellungen-optionen) - bewusst ein
+  Integrations-, kein Kartenschalter, da damit echter, gemeinsam genutzter
+  Zustand auf der FRITZ!Box selbst verändert wird.
+
+Beide Aktionen sind zusätzlich über eigene Home-Assistant-Dienste nutzbar
+(Entwicklerwerkzeuge → Dienste, oder in eigenen Automatisierungen, z. B. um
+alte Nachrichten nach X Tagen automatisch zu löschen):
+
+| Dienst | Felder | Wirkung |
+| --- | --- | --- |
+| `fritzbox_anrufe.delete_voicemail_message` | `entity_id` (Anrufbeantworter-Sensor), `message_id` (aus dem `id`-Feld der jeweiligen Nachricht im Sensor-Attribut `messages`, siehe [Sensoren](#sensoren)) | löscht die Nachricht unwiderruflich |
+| `fritzbox_anrufe.mark_voicemail_message_read` | `entity_id`, `message_id`, `read` (optional, Standard `true`) | markiert die Nachricht als gelesen (`read: true`) bzw. wieder als neu (`read: false`) |
+
+**Woher kommt die Sicherheit, dass das technisch funktioniert?** Beide
+TR-064-Aktionen (`DeleteMessage` mit den Argumenten `NewIndex`/
+`NewMessageIndex`; `MarkMessage` zusätzlich mit `NewMarkedAsRead`) stammen
+aus AVMs eigener, offizieller Dienstbeschreibung des `X_AVM-DE_TAM`-Diensts.
+`DeleteMessage` wurde zusätzlich unabhängig von mehreren Personen in einem
+öffentlichen ioBroker-Forenthread als an echter Hardware (u. a. FRITZ!Box
+7530/6590, FRITZ!OS 7.20) funktionierend bestätigt. **Beide Aktionen wurden
+zum Zeitpunkt dieser Version noch nicht an Thorstens eigener FRITZ!Box
+getestet** - daher die Kennzeichnung "experimentell", passend zur
+durchgängigen Handhabung aller Anrufbeantworter-Funktionen in diesem
+Projekt (siehe auch
+[Bekannte Einschränkungen](#bekannte-einschränkungen)). Bitte zunächst mit
+unwichtigen Nachrichten testen und Auffälligkeiten als GitHub-Issue melden
+(siehe [Fehlerbehebung](#fehlerbehebung)).
+
+Wie beim Abspielen wird zudem angenommen (aber ebenfalls noch nicht an
+echter Hardware verifiziert), dass für beide Aktionen dieselbe
+TR-064-Berechtigung nötig ist, die auch `GetMessageList` bereits
+voraussetzt (siehe [Voraussetzungen](#voraussetzungen)) - es ist also keine
+zusätzliche FRITZ!Box-Benutzerrechte-Einrichtung zu erwarten.
+
 ### Variante 2: flex-table-card (YAML, spaltenweise ein-/ausblendbar)
 
 Für eine klassische, tabellarische Darstellung mit frei konfigurierbaren
@@ -715,9 +808,48 @@ die dortigen Maintainer den Fehler beheben.
   nicht etwas, das diese Integration umgehen könnte. Die Sortierung
   (Datum/Dauer/Name) ist davon nicht betroffen und funktioniert auf jedem
   Tab, einschließlich Anrufbeantworter.
+- **Anrufbeantworter-Nachrichten löschen/als gelesen markieren sind
+  experimentell und noch nicht an echter Hardware bestätigt** (seit Version
+  1.0.5b0): Beide zugrunde liegenden TR-064-Aktionen (`DeleteMessage`,
+  `MarkMessage` desselben `X_AVM-DE_TAM`-Diensts) stammen aus AVMs eigener
+  offizieller Dienstbeschreibung; `DeleteMessage` wurde zusätzlich
+  unabhängig in einem öffentlichen ioBroker-Forenthread als an anderer
+  FRITZ!Box-Hardware funktionierend bestätigt - beide jedoch noch nicht an
+  Thorstens eigener FRITZ!Box getestet. **Löschen ist zudem grundsätzlich
+  unwiderruflich** - die FRITZ!Box kennt für Anrufbeantworter-Nachrichten
+  keinen Papierkorb. Deshalb ist der Papierkorb-Button auf der Karte
+  (`show_delete_button`) standardmäßig ausgeblendet, zusätzlich durch eine
+  inline Sicherheitsabfrage geschützt, und die Einstellung
+  `auto_mark_read` standardmäßig aus. Siehe
+  [Anrufbeantworter-Nachrichten löschen / als gelesen markieren](#anrufbeantworter-nachrichten-löschen--als-gelesen-markieren-seit-version-105b0-optional-experimentell).
 
 ## Versionshistorie
 
+- **1.0.5b0** (Vorabversion): Wunsch aus der Community umgesetzt:
+  Anrufbeantworter-Nachrichten lassen sich jetzt löschen, und der
+  "Neu"-Status kann nach dem Abspielen automatisch verschwinden - genau wie
+  beim Abhören an einem FRITZ!Box-eigenen Telefon. Neuer, optionaler
+  Papierkorb-Button pro Nachricht auf der Dashboard-Karte
+  (`show_delete_button`, standardmäßig aus) mit inline
+  "Wirklich löschen?"-Sicherheitsabfrage statt eines nativen
+  Browser-Dialogs; das Löschen selbst läuft optimistisch (Zeile
+  verschwindet sofort, erscheint bei einem Fehler wieder). Neue
+  Options-Flow-Einstellung `auto_mark_read` (standardmäßig aus), um
+  Nachrichten nach der Wiedergabe über diese Integration automatisch auf
+  der FRITZ!Box selbst als gelesen zu markieren - bewusst auf
+  Integrations- statt Kartenebene, da echter, gemeinsam genutzter Zustand
+  auf der FRITZ!Box verändert wird (wirkt sich z. B. auch auf FRITZ!App Fon
+  aus). Beide Aktionen zusätzlich als eigene Home-Assistant-Dienste
+  nutzbar (`fritzbox_anrufe.delete_voicemail_message`,
+  `fritzbox_anrufe.mark_voicemail_message_read`), z. B. für eigene
+  Automatisierungen. Technisch beruhen beide auf zwei neuen TR-064-Aktionen
+  (`DeleteMessage`, `MarkMessage`) desselben `X_AVM-DE_TAM`-Diensts, den
+  diese Integration bereits für die Nachrichtenliste und Wiedergabe nutzt -
+  aus AVMs eigener Dienstbeschreibung sowie (für `DeleteMessage`)
+  unabhängig community-bestätigt an anderer FRITZ!Box-Hardware, aber noch
+  nicht an Thorstens eigener Box getestet. Siehe
+  [Anrufbeantworter-Nachrichten löschen / als gelesen markieren](#anrufbeantworter-nachrichten-löschen--als-gelesen-markieren-seit-version-105b0-optional-experimentell)
+  und [Bekannte Einschränkungen](#bekannte-einschränkungen).
 - **1.0.4**: Individuelle farbliche Gestaltung der Dashboard-Karte über den
   grafischen Editor (neuer Bereich "Farben", zwölf `color_*`-Schlüssel für
   Tab-Farbe, VIP-Stern, Zeilen-Icons, Live-Banner, Weiterverarbeitungs-Icons

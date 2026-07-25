@@ -1,0 +1,32 @@
+# Anrufbeantworter-Nachrichten löschen / als gelesen markieren (seit
+# v1.0.5b0, EXPERIMENTELL - siehe tam.py und README). Namen/Beschreibungen
+# werden aus strings.json/translations/*.json übersetzt (siehe dort für die
+# vollen, mehrsprachigen Texte) - hier bewusst nur die Struktur.
+delete_voicemail_message:
+  target:
+    entity:
+      integration: fritzbox_anrufe
+      domain: sensor
+  fields:
+    message_id:
+      required: true
+      example: "12"
+      selector:
+        text: {}
+
+mark_voicemail_message_read:
+  target:
+    entity:
+      integration: fritzbox_anrufe
+      domain: sensor
+  fields:
+    message_id:
+      required: true
+      example: "12"
+      selector:
+        text: {}
+    read:
+      required: false
+      default: true
+      selector:
+        boolean: {}

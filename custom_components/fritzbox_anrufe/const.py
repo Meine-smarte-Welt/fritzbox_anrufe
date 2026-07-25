@@ -167,3 +167,24 @@ def conf_call_log_count(call_type: str) -> str:
 def conf_call_log_days(call_type: str) -> str:
     """Options-Key: Tage-Fenster für einen Anruflisten-Sensor."""
     return f"call_log_days_{call_type}"
+
+
+# --- Anrufbeantworter-Nachrichten löschen / als gelesen markieren (seit
+# v1.0.5b0, EXPERIMENTELL) - siehe tam.py für die zugrunde liegende
+# TR-064-Recherche (AVMs eigene X_AVM-DE_TAM-Spezifikation + community-
+# bestätigte DeleteMessage-Nutzung), voicemail.py/sensor.py für die
+# Home-Assistant-Services, und die Dashboard-Karte für den Papierkorb-Button.
+ATTR_MESSAGE_ID = "message_id"
+ATTR_READ = "read"
+SERVICE_DELETE_VOICEMAIL_MESSAGE = "delete_voicemail_message"
+SERVICE_MARK_VOICEMAIL_MESSAGE_READ = "mark_voicemail_message_read"
+
+# Options-Flow-Schalter: Nachricht nach Wiedergabe ÜBER DIESE INTEGRATION
+# automatisch auf der FRITZ!Box selbst als gelesen markieren (MarkMessage),
+# genau wie beim Abhören an einem FRITZ!Box-eigenen Gerät. Standardmäßig AUS -
+# anders als rein optische Darstellungs-Schalter (show_*) verändert dies
+# tatsächlich gemeinsam genutzten Zustand auf der Box selbst (z. B. auch die
+# Anzahl ungelesener Nachrichten in FRITZ!App Fon), nicht nur diese eine
+# Dashboard-Karte - siehe README.
+CONF_AUTO_MARK_READ = "auto_mark_read"
+DEFAULT_AUTO_MARK_READ = False

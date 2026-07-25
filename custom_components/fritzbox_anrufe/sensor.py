@@ -9,12 +9,17 @@ from threading import Event as ThreadingEvent, Thread
 from time import sleep
 from typing import Any, cast, override
 
+from fritzconnection.core.exceptions import FritzConnectionException, FritzSecurityError
 from fritzconnection.core.fritzmonitor import FritzMonitor
 from fritzconnection.lib.fritzcall import OUT_CALL_TYPE, Call
+from requests.exceptions import ConnectionError as RequestsConnectionError
+import voluptuous as vol
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_call_later
@@ -24,7 +29,9 @@ from . import FritzBoxCallMonitorConfigEntry, FritzBoxRuntimeData
 from .base import Contact, FritzBoxPhonebook
 from .call_log import FritzCallLogCoordinator
 from .const import (
+    ATTR_MESSAGE_ID,
     ATTR_PREFIXES,
+    ATTR_READ,
     CALL_MEDIA_URL_BASE,
     CALL_OUTCOME_NOT_CONNECTED,
     CALL_TYPE_LIVE,
@@ -37,6 +44,8 @@ from .const import (
     MANUFACTURER,
     POST_CALL_REFRESH_DELAY_SECONDS,
     SERIAL_NUMBER,
+    SERVICE_DELETE_VOICEMAIL_MESSAGE,
+    SERVICE_MARK_VOICEMAIL_MESSAGE_READ,
     TAM_MEDIA_URL_BASE,
     FritzState,
 )
@@ -46,6 +55,39 @@ from .voicemail import FritzTamCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL = timedelta(hours=3)
+
+# Anrufbeantworter-Nachrichten löschen/als gelesen markieren (seit v1.0.5b0,
+# EXPERIMENTELL, siehe tam.py) - als Entity-Services registriert (nicht als
+# eigenständige hass-Services), damit Home Assistant den `entity_id`/`target`-
+# Selektor automatisch anbietet (Entwicklerwerkzeuge -> Aktionen) und ihn
+# selbst auf die passende(n) FritzBoxVoicemailSensor-Instanz(en) auflöst -
+# siehe FritzBoxVoicemailSensor.async_delete_voicemail_message/
+# async_mark_voicemail_message_read weiter unten. Nur EINMAL pro
+# Home-Assistant-Instanz registriert, unabhängig davon, wie viele
+# FRITZ!Box-Konten (Config Entries) konfiguriert sind.
+_VOICEMAIL_SERVICES_REGISTERED_KEY = f"{DOMAIN}_voicemail_services_registered"
+
+
+def _async_register_voicemail_services(hass: HomeAssistant) -> None:
+    """Register the delete/mark-read entity services, at most once."""
+    if hass.data.get(_VOICEMAIL_SERVICES_REGISTERED_KEY):
+        return
+    hass.data[_VOICEMAIL_SERVICES_REGISTERED_KEY] = True
+
+    platform = entity_platform.async_get_current_platform()
+    platform.async_register_entity_service(
+        SERVICE_DELETE_VOICEMAIL_MESSAGE,
+        {vol.Required(ATTR_MESSAGE_ID): cv.string},
+        "async_delete_voicemail_message",
+    )
+    platform.async_register_entity_service(
+        SERVICE_MARK_VOICEMAIL_MESSAGE_READ,
+        {
+            vol.Required(ATTR_MESSAGE_ID): cv.string,
+            vol.Optional(ATTR_READ, default=True): cv.boolean,
+        },
+        "async_mark_voicemail_message_read",
+    )
 
 
 class CallState(StrEnum):
@@ -75,6 +117,8 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the fritzbox_anrufe sensors from config_entry."""
+    _async_register_voicemail_services(hass)
+
     runtime_data: FritzBoxRuntimeData = config_entry.runtime_data
     fritzbox_phonebook = runtime_data.phonebook
     call_log_coordinator = runtime_data.call_log_coordinator
@@ -478,6 +522,12 @@ class FritzBoxVoicemailSensor(CoordinatorEntity[FritzTamCoordinator], SensorEnti
             else None
         )
         return {
+            # "id" (seit v1.0.5b0) = message.Index, die von der FRITZ!Box
+            # selbst vergebene TAM-Nachrichten-ID - NICHT die Listenposition.
+            # Von der Dashboard-Karte (Papierkorb-Button) sowie den
+            # delete_voicemail_message/mark_voicemail_message_read-Services
+            # als `message_id` verwendet, siehe tam.py/voicemail.py.
+            "id": message.Index,
             "name": message.Name or (contact.name if contact else None),
             "number": message.Number or None,
             "date": message.date.isoformat() if isinstance(message.date, datetime) else None,
@@ -486,6 +536,60 @@ class FritzBoxVoicemailSensor(CoordinatorEntity[FritzTamCoordinator], SensorEnti
             "vip": contact.vip if contact else False,
             "media_url": media_url,
         }
+
+    async def async_delete_voicemail_message(self, message_id: str) -> None:
+        """Service handler: delete_voicemail_message (siehe services.yaml).
+
+        EXPERIMENTELL, siehe tam.py - löscht die Nachricht UNWIDERRUFLICH von
+        der FRITZ!Box. Löst anschließend einen sofortigen Coordinator-Refresh
+        aus, damit die Karte/der Sensor die Änderung zeitnah zeigt, statt bis
+        zu 5 Minuten auf das nächste reguläre Polling zu warten.
+        """
+        try:
+            await self.coordinator.hass.async_add_executor_job(
+                self.coordinator.delete_message, message_id
+            )
+        except FritzSecurityError as ex:
+            raise HomeAssistantError(
+                "Dem FRITZ!Box-Konto fehlt vermutlich die Berechtigung"
+                f" 'Sprachnachrichten, Faxnachrichten, FRITZ!App Fon und"
+                f" Anrufliste' zum Löschen von Anrufbeantworter-Nachrichten:"
+                f" {ex}"
+            ) from ex
+        except (FritzConnectionException, RequestsConnectionError) as ex:
+            raise HomeAssistantError(
+                f"Löschen der Anrufbeantworter-Nachricht {message_id}"
+                f" fehlgeschlagen: {ex}"
+            ) from ex
+        await self.coordinator.async_request_refresh()
+
+    async def async_mark_voicemail_message_read(
+        self, message_id: str, read: bool = True
+    ) -> None:
+        """Service handler: mark_voicemail_message_read (siehe services.yaml).
+
+        EXPERIMENTELL, siehe tam.py. Gegenstück zum automatischen
+        auto_mark_read-Options-Schalter (siehe voicemail.py:
+        maybe_auto_mark_read) für den manuellen Fall - z. B. um eine
+        Nachricht gezielt (wieder) als "neu" zu markieren.
+        """
+        try:
+            await self.coordinator.hass.async_add_executor_job(
+                self.coordinator.mark_message_read, message_id, read
+            )
+        except FritzSecurityError as ex:
+            raise HomeAssistantError(
+                "Dem FRITZ!Box-Konto fehlt vermutlich die Berechtigung"
+                f" 'Sprachnachrichten, Faxnachrichten, FRITZ!App Fon und"
+                f" Anrufliste' zum Markieren von Anrufbeantworter-Nachrichten:"
+                f" {ex}"
+            ) from ex
+        except (FritzConnectionException, RequestsConnectionError) as ex:
+            raise HomeAssistantError(
+                f"Markieren der Anrufbeantworter-Nachricht {message_id}"
+                f" fehlgeschlagen: {ex}"
+            ) from ex
+        await self.coordinator.async_request_refresh()
 
 
 class FritzBoxCallMonitor:

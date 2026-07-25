@@ -28,8 +28,10 @@ from .const import (
     CALL_LOG_LIMIT_COUNT,
     CALL_LOG_LIMIT_DAYS,
     CALL_TYPES,
+    CONF_AUTO_MARK_READ,
     CONF_PHONEBOOK,
     CONF_PREFIXES,
+    DEFAULT_AUTO_MARK_READ,
     DEFAULT_CALL_LOG_COUNT,
     DEFAULT_CALL_LOG_DAYS,
     DEFAULT_CALL_LOG_LIMIT_TYPE,
@@ -401,6 +403,18 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
             ): str,
         }
         schema.update(_history_schema_dict(options))
+        # Anrufbeantworter: nach Wiedergabe automatisch als gelesen markieren
+        # (seit v1.0.5b0, EXPERIMENTELL, Standard AUS) - siehe tam.py/
+        # voicemail.py:maybe_auto_mark_read. Bewusst auf Integrations-
+        # (Options-Flow-) statt Karten-Ebene, da dies tatsächlichen, von
+        # allen Dashboards/Apps geteilten Zustand auf der FRITZ!Box selbst
+        # ändert, nicht nur diese eine Kartenansicht.
+        schema[
+            vol.Optional(
+                CONF_AUTO_MARK_READ,
+                default=options.get(CONF_AUTO_MARK_READ, DEFAULT_AUTO_MARK_READ),
+            )
+        ] = selector.BooleanSelector()
         return vol.Schema(schema)
 
     async def async_step_init(
@@ -430,6 +444,7 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
             title="",
             data={
                 CONF_PREFIXES: self._get_list_of_prefixes(prefixes),
+                CONF_AUTO_MARK_READ: user_input.get(CONF_AUTO_MARK_READ, DEFAULT_AUTO_MARK_READ),
                 **_parse_history_input(user_input),
             },
         )

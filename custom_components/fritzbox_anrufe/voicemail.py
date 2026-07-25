@@ -18,6 +18,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .const import CONF_AUTO_MARK_READ, DEFAULT_AUTO_MARK_READ
 from .tam import FritzTam, TamMessage
 
 _LOGGER = logging.getLogger(__name__)
@@ -161,6 +162,64 @@ class FritzTamCoordinator(DataUpdateCoordinator[list[TamMessage]]):
             f"Anrufbeantworter-Download fehlgeschlagen (HTTP {last_status})"
             f" nach {tried} Versuch(en) mit unterschiedlichen Sitzungen"
         )
+
+    def delete_message(self, message_id: str) -> None:
+        """BLOCKING - delete one message via TR-064. Run in executor.
+
+        Called from the ``delete_voicemail_message`` service (see
+        sensor.py:FritzBoxVoicemailSensor.async_delete_voicemail_message) -
+        propagates any FRITZ!Box exception unchanged so the caller can turn
+        it into a user-facing ``HomeAssistantError``; does NOT trigger a
+        coordinator refresh itself, that is the service handler's job (so it
+        only happens once the delete actually succeeded).
+        """
+        self._fritz_tam.delete_message(message_id)
+
+    def mark_message_read(self, message_id: str, read: bool = True) -> None:
+        """BLOCKING - mark one message read/unread via TR-064. Run in executor.
+
+        Called from the ``mark_voicemail_message_read`` service, see
+        :meth:`delete_message` above for the same propagate-don't-refresh
+        contract.
+        """
+        self._fritz_tam.mark_message(message_id, read=read)
+
+    def maybe_auto_mark_read(self, message: TamMessage) -> None:
+        """BLOCKING - run in executor, right after a successful ``fetch_audio``.
+
+        If the ``auto_mark_read`` option (Options-Flow, default OFF - see
+        const.py) is enabled, clears the message's "New" flag on the
+        FRITZ!Box itself once it has actually been played back through this
+        integration - matching what happens when a message is played back on
+        a real FRITZ!Box device/app. Deliberately swallows every exception
+        (logged as a WARNING only): a failure here must never turn an
+        otherwise-successful playback into an error response, and this is
+        still EXPERIMENTELL/unconfirmed territory (see tam.py). No-op if the
+        message is already read, or the option is off - avoids an
+        unnecessary TR-064 round-trip and a pointless coordinator refresh on
+        every single playback.
+        """
+        if not self.config_entry.options.get(CONF_AUTO_MARK_READ, DEFAULT_AUTO_MARK_READ):
+            return
+        if not message.new:
+            return
+        try:
+            self._fritz_tam.mark_message(message.Index, read=True)
+        except Exception as ex:  # noqa: BLE001 - must never break playback, see docstring
+            _LOGGER.warning(
+                "Anrufbeantworter: Nachricht %s konnte nach der Wiedergabe nicht"
+                " automatisch als gelesen markiert werden (%s: %s)",
+                message.Index,
+                type(ex).__name__,
+                ex,
+            )
+            return
+        # Cross-thread hand-off (this runs in an executor job, not the event
+        # loop) - same pattern as sensor.py's post-call refresh
+        # (call_soon_threadsafe), but hass.add_job() already does that
+        # thread-safety internally, so no extra callback indirection is
+        # needed here.
+        self.hass.add_job(self.async_request_refresh)
 
     def _sid_candidates(self):
         """Yield sid candidates to try for a recording download, in order.

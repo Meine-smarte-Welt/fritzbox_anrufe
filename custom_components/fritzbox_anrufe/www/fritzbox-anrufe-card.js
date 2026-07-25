@@ -108,6 +108,27 @@
  * size was re-verified once more for consistency with the other 4
  * accordion groups (see the v1.0.4b3 paragraph above for the original fix).
  *
+ * v1.0.5b0 (EXPERIMENTELL, community wish relayed by Thorsten): "Kann eine
+ * Anrufbeantworter-Nachricht gelöscht werden, und kann nach dem Anhören
+ * automatisch der Status 'Neu' verschwinden, wie bei einer FRITZ!Box-eigenen
+ * Hardware?" Both are now possible, grounded in AVM's own TR-064 service
+ * description for X_AVM-DE_TAM (DeleteMessage/MarkMessage - see the module
+ * docstring in tam.py for the full research/sourcing), but NOT yet confirmed
+ * against Thorsten's own hardware. (1) A trash-can button per message (only
+ * shown when `show_delete_button` is on - off by default, since deletion is
+ * IRREVERSIBLE and this action is unconfirmed territory) opens an inline
+ * two-step confirmation ("Wirklich löschen?" + Ja/Abbrechen, rendered right
+ * in the row - deliberately NOT a native browser confirm() dialog, which can
+ * behave inconsistently inside a Companion App WebView) before calling the
+ * new `fritzbox_anrufe.delete_voicemail_message` service
+ * (see FritzboxAnrufeCard._deleteVoicemailMessage()). (2) Automatically
+ * clearing the "New" flag after playback is a separate, integration-level
+ * option (`auto_mark_read`, Options-Flow, off by default) rather than a card
+ * setting - it changes real, shared state on the FRITZ!Box itself (e.g. also
+ * the unread count in FRITZ!App Fon), not just this one dashboard, so it
+ * lives alongside the other config-entry options instead of the card's
+ * show_* / color_* keys - see voicemail.py:maybe_auto_mark_read.
+ *
  * Playback: the FRITZ!Box audio recording is served by this integration's
  * own authenticated proxy endpoint (see http.py), which requires a valid
  * Home Assistant session - a plain <audio src="..."> cannot supply that
@@ -166,6 +187,7 @@
  *   show_processing_ausgehend: false
  *   show_processing_verpasst: false
  *   show_filter_bar: false
+ *   show_delete_button: false
  *   color_tab_active: ""
  *   color_success: ""
  *   color_error: ""
@@ -444,6 +466,12 @@ const CONFIG_DEFAULTS = {
   // solange dieser aus ist, bleibt auch die Reihenfolge/Filterung exakt wie
   // zuvor (siehe FritzboxAnrufeCard._visibleCalls()).
   show_filter_bar: false,
+  // Papierkorb-Button je Anrufbeantworter-Nachricht (seit v1.0.5b0,
+  // EXPERIMENTELL) - standardmäßig aus: Löschen ist UNWIDERRUFLICH und
+  // dieser TR-064-Weg noch nicht an echter Hardware bestätigt (siehe
+  // Moduldoku oben/tam.py), daher bewusstes Opt-in statt eines automatisch
+  // erscheinenden, destruktiven Buttons.
+  show_delete_button: false,
   // Farben (seit v1.0.4) - leer = bisheriger, fester Theme-Farbwert (siehe
   // COLOR_CONFIG_KEYS oben für die jeweiligen Standardwerte).
   color_tab_active: "",
@@ -500,6 +528,13 @@ function renderVoicemailRows(messages, opts) {
     showDate: true,
     showDuration: true,
     maxRows: Infinity,
+    // Papierkorb-Button (seit v1.0.5b0, EXPERIMENTELL) - siehe Moduldoku
+    // oben. showDeleteButton gated durch die Kartenkonfiguration
+    // (show_delete_button); confirmDeleteId ist reiner UI-Laufzeitstatus
+    // (welche Nachricht gerade die "Wirklich löschen?"-Bestätigung zeigt) -
+    // siehe FritzboxAnrufeCard._confirmDeleteMessageId.
+    showDeleteButton: false,
+    confirmDeleteId: null,
     ...(opts || {}),
   };
   const list = (messages || []).slice(0, options.maxRows);
@@ -511,8 +546,9 @@ function renderVoicemailRows(messages, opts) {
   return `
     <div class="voicemail-rows">
       ${list
-        .map(
-          (msg) => `
+        .map((msg) => {
+          const confirming = options.showDeleteButton && msg.id && options.confirmDeleteId === msg.id;
+          return `
         <div class="voicemail-row ${msg.new ? "unread" : ""}">
           <div class="voicemail-main">
             <div class="voicemail-primary">
@@ -525,19 +561,38 @@ function renderVoicemailRows(messages, opts) {
               ${options.showDuration && msg.duration ? `<span>${escapeHtml(msg.duration)}</span>` : ""}
             </div>
           </div>
-          ${
-            msg.media_url
-              ? `<div class="voicemail-player-slot" data-media-url="${escapeHtml(msg.media_url)}">
-                   <button class="voicemail-play-btn" type="button">
-                     <ha-icon icon="mdi:play-circle-outline"></ha-icon>
-                     <span>Abspielen</span>
-                   </button>
-                 </div>`
-              : `<span class="voicemail-no-audio">Kein Wiedergabelink</span>`
-          }
+          <div class="voicemail-actions">
+            ${
+              msg.media_url
+                ? `<div class="voicemail-player-slot" data-media-url="${escapeHtml(msg.media_url)}">
+                     <button class="voicemail-play-btn" type="button">
+                       <ha-icon icon="mdi:play-circle-outline"></ha-icon>
+                       <span>Abspielen</span>
+                     </button>
+                   </div>`
+                : `<span class="voicemail-no-audio">Kein Wiedergabelink</span>`
+            }
+            ${
+              options.showDeleteButton && msg.id
+                ? confirming
+                  ? `<div class="voicemail-delete-confirm" data-message-id="${escapeHtml(msg.id)}">
+                       <span>Wirklich löschen?</span>
+                       <button class="voicemail-delete-confirm-yes" type="button" title="Löschen bestätigen">
+                         <ha-icon icon="mdi:check"></ha-icon>
+                       </button>
+                       <button class="voicemail-delete-confirm-no" type="button" title="Abbrechen">
+                         <ha-icon icon="mdi:close"></ha-icon>
+                       </button>
+                     </div>`
+                  : `<button class="voicemail-delete-btn" type="button" data-message-id="${escapeHtml(msg.id)}" title="Nachricht löschen">
+                       <ha-icon icon="mdi:trash-can-outline"></ha-icon>
+                     </button>`
+                : ""
+            }
+          </div>
         </div>
-      `
-        )
+      `;
+        })
         .join("")}
     </div>
   `;
@@ -626,6 +681,47 @@ const VOICEMAIL_ROWS_STYLES = `
     color: var(--secondary-text-color, #727272);
     font-style: italic;
   }
+  /* Papierkorb-Button + Inline-Bestätigung (seit v1.0.5b0, EXPERIMENTELL,
+     nur bei show_delete_button) - bewusst KEIN natives confirm(), siehe
+     Moduldoku oben. */
+  .voicemail-actions { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+  .voicemail-delete-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    color: var(--fba-color-error);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+  }
+  .voicemail-delete-btn:hover { background: var(--secondary-background-color, rgba(0, 0, 0, 0.08)); }
+  .voicemail-delete-btn ha-icon { --mdc-icon-size: 18px; }
+  .voicemail-delete-confirm {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8em;
+    color: var(--secondary-text-color, #727272);
+  }
+  .voicemail-delete-confirm-yes,
+  .voicemail-delete-confirm-no {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 6px;
+    padding: 3px;
+    cursor: pointer;
+  }
+  .voicemail-delete-confirm-yes { background: var(--fba-color-error); color: var(--text-primary-color, #fff); }
+  .voicemail-delete-confirm-no {
+    background: var(--secondary-background-color, rgba(0, 0, 0, 0.1));
+    color: var(--primary-text-color, #212121);
+  }
+  .voicemail-delete-confirm-yes ha-icon,
+  .voicemail-delete-confirm-no ha-icon { --mdc-icon-size: 16px; }
 `;
 
 // --- "Weiterverarbeitung"-Zeile (seit v1.0.3) --------------------------
@@ -740,6 +836,13 @@ class FritzboxAnrufeCard extends HTMLElement {
     // verloren (siehe setConfig()).
     this._filterOwnNumber = "";
     this._sortBy = DEFAULT_SORT;
+    // Papierkorb-Bestätigung (seit v1.0.5b0, EXPERIMENTELL) - reiner
+    // UI-Laufzeitstatus, genau wie _activeFilter/_filterOwnNumber/_sortBy:
+    // welche Nachrichten-ID gerade die "Wirklich löschen?"-Bestätigung
+    // zeigt, und welche IDs optimistisch (vor der Coordinator-Bestätigung)
+    // bereits ausgeblendet sind - siehe _deleteVoicemailMessage().
+    this._confirmDeleteMessageId = null;
+    this._pendingDeletedMessageIds = new Set();
     this._hass = null;
     this._config = null;
     this._objectUrls = [];
@@ -759,6 +862,8 @@ class FritzboxAnrufeCard extends HTMLElement {
     this._activeFilter = this._defaultFilter();
     this._filterOwnNumber = "";
     this._sortBy = DEFAULT_SORT;
+    this._confirmDeleteMessageId = null;
+    this._pendingDeletedMessageIds = new Set();
     this._lastSignature = null;
     this._render();
   }
@@ -1096,7 +1201,44 @@ class FritzboxAnrufeCard extends HTMLElement {
     if (this._config.show_filter_bar) {
       messages = this._sortEntries(messages);
     }
-    return renderVoicemailRows(messages, { maxRows });
+    // Optimistisch ausgeblendete, gerade erst gelöschte Nachrichten (seit
+    // v1.0.5b0) - siehe _deleteVoicemailMessage(). Verschwinden endgültig,
+    // sobald der Coordinator-Refresh sie tatsächlich aus den Sensordaten
+    // entfernt hat; bei einem fehlgeschlagenen Löschversuch werden sie
+    // wieder eingeblendet.
+    if (this._pendingDeletedMessageIds && this._pendingDeletedMessageIds.size) {
+      messages = messages.filter((msg) => !this._pendingDeletedMessageIds.has(msg.id));
+    }
+    return renderVoicemailRows(messages, {
+      maxRows,
+      showDeleteButton: !!this._config.show_delete_button,
+      confirmDeleteId: this._confirmDeleteMessageId,
+    });
+  }
+
+  // Papierkorb-Button (seit v1.0.5b0, EXPERIMENTELL) - siehe Moduldoku oben.
+  // Blendet die Zeile optimistisch sofort aus, ruft den neuen
+  // delete_voicemail_message-Service auf und blendet die Zeile bei einem
+  // Fehler (z. B. fehlende FRITZ!Box-Berechtigung) wieder ein, statt sie
+  // stillschweigend verschwinden zu lassen.
+  _deleteVoicemailMessage(messageId) {
+    if (!this._hass || !this._config.entity_voicemail || !messageId) return;
+    this._pendingDeletedMessageIds.add(messageId);
+    this._render();
+    this._hass
+      .callService("fritzbox_anrufe", "delete_voicemail_message", {
+        entity_id: this._config.entity_voicemail,
+        message_id: messageId,
+      })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error(
+          "fritzbox_anrufe: Löschen der Anrufbeantworter-Nachricht fehlgeschlagen",
+          err
+        );
+        this._pendingDeletedMessageIds.delete(messageId);
+        this._render();
+      });
   }
 
   // Filter-/Sortierleiste (seit v1.0.4b3) - siehe Moduldoku oben. Eigene
@@ -1204,6 +1346,35 @@ class FritzboxAnrufeCard extends HTMLElement {
       btn.addEventListener("click", () =>
         playVoicemail(this._hass, btn, (url) => this._objectUrls.push(url))
       );
+    });
+
+    // Papierkorb-Button + Inline-Bestätigung (seit v1.0.5b0, EXPERIMENTELL) -
+    // siehe Moduldoku oben. Zwei getrennte Klicks statt eines nativen
+    // confirm(): erster Klick zeigt "Wirklich löschen?" nur für DIESE
+    // Nachricht (ein erneuter Re-Render tauscht die anderen Zeilen nicht an).
+    this.shadowRoot.querySelectorAll(".voicemail-delete-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._confirmDeleteMessageId = btn.dataset.messageId;
+        this._render();
+      });
+    });
+    this.shadowRoot.querySelectorAll(".voicemail-delete-confirm-no").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._confirmDeleteMessageId = null;
+        this._render();
+      });
+    });
+    this.shadowRoot.querySelectorAll(".voicemail-delete-confirm-yes").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const wrap = btn.closest(".voicemail-delete-confirm");
+        const messageId = wrap && wrap.dataset.messageId;
+        this._confirmDeleteMessageId = null;
+        if (messageId) {
+          this._deleteVoicemailMessage(messageId);
+        } else {
+          this._render();
+        }
+      });
     });
 
     this.shadowRoot.querySelectorAll(".row-processing.clickable").forEach((row) => {
@@ -1432,6 +1603,7 @@ const EDITOR_LABELS = {
   show_processing_ausgehend: "Weiterverarbeitung bei 'Ausgehend' anzeigen",
   show_processing_verpasst: "Weiterverarbeitung bei 'Verpasst' anzeigen",
   show_filter_bar: "Filter-/Sortierleiste auf der Karte anzeigen",
+  show_delete_button: "Papierkorb-Button je Anrufbeantworter-Nachricht anzeigen (experimentell)",
   // Farben (seit v1.0.4, seit v1.0.4b1 nicht mehr über <ha-form> gerendert)
   // sind hier absichtlich NICHT mehr gelistet - siehe COLOR_EDITOR_FIELDS
   // und FritzboxAnrufeCardEditor._buildColorSection() weiter unten.
@@ -1443,6 +1615,8 @@ const EDITOR_LABELS = {
 const EDITOR_HELPERS = {
   show_filter_bar:
     "Zeigt auf der Karte eine Leiste zum Filtern nach eigener Rufnummer (nur Anrufliste, nicht Anrufbeantworter) und zum Sortieren (Datum/Dauer/Name).",
+  show_delete_button:
+    "Zeigt einen Papierkorb-Button je Nachricht im Anrufbeantworter-Tab. Löschen ist UNWIDERRUFLICH (kein Papierkorb auf der FRITZ!Box) und noch nicht an echter Hardware bestätigt - bitte zunächst mit unwichtigen Nachrichten testen.",
 };
 
 function computeEditorLabel(schemaItem) {
@@ -1515,6 +1689,7 @@ const EDITOR_SCHEMA = [
       { name: "show_date", selector: { boolean: {} } },
       { name: "show_vip", selector: { boolean: {} } },
       { name: "show_filter_bar", selector: { boolean: {} } },
+      { name: "show_delete_button", selector: { boolean: {} } },
     ],
   },
   {

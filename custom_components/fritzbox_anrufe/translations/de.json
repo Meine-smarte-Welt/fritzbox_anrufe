@@ -136,12 +136,40 @@
           "call_log_days_ausgehend": "Ausgehende Anrufe: Anzahl Tage (falls 'Anzahl Tage' gewählt)",
           "call_log_limit_type_verpasst": "Verpasste Anrufe: Modus",
           "call_log_count_verpasst": "Verpasste Anrufe: Anzahl (falls 'Anzahl Anrufe' gewählt)",
-          "call_log_days_verpasst": "Verpasste Anrufe: Anzahl Tage (falls 'Anzahl Tage' gewählt)"
+          "call_log_days_verpasst": "Verpasste Anrufe: Anzahl Tage (falls 'Anzahl Tage' gewählt)",
+          "auto_mark_read": "Nach Wiedergabe automatisch als gelesen markieren"
         },
         "data_description": {
           "call_log_limit_type_eingehend": "Bestimmt, ob der Sensor fritzbox_anrufe_eingehend (Angenommene Anrufe) nach Anzahl oder nach Zeitraum begrenzt wird.",
           "call_log_limit_type_ausgehend": "Bestimmt, ob der Sensor fritzbox_anrufe_ausgehend nach Anzahl oder nach Zeitraum begrenzt wird.",
-          "call_log_limit_type_verpasst": "Bestimmt, ob der Sensor fritzbox_anrufe_verpasst nach Anzahl oder nach Zeitraum begrenzt wird."
+          "call_log_limit_type_verpasst": "Bestimmt, ob der Sensor fritzbox_anrufe_verpasst nach Anzahl oder nach Zeitraum begrenzt wird.",
+          "auto_mark_read": "Wenn aktiviert, wird beim Abspielen einer Anrufbeantworter-Nachricht über diese Integration (Dashboard-Karte oder Service) die 'Neu'-Markierung auch direkt auf der FRITZ!Box entfernt - wie bei echter FRITZ!Box-Hardware/-Apps. Standardmäßig aus, da dies einen von allen Geräten/Apps geteilten Zustand auf der Box ändert (z. B. auch die Anzahl ungelesener Nachrichten in FRITZ!App Fon), nicht nur dieses Dashboard. Experimentell, siehe README."
+        }
+      }
+    }
+  },
+  "services": {
+    "delete_voicemail_message": {
+      "name": "Anrufbeantworter-Nachricht löschen",
+      "description": "Löscht eine einzelne Anrufbeantworter-Nachricht UNWIDERRUFLICH von der FRITZ!Box (kein Papierkorb). Experimentell, siehe README.",
+      "fields": {
+        "message_id": {
+          "name": "Nachrichten-ID",
+          "description": "Die 'id' der Nachricht (siehe messages-Attribut des Anrufbeantworter-Sensors, oder der Papierkorb-Button auf der Dashboard-Karte)."
+        }
+      }
+    },
+    "mark_voicemail_message_read": {
+      "name": "Anrufbeantworter-Nachricht als gelesen/neu markieren",
+      "description": "Setzt oder entfernt die 'Neu'-Markierung einer Anrufbeantworter-Nachricht direkt auf der FRITZ!Box. Experimentell, siehe README.",
+      "fields": {
+        "message_id": {
+          "name": "Nachrichten-ID",
+          "description": "Die 'id' der Nachricht (siehe messages-Attribut)."
+        },
+        "read": {
+          "name": "Gelesen",
+          "description": "true = als gelesen markieren (Standard), false = wieder als neu markieren."
         }
       }
     }
