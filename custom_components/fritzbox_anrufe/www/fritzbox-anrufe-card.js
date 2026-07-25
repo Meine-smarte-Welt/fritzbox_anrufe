@@ -159,6 +159,27 @@
  * "Neu" badge still disappears promptly instead of only on the next
  * unrelated card update.
  *
+ * v1.0.5b2 follow-up: Thorsten confirmed the "nichts erscheint mehr nach
+ * Abspielen" symptom persisted in v1.0.5b1 even with `auto_mark_read`
+ * switched OFF - ruling out the render-skip race above as the (sole)
+ * cause. Actual root cause, found by inspecting the rendered <audio>
+ * element's own box size: `.voicemail-player-slot` became a child of a new
+ * flex container (`.voicemail-actions`) in v1.0.5b0, added to hold the new
+ * delete button alongside the player. A flex item with no explicit width
+ * gets an "auto" content-based width - and a percentage-sized replaced
+ * element (the <audio width:100%> inserted once playback starts, see
+ * `.voicemail-player` below) does not contribute to that content size at
+ * all. Both the slot and the <audio> element therefore resolved to
+ * `width: 0` - present in the DOM and genuinely playing (autoplay), but
+ * with zero visible size, indistinguishable from "nothing appears" even
+ * though nothing had actually been destroyed this time. Deterministic, not
+ * a race - matches Thorsten's report with `auto_mark_read` off, and
+ * explains why the Weiterverarbeitung row (`.row-processing-player`, which
+ * has no `width: 100%` rule) was never affected. Fix: `flex: 1 1 auto;
+ * min-width: 0;` on `.voicemail-player-slot` gives it a real, available-
+ * space-derived width for the percentage-sized <audio> element to resolve
+ * against.
+ *
  * Playback: the FRITZ!Box audio recording is served by this integration's
  * own authenticated proxy endpoint (see http.py), which requires a valid
  * Home Assistant session - a plain <audio src="..."> cannot supply that
@@ -689,7 +710,23 @@ const VOICEMAIL_ROWS_STYLES = `
     font-size: 0.8em;
     color: var(--secondary-text-color, #727272);
   }
-  .voicemail-player-slot { margin-top: 2px; }
+  /* Bugfix (v1.0.5b2): .voicemail-player-slot ist seit v1.0.5b0 ein Kind
+     eines Flex-Containers (.voicemail-actions, wegen des neuen Papierkorb-
+     Buttons daneben). Ohne eigene Breitenangabe bekommt ein Flex-Item per
+     Spezifikation eine "auto"-Breite auf Basis seines Inhalts - und ein
+     prozentual breites Ersatzelement (audio mit width:100%, siehe
+     .voicemail-player unten) trägt zu dieser Inhaltsgröße NICHT bei
+     (Prozentwerte zählen für die intrinsische Größe als 0). Ergebnis: das
+     Flex-Item UND das darin liegende audio-Element werden mit Breite 0
+     berechnet - unsichtbar, obwohl technisch vorhanden und (dank autoplay)
+     hörbar spielend. flex: 1 1 auto gibt dem Slot eine echte, aus dem
+     verfügbaren Platz berechnete Breite; min-width: 0 verhindert, dass der
+     Flexbox-Standardwert min-width: auto das Schrumpfen blockiert. Betrifft
+     NUR den Anrufbeantworter-Tab (.voicemail-player), nicht die
+     Weiterverarbeitungs-Zeile (.row-processing-player), deren CSS bewusst
+     keine width:100%-Regel hat - genau das erklärt, warum dort die
+     Bedienleiste immer sichtbar blieb. */
+  .voicemail-player-slot { margin-top: 2px; flex: 1 1 auto; min-width: 0; }
   .voicemail-player { width: 100%; height: 32px; }
   .voicemail-play-btn {
     display: inline-flex;

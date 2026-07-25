@@ -825,6 +825,20 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
+- **1.0.5b2** (Vorabversion, Bugfix): Behebt den eigentlichen, tieferen Grund
+  hinter dem in 1.0.5b1 (unvollständig) behobenen "Statusleiste verschwindet
+  nach dem Abspielen"-Problem - bestätigt durch Thorsten auch mit
+  deaktiviertem `auto_mark_read`, was die dort behobene Race-Condition als
+  (alleinige) Ursache ausschloss. Tatsächliche Ursache: seit 1.0.5b0 steckt
+  die Abspielleiste in einem neuen Flex-Container (zusammen mit dem
+  Papierkorb-Button), wodurch das `<audio>`-Element (dessen Breite
+  prozentual auf 100 % gesetzt ist) auf eine berechnete Breite von 0 Pixeln
+  kam - technisch vorhanden und hörbar abspielend, aber unsichtbar. Betraf
+  ausschließlich den Anrufbeantworter-Tab; die Weiterverarbeitungs-Zeile war
+  aus rein CSS-technischen Gründen nie betroffen. Behoben durch eine
+  gezielte CSS-Korrektur (`flex: 1 1 auto; min-width: 0;`); die in 1.0.5b1
+  behobene Race-Condition bleibt als zusätzliche, unabhängige Absicherung
+  bestehen.
 - **1.0.5b1** (Vorabversion, Bugfix): Behebt eine von Thorsten gemeldete
   Regression aus 1.0.5b0: War die neue Einstellung `auto_mark_read`
   aktiviert, verschwand nach dem Antippen einer Anrufbeantworter-Nachricht
