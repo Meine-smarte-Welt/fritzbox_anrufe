@@ -825,6 +825,20 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
+- **1.0.5b1** (Vorabversion, Bugfix): Behebt eine von Thorsten gemeldete
+  Regression aus 1.0.5b0: War die neue Einstellung `auto_mark_read`
+  aktiviert, verschwand nach dem Antippen einer Anrufbeantworter-Nachricht
+  im Anrufbeantworter-Tab die Abspielleiste (`<audio>`-Player) - die
+  Nachricht wurde zwar trotzdem hörbar abgespielt, aber ohne sichtbare
+  Bedienelemente. Ursache: `auto_mark_read` löst nach der Wiedergabe
+  bewusst eine Sensor-Aktualisierung aus, um den "Neu"-Status zu löschen -
+  genau diese Aktualisierung ließ die Karte (unbeabsichtigt) die gerade
+  erst gestartete Wiedergabe mit neu aufbauen und dabei verschwinden bzw.
+  im nicht mehr sichtbaren Teil des DOM landen. Die Karte erkennt eine
+  laufende oder gerade erst gestartete Wiedergabe jetzt und verschiebt eine
+  fällige Aktualisierung, bis die Wiedergabe zu Ende ist - der "Neu"-Status
+  verschwindet dann unmittelbar danach. Betrifft nur, wer `auto_mark_read`
+  aktiviert hat; ohne diese Option war 1.0.5b0 nicht betroffen.
 - **1.0.5b0** (Vorabversion): Wunsch aus der Community umgesetzt:
   Anrufbeantworter-Nachrichten lassen sich jetzt löschen, und der
   "Neu"-Status kann nach dem Abspielen automatisch verschwinden - genau wie
