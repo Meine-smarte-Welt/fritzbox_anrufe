@@ -1,3 +1,4 @@
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): c6f9db1242d95e8197aabfefd7506b54302c3c6bbd2a01cb190da9771786ccb8
 """Coordinator + audio access for the FRITZ!Box answering machine (TAM).
 
 EXPERIMENTAL - see the module docstring in :mod:`.tam` for details on what

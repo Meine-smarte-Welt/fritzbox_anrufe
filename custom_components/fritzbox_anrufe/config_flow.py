@@ -1,3 +1,4 @@
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 1c99bf1c0bd7c45999d30d8e36d3e280bce3f93207293e417db9a9fb0bb5e4f4
 """Config flow for fritzbox_anrufe."""
 
 from __future__ import annotations

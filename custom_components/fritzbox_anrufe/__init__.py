@@ -1,3 +1,4 @@
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 99755697a3d5e8109801e9a87d37a3d4a29ff63f73036c4451749beb4886f7b7
 """The fritzbox_anrufe integration."""
 
 from dataclasses import dataclass

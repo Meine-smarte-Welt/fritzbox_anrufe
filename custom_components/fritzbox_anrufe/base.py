@@ -1,3 +1,4 @@
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): a1a7b2c272431b63c5ce68264b3e0e34e0a9f7935fb9c6a73e1ce8dbbb633752
 """Base class for fritzbox_anrufe entities."""
 
 from contextlib import suppress

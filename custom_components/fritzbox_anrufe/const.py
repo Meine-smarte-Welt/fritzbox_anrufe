@@ -1,3 +1,4 @@
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 85bb4d0d44d565ee28d7d247d58b0fff2242eee7435fd2e9dc62f12bb5998077
 """Constants for the AVM Fritz!Box call monitor integration."""
 
 from enum import StrEnum

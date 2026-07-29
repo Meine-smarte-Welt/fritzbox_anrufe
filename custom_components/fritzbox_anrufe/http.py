@@ -1,3 +1,4 @@
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 707f0b7ada7a1b27b19b2ab4b6429dc76faf3b3f67541db2451c4e286f26322c
 """Authenticated proxy view for FRITZ!Box answering-machine (TAM) audio.
 
 EXPERIMENTAL - see :mod:`.tam`. The FRITZ!Box audio recording itself

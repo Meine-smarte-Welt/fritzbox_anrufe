@@ -1,3 +1,4 @@
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 4920ee78d0450b7efe4ffcdbbcbc8dec43ab91c17dd15ac1c11964dbab343e92
 """Sensor to monitor incoming/outgoing phone calls on a Fritz!Box router."""
 
 from collections.abc import Mapping

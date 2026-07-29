@@ -1,3 +1,4 @@
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 51c5a8600a5963575a5c88f6dd3142300b59c69b082b18108c8ff1015721256a
 """Wrapper around the FRITZ!Box answering machine (TAM) TR-064 API.
 
 EXPERIMENTAL - message list confirmed working on real hardware; audio

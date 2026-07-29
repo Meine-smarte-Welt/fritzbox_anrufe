@@ -1,3 +1,4 @@
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 6aa893cfade2130766a65beaa8b97c5a62e73c850e49b676cf1ba9fd7fb8da0d
 """Coordinator to poll the FRITZ!Box call list (incoming/outgoing/missed).
 
 Unlike the call monitor (TCP port 1012), which only streams live call
