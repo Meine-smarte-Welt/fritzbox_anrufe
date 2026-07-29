@@ -18,6 +18,7 @@ mitgelieferte Dashboard-Karte.
 - [Icon](#icon)
 - [Bekannte Einschränkungen](#bekannte-einschränkungen)
 - [Versionshistorie](#versionshistorie)
+- [Datei-Integrität (Hash-Kommentare)](#datei-integrität-hash-kommentare)
 - [Fehlerbehebung](#fehlerbehebung)
 
 ## Funktionsumfang
@@ -34,9 +35,9 @@ mitgelieferte Dashboard-Karte.
   Icon-Filterleiste, Live-Banner und responsivem Layout - keine manuelle
   Lovelace-Ressource nötig.
 - Optionale Filter-/Sortierleiste direkt auf der Karte (seit Version
-  1.0.4b3, `show_filter_bar`): nach eigener Rufnummer filtern und nach
+  1.0.4, `show_filter_bar`): nach eigener Rufnummer filtern und nach
   Datum/Dauer/Name sortieren, ohne den Editor zu öffnen - siehe
-  [Filter-/Sortierleiste](#filter-sortierleiste-seit-version-104b3-optional).
+  [Filter-/Sortierleiste](#filter-sortierleiste-seit-version-104-optional).
 - Grafischer Karten-Editor (Home-Assistant-Standardformular): Sensoren,
   Zeilenanzahl, einzeln zuschaltbare Kategorien (Alle/Gesamt, Angenommen,
   Ausgehend, Verpasst, Anrufbeantworter) und einzeln zuschaltbare Spalten
@@ -272,12 +273,12 @@ lassen sich jederzeit ändern:
     (nur wirksam im Modus "Anzahl Anrufe").
   - *Tage*: Zahl zwischen 1 und 90 (nur wirksam im Modus "Anzahl Tage").
 - **Nach Wiedergabe automatisch als gelesen markieren** (seit Version
-  1.0.5b4, `auto_mark_read`, standardmäßig aus, EXPERIMENTELL): sobald eine
+  1.0.5, `auto_mark_read`, standardmäßig aus, EXPERIMENTELL): sobald eine
   Anrufbeantworter-Nachricht über diese Integration abgespielt wurde,
   entfernt die FRITZ!Box selbst das "Neu"-Kennzeichen - genau wie beim
   Abhören direkt an einem FRITZ!Box-Gerät oder in FRITZ!App Fon (TR-064-
   Aktion `MarkMessage`, siehe
-  [Automatisch als gelesen markieren](#automatisch-als-gelesen-markieren-seit-version-105b4-optional-experimentell)).
+  [Automatisch als gelesen markieren](#automatisch-als-gelesen-markieren-seit-version-105-optional-experimentell)).
   Bewusst auf dieser Integrations-Ebene statt als Karten-Option angesiedelt,
   da dabei tatsächlicher, von allen Apps/Dashboards gemeinsam genutzter
   Zustand auf der FRITZ!Box geändert wird (u. a. auch die Anzahl ungelesener
@@ -358,11 +359,11 @@ show_processing_alle: false
 show_processing_eingehend: false
 show_processing_ausgehend: false
 show_processing_verpasst: false
-# Filter-/Sortierleiste (seit Version 1.0.4b3, optional) - standardmäßig
+# Filter-/Sortierleiste (seit Version 1.0.4, optional) - standardmäßig
 # aus, damit bestehende Dashboards nach einem Update optisch unverändert
 # bleiben.
 show_filter_bar: false
-# Papierkorb-Button für Anrufbeantworter-Nachrichten (seit Version 1.0.5b3,
+# Papierkorb-Button für Anrufbeantworter-Nachrichten (seit Version 1.0.5,
 # optional, EXPERIMENTELL) - standardmäßig aus: Löschen ist unwiderruflich.
 show_delete_button: false
 # Farben (seit Version 1.0.4, optional) - CSS-Farbwert (Hex, rgb()/rgba(),
@@ -400,7 +401,7 @@ Zeitpunkt dieser Änderung noch nicht an echter Hardware bestätigt) - erscheint
 einer dieser vier Abschnitte stattdessen als eine lange, ungruppierte Liste
 oder mit einem seltsam benannten Zusatzfeld, bitte als GitHub-Issue mit der
 Home-Assistant-Version melden. Der fünfte Abschnitt, "Farben", ist davon
-**nicht** betroffen: er wird seit Version 1.0.4b1 nicht mehr über dieses
+**nicht** betroffen: er wird seit Version 1.0.4 nicht mehr über dieses
 Home-Assistant-Formularfeature gerendert, sondern mit einfachem,
 browser-eigenem HTML (siehe [Farben](#farben-seit-version-104-optional)
 unten) - unabhängig von der Home-Assistant-Frontend-Version.
@@ -418,7 +419,7 @@ auch aus der "Alle"/"Gesamt"-Sammelansicht herausgerechnet.
 `show_own_number`, `show_device`, `show_duration`, `show_date`, `show_vip`)
 blenden einzelne Spalten der Anrufliste ein oder aus.
 
-### Filter-/Sortierleiste (seit Version 1.0.4b3, optional)
+### Filter-/Sortierleiste (seit Version 1.0.4, optional)
 
 Über `show_filter_bar` (Standard: `false`, damit bestehende Dashboards nach
 einem Update optisch unverändert bleiben) lässt sich eine kleine Leiste
@@ -456,11 +457,11 @@ was die bisherige, feste Theme-Farbe unverändert lässt:
 | `color_vip` | VIP-Stern | `--warning-color` |
 | `color_row_icon` | Anruf-Symbol in jeder Zeile - EINE Farbe für ALLE Zeilen, überschreibt bei Bedarf die Kategorie-Icon-Farben unten | `--secondary-text-color` |
 | `color_live_banner` | Hintergrund des Live-Banners | `--state-icon-active-color` |
-| `color_icon_alle` (seit 1.0.4b1) | Symbol des Tabs "Alle" | folgt der Tab-Farbe (aktiv/inaktiv) |
-| `color_icon_eingehend` (seit 1.0.4b1) | Symbol des Tabs "Angenommen" | folgt der Tab-Farbe (aktiv/inaktiv) |
-| `color_icon_ausgehend` (seit 1.0.4b1) | Symbol des Tabs "Ausgehend" | folgt der Tab-Farbe (aktiv/inaktiv) |
-| `color_icon_verpasst` (seit 1.0.4b1) | Symbol des Tabs "Verpasst" | folgt der Tab-Farbe (aktiv/inaktiv) |
-| `color_icon_anrufbeantworter` (seit 1.0.4b1) | Symbol des Tabs "Anrufbeantworter" | folgt der Tab-Farbe (aktiv/inaktiv) |
+| `color_icon_alle` (seit 1.0.4) | Symbol des Tabs "Alle" | folgt der Tab-Farbe (aktiv/inaktiv) |
+| `color_icon_eingehend` (seit 1.0.4) | Symbol des Tabs "Angenommen" | folgt der Tab-Farbe (aktiv/inaktiv) |
+| `color_icon_ausgehend` (seit 1.0.4) | Symbol des Tabs "Ausgehend" | folgt der Tab-Farbe (aktiv/inaktiv) |
+| `color_icon_verpasst` (seit 1.0.4) | Symbol des Tabs "Verpasst" | folgt der Tab-Farbe (aktiv/inaktiv) |
+| `color_icon_anrufbeantworter` (seit 1.0.4) | Symbol des Tabs "Anrufbeantworter" | folgt der Tab-Farbe (aktiv/inaktiv) |
 
 Jeder Wert akzeptiert einen beliebigen CSS-Farbwert - Hex (`#4caf50`),
 `rgb()`/`rgba()`, `hsl()`/`hsla()`, einen benannten CSS-Farbnamen, oder eine
@@ -484,7 +485,7 @@ ihrer eigenen Kategorie. **Einzige Ausnahme:** Ist `color_row_icon` gesetzt
 einheitliche Einstellung - Kategorie-Icon-Farben wirken dann ausschließlich
 noch auf die Tab-Symbole selbst, nicht mehr auf die Zeilen darunter.
 
-**Grafische Farbauswahl (seit Version 1.0.4b1):** Im grafischen Editor
+**Grafische Farbauswahl (seit Version 1.0.4):** Im grafischen Editor
 ("Karte bearbeiten" → Abschnitt "Farben") steht neben jedem Textfeld
 zusätzlich ein Farbfeld (`<input type="color">`) - ein Klick darauf öffnet
 die native Farbauswahl des Betriebssystems/Browsers. Eine dort gewählte
@@ -504,7 +505,7 @@ CSS-Werte, eine grafische Auswahl und die aktuell wirksame Farbe anzeigen
 kann, als auch damit diese Sektion unabhängig von der
 Home-Assistant-Frontend-Version zuverlässig funktioniert.
 
-**Zurücksetzen (seit Version 1.0.4b2):** Der Button "Alle Farben
+**Zurücksetzen (seit Version 1.0.4):** Der Button "Alle Farben
 zurücksetzen" oben im Abschnitt leert alle zwölf Farbfelder auf einen Schlag
 (zurück zur jeweiligen Standardfarbe) - praktischer als jedes Feld einzeln zu
 leeren.
@@ -565,7 +566,7 @@ im Home-Assistant-Log erscheint eine Meldung wie *"Login attempt or request
 with invalid authentication ... /api/fritzbox_anrufe/tam_media/..."* vom
 `http.ban`-Modul - das war das Verhalten vor diesem Fix.
 
-### Anrufbeantworter-Nachrichten löschen (seit Version 1.0.5b3, optional, EXPERIMENTELL)
+### Anrufbeantworter-Nachrichten löschen (seit Version 1.0.5, optional, EXPERIMENTELL)
 
 Ein neuer, standardmäßig ausgeblendeter Papierkorb-Button (`show_delete_button`)
 löscht eine Anrufbeantworter-Nachricht unwiderruflich von der FRITZ!Box (TR-064-
@@ -587,7 +588,7 @@ im `messages`-Attribut des Anrufbeantworter-Sensors.
 Projekt noch nicht an eigener Hardware bestätigt - bitte zunächst mit
 unwichtigen Nachrichten testen.
 
-### Automatisch als gelesen markieren (seit Version 1.0.5b4, optional, EXPERIMENTELL)
+### Automatisch als gelesen markieren (seit Version 1.0.5, optional, EXPERIMENTELL)
 
 Über die Einstellungen der Integration (siehe
 [Einstellungen (Optionen)](#einstellungen-optionen)) lässt sich `auto_mark_read`
@@ -754,7 +755,7 @@ die dortigen Maintainer den Fehler beheben.
   gruppierte Liste) - bitte mit Home-Assistant-Version und Browser als
   GitHub-Issue melden, falls sich das anders verhält. Der fünfte
   Editor-Abschnitt, "Farben", ist von dieser Einschränkung seit Version
-  1.0.4b1 **nicht** mehr betroffen: er verwendet statt `ha-form` einfaches,
+  1.0.4 **nicht** mehr betroffen: er verwendet statt `ha-form` einfaches,
   browser-eigenes HTML (`<details>`, `<input type="color">`), das seit
   Langem in praktisch jedem Browser gleich funktioniert. Dessen
   Icon-Größe/Schriftgröße wurde in Version 1.0.4 noch einmal geprüft und an
@@ -767,7 +768,7 @@ die dortigen Maintainer den Fehler beheben.
   Screenshot melden, falls die fünf Abschnittsüberschriften optisch
   weiterhin unterschiedlich groß wirken.
 - **Filter-/Sortierleiste - keine "Eigene Rufnummer" bei Anrufbeantworter-
-  Nachrichten** (seit Version 1.0.4b3): Die FRITZ!Box-TAM-Nachrichtenliste
+  Nachrichten** (seit Version 1.0.4): Die FRITZ!Box-TAM-Nachrichtenliste
   (TR-064-Aktion `GetMessageList`, `fritzconnection`-Modell `TamMessage`)
   liefert für jede Nachricht nur Anrufer, Datum, Dauer und Name - **keine**
   eigene Rufnummer/MSN, im Gegensatz zur normalen Anrufliste
@@ -778,7 +779,7 @@ die dortigen Maintainer den Fehler beheben.
   (Datum/Dauer/Name) ist davon nicht betroffen und funktioniert auf jedem
   Tab, einschließlich Anrufbeantworter.
 - **Anrufbeantworter-Nachrichten löschen - unwiderruflich, EXPERIMENTELL**
-  (seit Version 1.0.5b3): Die TR-064-Aktion `DeleteMessage` löscht sofort und
+  (seit Version 1.0.5): Die TR-064-Aktion `DeleteMessage` löscht sofort und
   endgültig - die FRITZ!Box selbst hat dafür keinen Papierkorb. Der Button
   ist deshalb standardmäßig ausgeblendet (`show_delete_button: false`) und
   zeigt vor dem eigentlichen Löschen eine Bestätigung. Wie jede neue
@@ -787,51 +788,32 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
-- **1.0.5b4** (Vorabversion, EXPERIMENTELL): löst das in Version 1.0.5b3
-  bewusst zurückgestellte Versprechen ein - eine neue Options-Flow-
-  Einstellung `auto_mark_read` (standardmäßig aus) markiert eine
+- **1.0.5**: Anrufbeantworter-Nachrichten lassen sich jetzt direkt über die
+  Dashboard-Karte löschen (neuer Papierkorb-Button, `show_delete_button`,
+  standardmäßig aus - siehe
+  [Anrufbeantworter-Nachrichten löschen](#anrufbeantworter-nachrichten-löschen-seit-version-105-optional-experimentell)),
+  unwiderruflich über die TR-064-Aktion `DeleteMessage`, mit Bestätigung vor
+  dem eigentlichen Löschen und einem neuen
+  `fritzbox_anrufe.delete_voicemail_message`-Entity-Service für eigene
+  Automatisierungen. Zusätzlich eine neue Options-Flow-Einstellung
+  `auto_mark_read` (standardmäßig aus): markiert eine
   Anrufbeantworter-Nachricht nach erfolgreicher Wiedergabe über diese
   Integration automatisch auf der FRITZ!Box selbst als gelesen, genau wie
   beim Abhören an einem FRITZ!Box-eigenen Gerät (TR-064-Aktion
   `MarkMessage` - siehe
-  [Automatisch als gelesen markieren](#automatisch-als-gelesen-markieren-seit-version-105b4-optional-experimentell)).
+  [Automatisch als gelesen markieren](#automatisch-als-gelesen-markieren-seit-version-105-optional-experimentell)).
   Anders als die rein optischen `show_*`-Kartenoptionen sitzt dieser
   Schalter bewusst auf Integrations- statt Kartenebene, weil er
   tatsächlichen, von allen Apps/Dashboards geteilten Zustand auf der Box
-  ändert. Diesmal wurde die schützende Race-Condition-Abwehr aus dem
-  verworfenen 1.0.5b0-b2-Stand (siehe Eintrag zu 1.0.5b3 unten) von Anfang
-  an gemeinsam mit `auto_mark_read` gebaut und getestet - nicht erst als
-  Korrektur nachgereicht, nachdem ein Fehler auftrat: die automatische
-  Nachricht-als-gelesen-Markierung löst nach der Wiedergabe eine
+  ändert. Beide Fähigkeiten wurden bewusst nacheinander entwickelt und
+  jede für sich mit Thorsten getestet, bevor die nächste dazukam - die
+  automatische Markierung als gelesen löst nach der Wiedergabe eine
   Kartenaktualisierung aus, die eine noch laufende Audiowiedergabe nicht
-  mehr unterbrechen darf. Gegen genau dieses Szenario wurden die drei
-  archivierten Playwright-Tests aus den verworfenen 1.0.5b1/b2-Ständen
-  erneut - diesmal gegen den neu gebauten Code - ausgeführt und bestanden
-  alle. Wie jede neue Anrufbeantworter-Funktion in diesem Projekt bislang
-  EXPERIMENTELL, noch nicht an eigener Hardware bestätigt.
-- **1.0.5b3** (Vorabversion, EXPERIMENTELL): Anrufbeantworter-Nachrichten
-  lassen sich jetzt direkt über die Dashboard-Karte löschen (neuer
-  Papierkorb-Button, `show_delete_button`, standardmäßig aus - siehe
-  [Anrufbeantworter-Nachrichten löschen](#anrufbeantworter-nachrichten-löschen-seit-version-105b3-optional-experimentell)),
-  unwiderruflich über die TR-064-Aktion `DeleteMessage`, mit Bestätigung vor
-  dem eigentlichen Löschen und einem neuen
-  `fritzbox_anrufe.delete_voicemail_message`-Entity-Service für eigene
-  Automatisierungen. Diese Version baut bewusst nur auf Version 1.0.4 auf
-  und bringt ausschließlich diese eine neue Fähigkeit mit - ein früherer,
-  nie veröffentlichter 1.0.5-Entwicklungsstand (intern b0 bis b2) hatte
-  zusätzlich noch eine "automatisch als gelesen markieren"-Option im
-  selben Release gebündelt, was in Kombination mit der Layoutänderung durch
-  den neuen Papierkorb-Button zu einer schwer zu isolierenden CSS-Regression
-  führte (die Wiedergabeleiste im Anrufbeantworter-Tab kollabierte auf
-  Breite 0). Diese Version hier ist ein bewusster Neustart von Version 1.0.4
-  aus, um genau das zu vermeiden: eine Fähigkeit nach der anderen, jede für
-  sich getestet, bevor die nächste dazukommt - "automatisch als gelesen
-  markieren" folgt entsprechend erst in einer eigenen, späteren Version.
-  Versionsnummer bewusst `1.0.5b3` statt `1.0.5b0`: die Bezeichnungen
-  `1.0.5b0` bis `1.0.5b2` wurden für den verworfenen, gebündelten Stand
-  bereits vergeben (wenn auch nie auf GitHub veröffentlicht) - um jede
-  Verwechslung mit diesen ausgelieferten, aber zurückgezogenen Ständen
-  auszuschließen, wird für diesen Neustart direkt bei `b3` weitergezählt.
+  unterbrechen darf; die entsprechende Schutzlogik wurde von Anfang an
+  gemeinsam mit dieser Funktion gebaut und getestet, nicht erst als
+  Korrektur nachgereicht. Wie jede neue Anrufbeantworter-Funktion in
+  diesem Projekt bislang EXPERIMENTELL, noch nicht an eigener Hardware
+  bestätigt.
 - **1.0.4**: Individuelle farbliche Gestaltung der Dashboard-Karte über den
   grafischen Editor (neuer Bereich "Farben", zwölf `color_*`-Schlüssel für
   Tab-Farbe, VIP-Stern, Zeilen-Icons, Live-Banner, Weiterverarbeitungs-Icons
@@ -852,7 +834,7 @@ die dortigen Maintainer den Fehler beheben.
   Optionale Filter-/Sortierleiste direkt auf der Karte (`show_filter_bar`,
   standardmäßig aus): nach eigener Rufnummer filtern (nur Anrufliste, nicht
   Anrufbeantworter) und nach Datum/Dauer/Name sortieren - siehe
-  [Filter-/Sortierleiste](#filter-sortierleiste-seit-version-104b3-optional).
+  [Filter-/Sortierleiste](#filter-sortierleiste-seit-version-104-optional).
   Fix für einen horizontalen Scrollbalken in der Tab-Leiste, der auf einer
   schmalen Desktop-Dashboard-Spalte auftreten konnte, seit "Eingehend" in
   Version 1.0.3 zum längeren "Angenommen" wurde - die Tab-Leiste reagiert
@@ -866,8 +848,8 @@ die dortigen Maintainer den Fehler beheben.
   beruhen auf vergleichsweise moderner Web-Plattform-Technik und sind noch
   nicht an einer breiten Auswahl echter Home-Assistant-Frontend-Versionen
   bestätigt - siehe [Bekannte Einschränkungen](#bekannte-einschränkungen).
-  Über den 1.0.4-Vorabversionen-Zyklus (1.0.4b0-b3) hinweg schrittweise mit
-  Thorsten anhand seiner eigenen Praxistests entwickelt und verfeinert.
+  Über mehrere Vorabversionen hinweg schrittweise mit Thorsten anhand
+  seiner eigenen Praxistests entwickelt und verfeinert.
 - **1.0.3**: Größere Überarbeitung der Anrufklassifizierung, gemeinsam mit
   Thorsten anhand von Beobachtungen an seiner eigenen FRITZ!Box entwickelt.
   Eingehende Anrufe, die an den Anrufbeantworter weitergeleitet wurden
@@ -955,6 +937,52 @@ die dortigen Maintainer den Fehler beheben.
   drei neue Verlaufs-Sensoren für eingehende/ausgehende/verpasste Anrufe
   (TR-064-basiert) mit gemeinsam konfigurierbarer Verlaufstiefe
   (Anzahl oder Tage); `flex-table-card`-Beispielkarte.
+
+## Datei-Integrität (Hash-Kommentare)
+
+Seit Version 1.0.5 trägt jede Python-/JavaScript-/YAML-Datei dieser
+Integration als allererste Zeile einen Kommentar mit dem SHA256-Hash
+ihres restlichen Inhalts, z. B.:
+
+```
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 85bb4d0d...
+```
+
+Der Hash deckt bewusst nicht die Kommentarzeile selbst ab (das wäre
+technisch unmöglich - eine Datei kann keinen Hash über sich selbst
+*inklusive* dieses Hashwerts enthalten), sondern alles AB Zeile 2, also
+exakt den ursprünglichen Dateiinhalt vor dem Einfügen dieser Zeile. Zum
+Nachrechnen z. B. unter Linux/macOS:
+
+```
+tail -n +2 tam.py | sha256sum
+```
+
+Stimmt das Ergebnis mit dem in Zeile 1 eingetragenen Wert überein, ist die
+Datei unverändert gegenüber dieser Auslieferung. JSON-Dateien
+(`manifest.json`, `strings.json`, `translations/*.json`, `icons.json`)
+unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
+ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
+die komplette Datei, z. B. `sha256sum manifest.json`).
+
+| Datei | SHA256 (Version 1.0.5) |
+| --- | --- |
+| `__init__.py` | `99755697a3d5e8109801e9a87d37a3d4a29ff63f73036c4451749beb4886f7b7` |
+| `base.py` | `a1a7b2c272431b63c5ce68264b3e0e34e0a9f7935fb9c6a73e1ce8dbbb633752` |
+| `call_log.py` | `6aa893cfade2130766a65beaa8b97c5a62e73c850e49b676cf1ba9fd7fb8da0d` |
+| `config_flow.py` | `1c99bf1c0bd7c45999d30d8e36d3e280bce3f93207293e417db9a9fb0bb5e4f4` |
+| `const.py` | `85bb4d0d44d565ee28d7d247d58b0fff2242eee7435fd2e9dc62f12bb5998077` |
+| `http.py` | `707f0b7ada7a1b27b19b2ab4b6429dc76faf3b3f67541db2451c4e286f26322c` |
+| `sensor.py` | `4920ee78d0450b7efe4ffcdbbcbc8dec43ab91c17dd15ac1c11964dbab343e92` |
+| `tam.py` | `51c5a8600a5963575a5c88f6dd3142300b59c69b082b18108c8ff1015721256a` |
+| `voicemail.py` | `c6f9db1242d95e8197aabfefd7506b54302c3c6bbd2a01cb190da9771786ccb8` |
+| `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
+| `www/fritzbox-anrufe-card.js` | `3158a8e234a143c39e5845c3c312a4640820b59c700c6774f101e1c65119b2ad` |
+| `manifest.json` | `b23c8751ac84a64c122a45190ac41ac79212e5cba8e3b14a1f2f910ad20fdde6` |
+| `strings.json` | `0f94761b93515e158fd344e00586ea3d8a7b980fa0aa306cdb5e9f9c90cff9c3` |
+| `translations/de.json` | `789d5d58dd0cf61b056624601bdb3bba9690df15ce45e91226ce690342697270` |
+| `translations/en.json` | `0f94761b93515e158fd344e00586ea3d8a7b980fa0aa306cdb5e9f9c90cff9c3` |
+| `icons.json` | `9d6c00c4c10b849524b99b6f6bd6849b74c3caa9c0bbce509ac942722b89113f` |
 
 ## Fehlerbehebung
 
