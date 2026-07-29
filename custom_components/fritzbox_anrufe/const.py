@@ -167,3 +167,15 @@ def conf_call_log_count(call_type: str) -> str:
 def conf_call_log_days(call_type: str) -> str:
     """Options-Key: Tage-Fenster für einen Anruflisten-Sensor."""
     return f"call_log_days_{call_type}"
+
+
+# Options-Flow-Schalter (seit v1.0.5b4): Nachricht nach Wiedergabe ÜBER
+# DIESE INTEGRATION automatisch auf der FRITZ!Box selbst als gelesen
+# markieren (MarkMessage, siehe tam.py), genau wie beim Abhören an einem
+# FRITZ!Box-eigenen Gerät. Standardmäßig AUS - anders als rein optische
+# Darstellungs-Schalter (show_*) verändert dies tatsächlich gemeinsam
+# genutzten Zustand auf der Box selbst (z. B. auch die Anzahl ungelesener
+# Nachrichten in FRITZ!App Fon), nicht nur diese eine Dashboard-Karte.
+# Bewusst auf Integrations- statt Karten-Ebene angesiedelt - siehe README.
+CONF_AUTO_MARK_READ = "auto_mark_read"
+DEFAULT_AUTO_MARK_READ = False

@@ -170,12 +170,14 @@
           "call_log_days_ausgehend": "Outgoing calls: number of days (if 'Number of days' selected)",
           "call_log_limit_type_verpasst": "Missed calls: mode",
           "call_log_count_verpasst": "Missed calls: number of calls (if 'Number of calls' selected)",
-          "call_log_days_verpasst": "Missed calls: number of days (if 'Number of days' selected)"
+          "call_log_days_verpasst": "Missed calls: number of days (if 'Number of days' selected)",
+          "auto_mark_read": "Automatically mark as read after playback"
         },
         "data_description": {
           "call_log_limit_type_eingehend": "Whether the fritzbox_anrufe_eingehend sensor (Answered calls) is limited by count or by time period.",
           "call_log_limit_type_ausgehend": "Whether the outgoing-calls sensor is limited by count or by time period.",
-          "call_log_limit_type_verpasst": "Whether the missed-calls sensor is limited by count or by time period."
+          "call_log_limit_type_verpasst": "Whether the missed-calls sensor is limited by count or by time period.",
+          "auto_mark_read": "When enabled, playing an answering-machine message through this integration (dashboard card or service) also clears its 'new' flag directly on the FRITZ!Box itself - matching real FRITZ!Box hardware/apps. Off by default, since this changes state shared by every device/app (e.g. also the unread count in FRITZ!App Fon), not just this dashboard. Experimental, see README."
         }
       }
     }

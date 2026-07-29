@@ -101,6 +101,14 @@ ACTION_GET_MESSAGE_LIST = "GetMessageList"
 # FRITZ!OS 7.20) - but NOT yet confirmed against this integration's own
 # users' hardware, same "experimental" status as the rest of this module.
 ACTION_DELETE_MESSAGE = "DeleteMessage"
+# MarkMessage: same X_AVM-DE_TAM1 service and AVM spec as DeleteMessage
+# above - arguments NewIndex/NewMessageIndex plus NewMarkedAsRead ("1"/"0").
+# Mirrors exactly the "New" field TamMessage.new already reads. No separate
+# independent real-hardware report was found for this specific action (the
+# ioBroker thread above only covers DeleteMessage), but it comes from the
+# identical, otherwise-confirmed service description - same "experimental,
+# not yet confirmed against this integration's own users' hardware" status.
+ACTION_MARK_MESSAGE = "MarkMessage"
 
 # Some FRITZ!OS versions expose more than one answering machine ("TAM
 # index" 0, 1, ...). We only support the first/default one for now.
@@ -253,6 +261,26 @@ class FritzTam:
             SERVICE,
             ACTION_DELETE_MESSAGE,
             arguments={"NewIndex": self.index, "NewMessageIndex": index},
+        )
+
+    def mark_message(self, index: str, *, read: bool = True) -> None:
+        """Mark one answering-machine message as read/unread via TR-064.
+
+        EXPERIMENTAL, not yet confirmed against this integration's own
+        users' hardware - see module docstring above and
+        :meth:`FritzTamCoordinator.maybe_auto_mark_read` in ``voicemail.py``
+        for the caller-facing wrapper. Mirrors directly the same ``New``
+        field :attr:`TamMessage.new` reads: ``read=True`` clears the "Neu"
+        flag, ``read=False`` sets it again.
+        """
+        self.fc.call_action(
+            SERVICE,
+            ACTION_MARK_MESSAGE,
+            arguments={
+                "NewIndex": self.index,
+                "NewMessageIndex": index,
+                "NewMarkedAsRead": "1" if read else "0",
+            },
         )
 
     def get_message_list_sid(self) -> str | None:

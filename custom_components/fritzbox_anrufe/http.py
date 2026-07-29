@@ -65,6 +65,12 @@ class FritzBoxTamMediaView(HomeAssistantView):
             )
             return web.Response(status=502)
 
+        # Seit v1.0.5b4, EXPERIMENTELL (siehe tam.py) - no-op, falls
+        # auto_mark_read (Options-Flow) nicht aktiviert ist; schlägt niemals
+        # fehl (siehe maybe_auto_mark_read-Docstring), daher kein try/except
+        # hier nötig.
+        await hass.async_add_executor_job(tam_coordinator.maybe_auto_mark_read, message)
+
         return web.Response(body=audio_bytes, content_type=content_type)
 
 
@@ -122,5 +128,17 @@ class FritzBoxCallMediaView(HomeAssistantView):
                 ex,
             )
             return web.Response(status=502)
+
+        # Seit v1.0.5b4, EXPERIMENTELL (siehe tam.py) - nur möglich, wenn
+        # dieser Anruf beim letzten Abgleich eindeutig einer echten
+        # TamMessage zugeordnet werden konnte (call_log.py:
+        # _find_matching_tam_message); `call` selbst ist ein Call-Objekt
+        # ohne eigenen TAM-Index. Ohne Zuordnung bleibt die "Neu"-Markierung
+        # unangetastet - kein Fehler, einfach nichts zu tun.
+        tam_message = getattr(call, "tam_message", None)
+        if tam_message is not None:
+            await hass.async_add_executor_job(
+                tam_coordinator.maybe_auto_mark_read, tam_message
+            )
 
         return web.Response(body=audio_bytes, content_type=content_type)
