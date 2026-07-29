@@ -70,45 +70,6 @@ several revisions:
 This is still not confirmed against the user's actual hardware - please
 open a GitHub issue (ideally with the resulting HTTP status code for each
 attempt, visible in the Home Assistant log) if it still fails.
-
-DELETING a message / marking it (un)read (added in v1.0.5b0, EXPERIMENTELL)
------------------------------------------------------------------------
-A community wish (relayed by Thorsten): can a message be deleted, and can
-the "New" flag be cleared automatically after listening, like on real
-FRITZ!Box hardware? Researched before implementing, since neither action
-had been used anywhere in this integration before:
-
-1. AVM's own TR-064 service description for ``X_AVM-DE_TAM``
-   (``x_tam.pdf`` / mirrored as ``TR-064_TAM.pdf`` on avm.de/fritz.com)
-   documents two actions beyond ``GetInfo``/``SetEnable``/``GetMessageList``:
-
-   - ``DeleteMessage`` - arguments ``NewIndex`` (the TAM index, same as
-     ``GetMessageList``) and ``NewMessageIndex`` (the message's own
-     ``Index``, i.e. :attr:`TamMessage.Index`). No output arguments -
-     deletes the message, no undo/trash.
-   - ``MarkMessage`` - arguments ``NewIndex``, ``NewMessageIndex`` and
-     ``NewMarkedAsRead`` ("1" = mark read, "0" = mark unread/new again).
-
-2. Independently, a real-world ioBroker forum thread
-   (forum.iobroker.net/topic/14288, users on FRITZ!Box 7530/6590,
-   FRITZ!OS 7.20) confirms ``DeleteMessage`` with exactly those two
-   arguments working against real hardware - the same action name/shape
-   AVM's own spec describes, from an independent source. No equivalent
-   real-hardware confirmation was found for ``MarkMessage`` specifically,
-   but it comes from the identical, otherwise-confirmed service
-   description as ``GetMessageList``/``DeleteMessage``.
-
-Both are therefore plausible and well-grounded (an official AVM service
-description PLUS an independent, hardware-confirmed report for the sibling
-action), but - like the rest of this module - **not yet confirmed against
-Thorsten's own hardware**. Please open a GitHub issue (ideally with the
-FRITZ!OS version and any HTTP/SOAP fault text from the Home Assistant log)
-if either action fails.
-
-Both actions require the same TR-064 permission as ``GetMessageList``
-("Sprachnachrichten, Faxnachrichten, FRITZ!App Fon und Anrufliste") -
-untested assumption, but consistent with every other TAM-related action in
-this service.
 """
 
 from __future__ import annotations
@@ -131,10 +92,15 @@ _LOGGER = logging.getLogger(__name__)
 
 SERVICE = "X_AVM-DE_TAM1"
 ACTION_GET_MESSAGE_LIST = "GetMessageList"
-# Siehe Moduldoku ("DELETING a message ...") für die Herleitung dieser
-# beiden Aktionen und ihrer Argumentnamen.
+# DeleteMessage: same X_AVM-DE_TAM1 service as GetMessageList above, per
+# AVM's own TR-064 service description (fritz.support/resources/
+# TR-064_TAM.pdf) - takes the TAM index plus the message's own Index and
+# deletes it permanently (no undo/trash on the FRITZ!Box itself).
+# Independently corroborated by multiple real-hardware reports using the
+# exact same arguments (forum.iobroker.net/topic/14288, FRITZ!Box 7530/6590,
+# FRITZ!OS 7.20) - but NOT yet confirmed against this integration's own
+# users' hardware, same "experimental" status as the rest of this module.
 ACTION_DELETE_MESSAGE = "DeleteMessage"
-ACTION_MARK_MESSAGE = "MarkMessage"
 
 # Some FRITZ!OS versions expose more than one answering machine ("TAM
 # index" 0, 1, ...). We only support the first/default one for now.
@@ -274,6 +240,21 @@ class FritzTam:
         root = get_xml_root(url, session=self.fc.session)
         return list(TamMessageCollection(root))
 
+    def delete_message(self, index: str) -> None:
+        """Permanently delete one answering-machine message.
+
+        EXPERIMENTAL, not yet confirmed against this integration's own
+        users' hardware - see module docstring above and
+        :meth:`FritzTamCoordinator.delete_message` in ``voicemail.py`` for
+        the caller-facing wrapper. There is no undo: the FRITZ!Box itself
+        has no trash/recycle bin for answering-machine messages.
+        """
+        self.fc.call_action(
+            SERVICE,
+            ACTION_DELETE_MESSAGE,
+            arguments={"NewIndex": self.index, "NewMessageIndex": index},
+        )
+
     def get_message_list_sid(self) -> str | None:
         """Issue a fresh GetMessageList call and return its embedded sid.
 
@@ -294,38 +275,6 @@ class FritzTam:
             )
             return None
         return sid_match.group(1)
-
-    def delete_message(self, message_index: str) -> None:
-        """Permanently delete one answering-machine message via TR-064.
-
-        EXPERIMENTELL, siehe Moduldoku ("DELETING a message ..."). UNWIDER-
-        RUFLICH - die FRITZ!Box kennt hierfür keinen Papierkorb, die
-        Nachricht ist danach unwiederbringlich gelöscht. ``message_index``
-        ist :attr:`TamMessage.Index`, NICHT die Listenposition.
-        """
-        self.fc.call_action(
-            SERVICE,
-            ACTION_DELETE_MESSAGE,
-            arguments={"NewIndex": self.index, "NewMessageIndex": message_index},
-        )
-
-    def mark_message(self, message_index: str, *, read: bool = True) -> None:
-        """Mark one answering-machine message as read/unread via TR-064.
-
-        EXPERIMENTELL, siehe Moduldoku ("DELETING a message ..."). Spiegelt
-        direkt das ``New``-Feld, das auch :attr:`TamMessage.new` liefert -
-        ``read=True`` entfernt die "Neu"-Markierung, ``read=False`` setzt sie
-        wieder (z. B. um die Änderung in einem Test rückgängig zu machen).
-        """
-        self.fc.call_action(
-            SERVICE,
-            ACTION_MARK_MESSAGE,
-            arguments={
-                "NewIndex": self.index,
-                "NewMessageIndex": message_index,
-                "NewMarkedAsRead": "1" if read else "0",
-            },
-        )
 
     def build_download_url(
         self, message: TamMessage, sid: str, origin: str
