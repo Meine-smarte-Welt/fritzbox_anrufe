@@ -1,3 +1,4 @@
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 3158a8e234a143c39e5845c3c312a4640820b59c700c6774f101e1c65119b2ad
 /**
  * fritzbox-anrufe-card
  * ---------------------
