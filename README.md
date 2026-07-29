@@ -271,6 +271,18 @@ lassen sich jederzeit ändern:
   - *Anzahl*: Dropdown mit festen Werten 5 / 10 / 20 / 50 / 100 / 200
     (nur wirksam im Modus "Anzahl Anrufe").
   - *Tage*: Zahl zwischen 1 und 90 (nur wirksam im Modus "Anzahl Tage").
+- **Nach Wiedergabe automatisch als gelesen markieren** (seit Version
+  1.0.5b4, `auto_mark_read`, standardmäßig aus, EXPERIMENTELL): sobald eine
+  Anrufbeantworter-Nachricht über diese Integration abgespielt wurde,
+  entfernt die FRITZ!Box selbst das "Neu"-Kennzeichen - genau wie beim
+  Abhören direkt an einem FRITZ!Box-Gerät oder in FRITZ!App Fon (TR-064-
+  Aktion `MarkMessage`, siehe
+  [Automatisch als gelesen markieren](#automatisch-als-gelesen-markieren-seit-version-105b4-optional-experimentell)).
+  Bewusst auf dieser Integrations-Ebene statt als Karten-Option angesiedelt,
+  da dabei tatsächlicher, von allen Apps/Dashboards gemeinsam genutzter
+  Zustand auf der FRITZ!Box geändert wird (u. a. auch die Anzahl ungelesener
+  Nachrichten in FRITZ!App Fon) - nicht nur die Darstellung dieser einen
+  Karte.
 
 ## Dashboard-Karte
 
@@ -575,6 +587,31 @@ im `messages`-Attribut des Anrufbeantworter-Sensors.
 Projekt noch nicht an eigener Hardware bestätigt - bitte zunächst mit
 unwichtigen Nachrichten testen.
 
+### Automatisch als gelesen markieren (seit Version 1.0.5b4, optional, EXPERIMENTELL)
+
+Über die Einstellungen der Integration (siehe
+[Einstellungen (Optionen)](#einstellungen-optionen)) lässt sich `auto_mark_read`
+aktivieren, standardmäßig aus. Ist die Option an, entfernt die Integration
+nach jeder erfolgreichen Wiedergabe einer Anrufbeantworter-Nachricht - egal
+ob über den Abhören-Button im Anrufbeantworter-Tab oder über eine verknüpfte
+Aufnahme in der Anrufliste (Weiterverarbeitung) - automatisch das
+"Neu"-Kennzeichen dieser Nachricht auf der FRITZ!Box selbst (TR-064-Aktion
+`MarkMessage`), genau wie es beim Abhören an einem FRITZ!Box-eigenen Gerät
+oder in FRITZ!App Fon geschieht. War die Nachricht bereits gelesen, passiert
+nichts (kein unnötiger TR-064-Aufruf). Schlägt die Markierung fehl (z. B.
+TR-064-Fehler), wird das nur ins Home-Assistant-Log geschrieben - eine
+fehlgeschlagene Markierung lässt eine ansonsten erfolgreiche Wiedergabe
+niemals fehlschlagen.
+
+Damit eine laufende Wiedergabe durch die anschließende Kartenaktualisierung
+nicht unterbrochen wird, erkennt die Karte aktive/gerade gestartete
+Wiedergaben und verschiebt eine fällige Neudarstellung, bis die Wiedergabe
+endet - unabhängig davon, ob `auto_mark_read` aktiviert ist oder nicht.
+
+**EXPERIMENTELL:** Wie bei jeder neuen Anrufbeantworter-Funktion in diesem
+Projekt noch nicht an eigener Hardware bestätigt - bitte zunächst mit
+unwichtigen Nachrichten testen.
+
 ### Variante 2: flex-table-card (YAML, spaltenweise ein-/ausblendbar)
 
 Für eine klassische, tabellarische Darstellung mit frei konfigurierbaren
@@ -750,6 +787,28 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
+- **1.0.5b4** (Vorabversion, EXPERIMENTELL): löst das in Version 1.0.5b3
+  bewusst zurückgestellte Versprechen ein - eine neue Options-Flow-
+  Einstellung `auto_mark_read` (standardmäßig aus) markiert eine
+  Anrufbeantworter-Nachricht nach erfolgreicher Wiedergabe über diese
+  Integration automatisch auf der FRITZ!Box selbst als gelesen, genau wie
+  beim Abhören an einem FRITZ!Box-eigenen Gerät (TR-064-Aktion
+  `MarkMessage` - siehe
+  [Automatisch als gelesen markieren](#automatisch-als-gelesen-markieren-seit-version-105b4-optional-experimentell)).
+  Anders als die rein optischen `show_*`-Kartenoptionen sitzt dieser
+  Schalter bewusst auf Integrations- statt Kartenebene, weil er
+  tatsächlichen, von allen Apps/Dashboards geteilten Zustand auf der Box
+  ändert. Diesmal wurde die schützende Race-Condition-Abwehr aus dem
+  verworfenen 1.0.5b0-b2-Stand (siehe Eintrag zu 1.0.5b3 unten) von Anfang
+  an gemeinsam mit `auto_mark_read` gebaut und getestet - nicht erst als
+  Korrektur nachgereicht, nachdem ein Fehler auftrat: die automatische
+  Nachricht-als-gelesen-Markierung löst nach der Wiedergabe eine
+  Kartenaktualisierung aus, die eine noch laufende Audiowiedergabe nicht
+  mehr unterbrechen darf. Gegen genau dieses Szenario wurden die drei
+  archivierten Playwright-Tests aus den verworfenen 1.0.5b1/b2-Ständen
+  erneut - diesmal gegen den neu gebauten Code - ausgeführt und bestanden
+  alle. Wie jede neue Anrufbeantworter-Funktion in diesem Projekt bislang
+  EXPERIMENTELL, noch nicht an eigener Hardware bestätigt.
 - **1.0.5b3** (Vorabversion, EXPERIMENTELL): Anrufbeantworter-Nachrichten
   lassen sich jetzt direkt über die Dashboard-Karte löschen (neuer
   Papierkorb-Button, `show_delete_button`, standardmäßig aus - siehe
