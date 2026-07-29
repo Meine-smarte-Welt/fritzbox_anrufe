@@ -108,77 +108,30 @@
  * size was re-verified once more for consistency with the other 4
  * accordion groups (see the v1.0.4b3 paragraph above for the original fix).
  *
- * v1.0.5b0 (EXPERIMENTELL, community wish relayed by Thorsten): "Kann eine
- * Anrufbeantworter-Nachricht gelöscht werden, und kann nach dem Anhören
- * automatisch der Status 'Neu' verschwinden, wie bei einer FRITZ!Box-eigenen
- * Hardware?" Both are now possible, grounded in AVM's own TR-064 service
- * description for X_AVM-DE_TAM (DeleteMessage/MarkMessage - see the module
- * docstring in tam.py for the full research/sourcing), but NOT yet confirmed
- * against Thorsten's own hardware. (1) A trash-can button per message (only
- * shown when `show_delete_button` is on - off by default, since deletion is
- * IRREVERSIBLE and this action is unconfirmed territory) opens an inline
- * two-step confirmation ("Wirklich löschen?" + Ja/Abbrechen, rendered right
- * in the row - deliberately NOT a native browser confirm() dialog, which can
- * behave inconsistently inside a Companion App WebView) before calling the
- * new `fritzbox_anrufe.delete_voicemail_message` service
- * (see FritzboxAnrufeCard._deleteVoicemailMessage()). (2) Automatically
- * clearing the "New" flag after playback is a separate, integration-level
- * option (`auto_mark_read`, Options-Flow, off by default) rather than a card
- * setting - it changes real, shared state on the FRITZ!Box itself (e.g. also
- * the unread count in FRITZ!App Fon), not just this one dashboard, so it
- * lives alongside the other config-entry options instead of the card's
- * show_* / color_* keys - see voicemail.py:maybe_auto_mark_read.
+ * v1.0.5b3: deleting an Anrufbeantworter message (EXPERIMENTAL, `X_AVM-DE_
+ * TAM1`'s `DeleteMessage` TR-064 action, see tam.py), permanent and with no
+ * undo on the FRITZ!Box itself. `show_delete_button` (off by default) shows
+ * a trash icon per message; clicking it does NOT delete immediately but
+ * switches inline to a "Wirklich löschen?" confirm/cancel pair (deliberately
+ * not a native `confirm()` dialog, since those are known to misbehave in the
+ * Companion App WebView) - only confirming calls the new
+ * `fritzbox_anrufe.delete_voicemail_message` entity service. The row hides
+ * optimistically the instant deletion is confirmed and reappears if the
+ * service call fails (see `FritzboxAnrufeCard._deleteVoicemailMessage()`).
  *
- * v1.0.5b1 (bugfix, reported by Thorsten): "Nach dem Anklicken der
- * Sprachnachricht ... erscheint keine Statusleiste mehr. Die Sprachnachricht
- * wird jedoch abgespielt." Root cause: `auto_mark_read` (see above) triggers
- * a coordinator refresh right after playback to clear the "New" flag - that
- * refresh changes `entity_voicemail`'s `last_updated`, which the card's
- * render-skip signature (see `set hass()`) correctly treats as "something
- * relevant changed", triggering a full re-render. A full re-render tears
- * down and rebuilds every row from scratch (see `_render()`'s
- * `_revokeObjectUrls()` comment) - exactly the one playback that had just
- * triggered this refresh got torn down by it: the freshly created <audio>
- * element becomes detached from the visible DOM (it keeps playing - HTML
- * media elements don't require being attached - but with no visible
- * controls), or, if the refresh lands before the download even finishes,
- * the "Lädt …" button is reset and the in-flight fetch's callback later
- * writes its result into an already-detached old DOM node. Reproducible on
- * every single Anrufbeantworter-tab playback once `auto_mark_read` is on
- * (there `message.Index` is always known, so the refresh is guaranteed);
- * only intermittently via the Weiterverarbeitung row (there it depends on
- * whether the call could be confidently matched to a TAM message at all).
- * Fix: `FritzboxAnrufeCard._hasActiveMediaPlayback()` detects an in-flight
- * or already-started playback (voicemail tab or Weiterverarbeitung row) and
- * `set hass()` now defers (does not apply) a re-render while one is active,
- * instead of destroying it - deliberately without advancing
- * `_lastSignature`, so the next ordinary hass push still catches up once
- * playback is no longer active. `_catchUpRender()` (wired to the audio
- * element's "ended" event in playVoicemail()/playCallRecording()) applies
- * that deferred update as soon as playback naturally finishes, so e.g. the
- * "Neu" badge still disappears promptly instead of only on the next
- * unrelated card update.
- *
- * v1.0.5b2 follow-up: Thorsten confirmed the "nichts erscheint mehr nach
- * Abspielen" symptom persisted in v1.0.5b1 even with `auto_mark_read`
- * switched OFF - ruling out the render-skip race above as the (sole)
- * cause. Actual root cause, found by inspecting the rendered <audio>
- * element's own box size: `.voicemail-player-slot` became a child of a new
- * flex container (`.voicemail-actions`) in v1.0.5b0, added to hold the new
- * delete button alongside the player. A flex item with no explicit width
- * gets an "auto" content-based width - and a percentage-sized replaced
- * element (the <audio width:100%> inserted once playback starts, see
- * `.voicemail-player` below) does not contribute to that content size at
- * all. Both the slot and the <audio> element therefore resolved to
- * `width: 0` - present in the DOM and genuinely playing (autoplay), but
- * with zero visible size, indistinguishable from "nothing appears" even
- * though nothing had actually been destroyed this time. Deterministic, not
- * a race - matches Thorsten's report with `auto_mark_read` off, and
- * explains why the Weiterverarbeitung row (`.row-processing-player`, which
- * has no `width: 100%` rule) was never affected. Fix: `flex: 1 1 auto;
- * min-width: 0;` on `.voicemail-player-slot` gives it a real, available-
- * space-derived width for the percentage-sized <audio> element to resolve
- * against.
+ * This is a deliberately narrow, single-feature rebuild on top of v1.0.4:
+ * an earlier v1.0.5 line (b0 through b2) additionally bundled an
+ * "auto_mark_read" option (auto-clearing the "Neu" status after playback)
+ * in the very same release as this delete feature - which, combined with
+ * the delete button's own layout change below, triggered a genuine,
+ * deterministic CSS regression (the Anrufbeantworter-tab's playback bar
+ * silently collapsing to zero width, see the fix applied to
+ * `.voicemail-player-slot` below) that took multiple rounds to properly
+ * isolate and diagnose, none of which had shipped publicly. Restarting
+ * cleanly from v1.0.4 and shipping ONE new capability at a time (delete
+ * first, auto_mark_read as a later, separate step) - per Thorsten - makes
+ * each change easier to verify in isolation before the next one lands on
+ * top of it.
  *
  * Playback: the FRITZ!Box audio recording is served by this integration's
  * own authenticated proxy endpoint (see http.py), which requires a valid
@@ -238,7 +191,6 @@
  *   show_processing_ausgehend: false
  *   show_processing_verpasst: false
  *   show_filter_bar: false
- *   show_delete_button: false
  *   color_tab_active: ""
  *   color_success: ""
  *   color_error: ""
@@ -517,11 +469,10 @@ const CONFIG_DEFAULTS = {
   // solange dieser aus ist, bleibt auch die Reihenfolge/Filterung exakt wie
   // zuvor (siehe FritzboxAnrufeCard._visibleCalls()).
   show_filter_bar: false,
-  // Papierkorb-Button je Anrufbeantworter-Nachricht (seit v1.0.5b0,
-  // EXPERIMENTELL) - standardmäßig aus: Löschen ist UNWIDERRUFLICH und
-  // dieser TR-064-Weg noch nicht an echter Hardware bestätigt (siehe
-  // Moduldoku oben/tam.py), daher bewusstes Opt-in statt eines automatisch
-  // erscheinenden, destruktiven Buttons.
+  // Papierkorb-Button je Anrufbeantworter-Nachricht (seit v1.0.5b3,
+  // EXPERIMENTELL, siehe Moduldoku oben) - standardmäßig aus: Löschen ist
+  // unwiderruflich (die FRITZ!Box selbst hat keinen Papierkorb dafür), das
+  // soll niemand versehentlich freigeschaltet bekommen.
   show_delete_button: false,
   // Farben (seit v1.0.4) - leer = bisheriger, fester Theme-Farbwert (siehe
   // COLOR_CONFIG_KEYS oben für die jeweiligen Standardwerte).
@@ -579,7 +530,7 @@ function renderVoicemailRows(messages, opts) {
     showDate: true,
     showDuration: true,
     maxRows: Infinity,
-    // Papierkorb-Button (seit v1.0.5b0, EXPERIMENTELL) - siehe Moduldoku
+    // Papierkorb-Button (seit v1.0.5b3, EXPERIMENTELL) - siehe Moduldoku
     // oben. showDeleteButton gated durch die Kartenkonfiguration
     // (show_delete_button); confirmDeleteId ist reiner UI-Laufzeitstatus
     // (welche Nachricht gerade die "Wirklich löschen?"-Bestätigung zeigt) -
@@ -710,23 +661,19 @@ const VOICEMAIL_ROWS_STYLES = `
     font-size: 0.8em;
     color: var(--secondary-text-color, #727272);
   }
-  /* Bugfix (v1.0.5b2): .voicemail-player-slot ist seit v1.0.5b0 ein Kind
-     eines Flex-Containers (.voicemail-actions, wegen des neuen Papierkorb-
-     Buttons daneben). Ohne eigene Breitenangabe bekommt ein Flex-Item per
-     Spezifikation eine "auto"-Breite auf Basis seines Inhalts - und ein
-     prozentual breites Ersatzelement (audio mit width:100%, siehe
-     .voicemail-player unten) trägt zu dieser Inhaltsgröße NICHT bei
-     (Prozentwerte zählen für die intrinsische Größe als 0). Ergebnis: das
-     Flex-Item UND das darin liegende audio-Element werden mit Breite 0
-     berechnet - unsichtbar, obwohl technisch vorhanden und (dank autoplay)
-     hörbar spielend. flex: 1 1 auto gibt dem Slot eine echte, aus dem
-     verfügbaren Platz berechnete Breite; min-width: 0 verhindert, dass der
-     Flexbox-Standardwert min-width: auto das Schrumpfen blockiert. Betrifft
-     NUR den Anrufbeantworter-Tab (.voicemail-player), nicht die
-     Weiterverarbeitungs-Zeile (.row-processing-player), deren CSS bewusst
-     keine width:100%-Regel hat - genau das erklärt, warum dort die
-     Bedienleiste immer sichtbar blieb. */
-  .voicemail-player-slot { margin-top: 2px; flex: 1 1 auto; min-width: 0; }
+  /* .voicemail-player-slot sitzt (wegen des Papierkorb-Buttons daneben,
+     siehe .voicemail-actions unten) in einem Flex-Container. Ohne eigene
+     Breitenangabe würde ein Flex-Item nur eine "auto"-Breite basierend auf
+     seinem Inhalt bekommen - und ein prozentual breites Ersatzelement (das
+     audio-Element mit width:100% unten, sobald Wiedergabe startet) trägt zu
+     dieser Inhaltsgröße NICHT bei (Prozentwerte zählen dafür als 0). Ohne
+     flex: 1 1 auto; min-width: 0; würden sowohl der Slot als auch das
+     audio-Element auf Breite 0 kollabieren - technisch vorhanden und
+     (dank autoplay) hörbar spielend, aber unsichtbar. Deshalb von Anfang an
+     hier festgelegt, nicht erst nachträglich als Bugfix.
+     .row-processing-player (Weiterverarbeitungs-Zeile) hat bewusst keine
+     eigene width:100%-Regel und ist von diesem Effekt nicht betroffen. */
+  .voicemail-player-slot { flex: 1 1 auto; min-width: 0; }
   .voicemail-player { width: 100%; height: 32px; }
   .voicemail-play-btn {
     display: inline-flex;
@@ -748,9 +695,10 @@ const VOICEMAIL_ROWS_STYLES = `
     color: var(--secondary-text-color, #727272);
     font-style: italic;
   }
-  /* Papierkorb-Button + Inline-Bestätigung (seit v1.0.5b0, EXPERIMENTELL,
-     nur bei show_delete_button) - bewusst KEIN natives confirm(), siehe
-     Moduldoku oben. */
+  /* Papierkorb-Button + Inline-Bestätigung (seit v1.0.5b3, EXPERIMENTELL,
+     nur bei show_delete_button) - bewusst KEIN natives confirm(), da sich
+     solche Dialoge in der Companion-App-WebView erfahrungsgemäß nicht immer
+     zuverlässig verhalten. */
   .voicemail-actions { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
   .voicemail-delete-btn {
     display: inline-flex;
@@ -818,14 +766,8 @@ const PROCESSING_ROW_STYLES = `
  * Download one message's audio via the authenticated fetch API exposed to
  * custom cards (hass.fetchWithAuth), turn it into a blob object URL, and
  * swap the "Abspielen" button for a real, playable <audio> element.
- *
- * `onEnded` (seit dem auto_mark_read-Re-Render-Bugfix, siehe
- * FritzboxAnrufeCard._hasActiveMediaPlayback()/_catchUpRender()): wird beim
- * natürlichen Ende der Wiedergabe aufgerufen, damit die Karte einen
- * inzwischen fälligen, aber wegen der laufenden Wiedergabe zurückgehaltenen
- * Re-Render jetzt nachholen kann (z. B. um den "Neu"-Status zu aktualisieren).
  */
-async function playVoicemail(hass, button, onObjectUrlCreated, onEnded) {
+async function playVoicemail(hass, button, onObjectUrlCreated) {
   const slot = button.closest(".voicemail-player-slot");
   const mediaUrl = slot && slot.dataset.mediaUrl;
   if (!mediaUrl || !hass || !hass.fetchWithAuth) return;
@@ -847,14 +789,12 @@ async function playVoicemail(hass, button, onObjectUrlCreated, onEnded) {
     audio.autoplay = true;
     audio.className = "voicemail-player";
     audio.src = objectUrl;
-    if (onEnded) audio.addEventListener("ended", () => onEnded());
     slot.replaceChildren(audio);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("fritzbox_anrufe: Anrufbeantworter-Wiedergabe fehlgeschlagen", err);
     button.disabled = false;
     button.innerHTML = `<ha-icon icon="mdi:alert-circle-outline"></ha-icon><span>Fehler – erneut versuchen</span>`;
-    if (onEnded) onEnded();
   }
 }
 
@@ -864,10 +804,9 @@ async function playVoicemail(hass, button, onObjectUrlCreated, onEnded) {
  * Anrufbeantworter tab's own message list - reuses the identical
  * hass.fetchWithAuth()-to-blob-object-URL approach, just swapping the
  * *whole* row's content (arrow+icon+label) for the <audio> element instead
- * of a dedicated player slot next to a button. `onEnded`: siehe
- * playVoicemail() oben.
+ * of a dedicated player slot next to a button.
  */
-async function playCallRecording(hass, rowEl, onObjectUrlCreated, onEnded) {
+async function playCallRecording(hass, rowEl, onObjectUrlCreated) {
   const mediaUrl = rowEl.dataset.mediaUrl;
   if (!mediaUrl || !hass || !hass.fetchWithAuth) return;
 
@@ -888,14 +827,12 @@ async function playCallRecording(hass, rowEl, onObjectUrlCreated, onEnded) {
     audio.autoplay = true;
     audio.className = "row-processing-player";
     audio.src = objectUrl;
-    if (onEnded) audio.addEventListener("ended", () => onEnded());
     rowEl.replaceChildren(audio);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("fritzbox_anrufe: Wiedergabe über die Weiterverarbeitungs-Zeile fehlgeschlagen", err);
     rowEl.classList.add("clickable");
     rowEl.innerHTML = `<ha-icon icon="mdi:alert-circle-outline"></ha-icon><span>Fehler – erneut versuchen</span>`;
-    if (onEnded) onEnded();
   }
 }
 
@@ -914,7 +851,7 @@ class FritzboxAnrufeCard extends HTMLElement {
     // verloren (siehe setConfig()).
     this._filterOwnNumber = "";
     this._sortBy = DEFAULT_SORT;
-    // Papierkorb-Bestätigung (seit v1.0.5b0, EXPERIMENTELL) - reiner
+    // Papierkorb-Bestätigung (seit v1.0.5b3, EXPERIMENTELL) - reiner
     // UI-Laufzeitstatus, genau wie _activeFilter/_filterOwnNumber/_sortBy:
     // welche Nachrichten-ID gerade die "Wirklich löschen?"-Bestätigung
     // zeigt, und welche IDs optimistisch (vor der Coordinator-Bestätigung)
@@ -958,76 +895,8 @@ class FritzboxAnrufeCard extends HTMLElement {
     if (signature === this._lastSignature && this.shadowRoot.firstChild) {
       return;
     }
-    // Bugfix (seit v1.0.5b0-Folgefix): der neue `auto_mark_read`-Schalter
-    // löst NACH JEDER Wiedergabe absichtlich eine Coordinator-Aktualisierung
-    // aus, um den "Neu"-Status zeitnah zu löschen (siehe voicemail.py:
-    // maybe_auto_mark_read()). Genau das ändert aber `entity_voicemail`s
-    // `last_updated` - also die Signatur oben - und hätte damit ohne diesen
-    // Schutz exakt den einen Playback-Vorgang zerstört, den es gerade selbst
-    // ausgelöst hat: ein vollständiger Re-Render tauscht die gesamte
-    // Kartenoberfläche aus (siehe _render()/_revokeObjectUrls()), das
-    // laufende <audio>-Element wird dabei aus dem sichtbaren DOM entfernt
-    // (spielt technisch weiter, aber ohne jede sichtbare Bedienleiste) bzw.
-    // - falls der Refresh noch VOR dem Laden der Aufnahme eintrifft - der
-    // "Lädt …"-Button wird zurückgesetzt, während der ursprüngliche Klick-
-    // Handler noch auf das inzwischen losgelöste alte DOM-Element zeigt,
-    // sodass die fertige Aufnahme dort landet, wo sie niemand mehr sieht.
-    // Reproduzierbar bei JEDER Wiedergabe im Anrufbeantworter-Tab, sobald
-    // `auto_mark_read` aktiv ist (dort ist `message.Index` immer bekannt,
-    // der Refresh also garantiert) - über die Weiterverarbeitungs-Zeile nur,
-    // wenn der Anruf zusätzlich eindeutig einer Anrufbeantworter-Nachricht
-    // zugeordnet werden konnte. Fix: einen laufenden oder gerade erst
-    // gestarteten Wiedergabevorgang erkennen und den Re-Render in diesem
-    // Fall verschieben, statt die Karte trotzdem neu aufzubauen - bewusst
-    // OHNE `_lastSignature` zu aktualisieren, damit der nächste reguläre
-    // hass-Push (der ohnehin bald eintrifft) die inzwischen verpasste
-    // Aktualisierung (z. B. den verschwundenen "Neu"-Status) sauber
-    // nachholt, sobald die Wiedergabe nicht mehr aktiv ist.
-    if (this._hasActiveMediaPlayback()) {
-      return;
-    }
     this._lastSignature = signature;
     this._render();
-  }
-
-  // Erkennt eine laufende ODER gerade erst angestoßene (noch ladende)
-  // Wiedergabe, sowohl im Anrufbeantworter-Tab (.voicemail-player-slot) als
-  // auch in der Weiterverarbeitungs-Zeile (.row-processing) - siehe
-  // set hass() oben für den Grund. `.row-processing:not(.clickable)` deckt
-  // dort sowohl den "Lädt …"-Zwischenzustand als auch die fertige
-  // <audio>-Wiedergabe ab, da playCallRecording() die "clickable"-Klasse
-  // beim Laden entfernt und nie wieder hinzufügt. Ein bereits ZU ENDE
-  // gespieltes <audio>-Element (`.ended === true`) zählt bewusst NICHT mehr
-  // als aktiv - sonst würde _catchUpRender() nach dem natürlichen Ende der
-  // Wiedergabe für immer blockiert bleiben, da das <audio>-Element (mit
-  // sichtbarer Bedienleiste zum Nachhören) im DOM bestehen bleibt.
-  _hasActiveMediaPlayback() {
-    if (!this.shadowRoot) return false;
-    if (this.shadowRoot.querySelector(".voicemail-play-btn[disabled]")) return true;
-    if (this.shadowRoot.querySelector(".row-processing[data-media-url]:not(.clickable)")) {
-      const rowAudio = this.shadowRoot.querySelector(".row-processing-player");
-      if (!rowAudio || !rowAudio.ended) return true;
-    }
-    const voicemailAudio = this.shadowRoot.querySelector(".voicemail-player-slot audio");
-    if (voicemailAudio && !voicemailAudio.ended) return true;
-    return false;
-  }
-
-  // Wird aufgerufen, sobald eine Wiedergabe natürlich endet (audio "ended",
-  // siehe playVoicemail()/playCallRecording()) oder fehlschlägt - holt einen
-  // währenddessen zurückgehaltenen Re-Render jetzt nach, falls sich die
-  // Signatur inzwischen geändert hat (z. B. der "Neu"-Status durch
-  // auto_mark_read). Kein Effekt, falls sich nichts geändert hat oder
-  // inzwischen eine ANDERE Wiedergabe läuft (dann bleibt es weiterhin
-  // zurückgehalten, bis auch die vorbei ist).
-  _catchUpRender() {
-    if (!this._hass || !this._config) return;
-    if (this._hasActiveMediaPlayback()) return;
-    const signature = this._computeSignature();
-    if (signature !== this._lastSignature) {
-      this._lastSignature = signature;
-      this._render();
-    }
   }
 
   get hass() {
@@ -1348,7 +1217,7 @@ class FritzboxAnrufeCard extends HTMLElement {
       messages = this._sortEntries(messages);
     }
     // Optimistisch ausgeblendete, gerade erst gelöschte Nachrichten (seit
-    // v1.0.5b0) - siehe _deleteVoicemailMessage(). Verschwinden endgültig,
+    // v1.0.5b3) - siehe _deleteVoicemailMessage(). Verschwinden endgültig,
     // sobald der Coordinator-Refresh sie tatsächlich aus den Sensordaten
     // entfernt hat; bei einem fehlgeschlagenen Löschversuch werden sie
     // wieder eingeblendet.
@@ -1360,31 +1229,6 @@ class FritzboxAnrufeCard extends HTMLElement {
       showDeleteButton: !!this._config.show_delete_button,
       confirmDeleteId: this._confirmDeleteMessageId,
     });
-  }
-
-  // Papierkorb-Button (seit v1.0.5b0, EXPERIMENTELL) - siehe Moduldoku oben.
-  // Blendet die Zeile optimistisch sofort aus, ruft den neuen
-  // delete_voicemail_message-Service auf und blendet die Zeile bei einem
-  // Fehler (z. B. fehlende FRITZ!Box-Berechtigung) wieder ein, statt sie
-  // stillschweigend verschwinden zu lassen.
-  _deleteVoicemailMessage(messageId) {
-    if (!this._hass || !this._config.entity_voicemail || !messageId) return;
-    this._pendingDeletedMessageIds.add(messageId);
-    this._render();
-    this._hass
-      .callService("fritzbox_anrufe", "delete_voicemail_message", {
-        entity_id: this._config.entity_voicemail,
-        message_id: messageId,
-      })
-      .catch((err) => {
-        // eslint-disable-next-line no-console
-        console.error(
-          "fritzbox_anrufe: Löschen der Anrufbeantworter-Nachricht fehlgeschlagen",
-          err
-        );
-        this._pendingDeletedMessageIds.delete(messageId);
-        this._render();
-      });
   }
 
   // Filter-/Sortierleiste (seit v1.0.4b3) - siehe Moduldoku oben. Eigene
@@ -1434,6 +1278,29 @@ class FritzboxAnrufeCard extends HTMLElement {
   _revokeObjectUrls() {
     (this._objectUrls || []).forEach((u) => URL.revokeObjectURL(u));
     this._objectUrls = [];
+  }
+
+  // Papierkorb-Button (seit v1.0.5b3, EXPERIMENTELL) - siehe Moduldoku oben.
+  // Blendet die Zeile optimistisch sofort aus, ruft den neuen
+  // delete_voicemail_message-Entity-Service auf (siehe sensor.py), und
+  // blendet die Zeile bei einem fehlgeschlagenen Service-Call (z. B. TR-064-
+  // Fehler auf der FRITZ!Box) wieder ein - das Löschen selbst ist
+  // unwiderruflich, das optimistische Ausblenden hier ist es bewusst nicht.
+  async _deleteVoicemailMessage(messageId) {
+    if (!this._config || !this._config.entity_voicemail || !this._hass) return;
+    this._pendingDeletedMessageIds.add(messageId);
+    this._render();
+    try {
+      await this._hass.callService("fritzbox_anrufe", "delete_voicemail_message", {
+        message_id: messageId,
+        entity_id: this._config.entity_voicemail,
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("fritzbox_anrufe: Löschen der Anrufbeantworter-Nachricht fehlgeschlagen", err);
+      this._pendingDeletedMessageIds.delete(messageId);
+      this._render();
+    }
   }
 
   _render() {
@@ -1490,16 +1357,11 @@ class FritzboxAnrufeCard extends HTMLElement {
 
     this.shadowRoot.querySelectorAll(".voicemail-play-btn").forEach((btn) => {
       btn.addEventListener("click", () =>
-        playVoicemail(
-          this._hass,
-          btn,
-          (url) => this._objectUrls.push(url),
-          () => this._catchUpRender()
-        )
+        playVoicemail(this._hass, btn, (url) => this._objectUrls.push(url))
       );
     });
 
-    // Papierkorb-Button + Inline-Bestätigung (seit v1.0.5b0, EXPERIMENTELL) -
+    // Papierkorb-Button + Inline-Bestätigung (seit v1.0.5b3, EXPERIMENTELL) -
     // siehe Moduldoku oben. Zwei getrennte Klicks statt eines nativen
     // confirm(): erster Klick zeigt "Wirklich löschen?" nur für DIESE
     // Nachricht (ein erneuter Re-Render tauscht die anderen Zeilen nicht an).
@@ -1534,12 +1396,7 @@ class FritzboxAnrufeCard extends HTMLElement {
         // let its own controls handle further clicks instead of re-triggering.
         if (row.querySelector("audio")) return;
         if (row.dataset.mediaUrl) {
-          playCallRecording(
-            this._hass,
-            row,
-            (url) => this._objectUrls.push(url),
-            () => this._catchUpRender()
-          );
+          playCallRecording(this._hass, row, (url) => this._objectUrls.push(url));
           return;
         }
         if (row.dataset.targetTab) {
@@ -1759,7 +1616,7 @@ const EDITOR_LABELS = {
   show_processing_ausgehend: "Weiterverarbeitung bei 'Ausgehend' anzeigen",
   show_processing_verpasst: "Weiterverarbeitung bei 'Verpasst' anzeigen",
   show_filter_bar: "Filter-/Sortierleiste auf der Karte anzeigen",
-  show_delete_button: "Papierkorb-Button je Anrufbeantworter-Nachricht anzeigen (experimentell)",
+  show_delete_button: "Papierkorb-Button zum Löschen von Anrufbeantworter-Nachrichten anzeigen",
   // Farben (seit v1.0.4, seit v1.0.4b1 nicht mehr über <ha-form> gerendert)
   // sind hier absichtlich NICHT mehr gelistet - siehe COLOR_EDITOR_FIELDS
   // und FritzboxAnrufeCardEditor._buildColorSection() weiter unten.
@@ -1772,7 +1629,7 @@ const EDITOR_HELPERS = {
   show_filter_bar:
     "Zeigt auf der Karte eine Leiste zum Filtern nach eigener Rufnummer (nur Anrufliste, nicht Anrufbeantworter) und zum Sortieren (Datum/Dauer/Name).",
   show_delete_button:
-    "Zeigt einen Papierkorb-Button je Nachricht im Anrufbeantworter-Tab. Löschen ist UNWIDERRUFLICH (kein Papierkorb auf der FRITZ!Box) und noch nicht an echter Hardware bestätigt - bitte zunächst mit unwichtigen Nachrichten testen.",
+    "EXPERIMENTELL: Löschen ist unwiderruflich - die FRITZ!Box selbst hat keinen Papierkorb dafür. Vor dem endgültigen Löschen erscheint eine Bestätigung.",
 };
 
 function computeEditorLabel(schemaItem) {
