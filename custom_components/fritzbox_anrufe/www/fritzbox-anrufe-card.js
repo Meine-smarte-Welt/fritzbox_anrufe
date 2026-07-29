@@ -133,6 +133,23 @@
  * each change easier to verify in isolation before the next one lands on
  * top of it.
  *
+ * v1.0.5b4: the "auto_mark_read" step promised above, now that Thorsten
+ * confirmed the delete feature works well in practice. A new Options-Flow
+ * switch (integration level, NOT a card config key - see const.py's
+ * `CONF_AUTO_MARK_READ` docstring for why) clears a message's "Neu" status
+ * directly on the FRITZ!Box itself (`MarkMessage` TR-064 action, see
+ * tam.py) right after it has been played back through this integration -
+ * matching what happens when a message is played back on a real FRITZ!Box
+ * device/app, which is what Thorsten asked for. Off by default. This
+ * reintroduces the exact re-render race the abandoned v1.0.5b0-b2 line's b1
+ * paragraph above describes (a coordinator refresh fired by
+ * `maybe_auto_mark_read()` during active playback tearing down the in-
+ * progress `<audio>` element) - so `FritzboxAnrufeCard._hasActiveMediaPlayback()`
+ * / `_catchUpRender()` and the `onEnded` callback wiring on
+ * `playVoicemail()`/`playCallRecording()` (all below) are ported back in
+ * alongside it, this time verified together with `auto_mark_read` from the
+ * start rather than discovered as a follow-up bug.
+ *
  * Playback: the FRITZ!Box audio recording is served by this integration's
  * own authenticated proxy endpoint (see http.py), which requires a valid
  * Home Assistant session - a plain <audio src="..."> cannot supply that
@@ -766,8 +783,14 @@ const PROCESSING_ROW_STYLES = `
  * Download one message's audio via the authenticated fetch API exposed to
  * custom cards (hass.fetchWithAuth), turn it into a blob object URL, and
  * swap the "Abspielen" button for a real, playable <audio> element.
+ *
+ * `onEnded` (seit dem auto_mark_read-Re-Render-Bugfix, siehe
+ * FritzboxAnrufeCard._hasActiveMediaPlayback()/_catchUpRender()): wird beim
+ * natürlichen Ende der Wiedergabe aufgerufen, damit die Karte einen
+ * inzwischen fälligen, aber wegen der laufenden Wiedergabe zurückgehaltenen
+ * Re-Render jetzt nachholen kann (z. B. um den "Neu"-Status zu aktualisieren).
  */
-async function playVoicemail(hass, button, onObjectUrlCreated) {
+async function playVoicemail(hass, button, onObjectUrlCreated, onEnded) {
   const slot = button.closest(".voicemail-player-slot");
   const mediaUrl = slot && slot.dataset.mediaUrl;
   if (!mediaUrl || !hass || !hass.fetchWithAuth) return;
@@ -789,12 +812,14 @@ async function playVoicemail(hass, button, onObjectUrlCreated) {
     audio.autoplay = true;
     audio.className = "voicemail-player";
     audio.src = objectUrl;
+    if (onEnded) audio.addEventListener("ended", () => onEnded());
     slot.replaceChildren(audio);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("fritzbox_anrufe: Anrufbeantworter-Wiedergabe fehlgeschlagen", err);
     button.disabled = false;
     button.innerHTML = `<ha-icon icon="mdi:alert-circle-outline"></ha-icon><span>Fehler – erneut versuchen</span>`;
+    if (onEnded) onEnded();
   }
 }
 
@@ -804,9 +829,10 @@ async function playVoicemail(hass, button, onObjectUrlCreated) {
  * Anrufbeantworter tab's own message list - reuses the identical
  * hass.fetchWithAuth()-to-blob-object-URL approach, just swapping the
  * *whole* row's content (arrow+icon+label) for the <audio> element instead
- * of a dedicated player slot next to a button.
+ * of a dedicated player slot next to a button. `onEnded`: siehe
+ * playVoicemail() oben.
  */
-async function playCallRecording(hass, rowEl, onObjectUrlCreated) {
+async function playCallRecording(hass, rowEl, onObjectUrlCreated, onEnded) {
   const mediaUrl = rowEl.dataset.mediaUrl;
   if (!mediaUrl || !hass || !hass.fetchWithAuth) return;
 
@@ -827,12 +853,14 @@ async function playCallRecording(hass, rowEl, onObjectUrlCreated) {
     audio.autoplay = true;
     audio.className = "row-processing-player";
     audio.src = objectUrl;
+    if (onEnded) audio.addEventListener("ended", () => onEnded());
     rowEl.replaceChildren(audio);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("fritzbox_anrufe: Wiedergabe über die Weiterverarbeitungs-Zeile fehlgeschlagen", err);
     rowEl.classList.add("clickable");
     rowEl.innerHTML = `<ha-icon icon="mdi:alert-circle-outline"></ha-icon><span>Fehler – erneut versuchen</span>`;
+    if (onEnded) onEnded();
   }
 }
 
@@ -895,8 +923,76 @@ class FritzboxAnrufeCard extends HTMLElement {
     if (signature === this._lastSignature && this.shadowRoot.firstChild) {
       return;
     }
+    // Bugfix (seit v1.0.5b4, `auto_mark_read`): der Options-Flow-Schalter
+    // löst NACH JEDER Wiedergabe absichtlich eine Coordinator-Aktualisierung
+    // aus, um den "Neu"-Status zeitnah zu löschen (siehe voicemail.py:
+    // maybe_auto_mark_read()). Genau das ändert aber `entity_voicemail`s
+    // `last_updated` - also die Signatur oben - und würde damit ohne diesen
+    // Schutz exakt den einen Playback-Vorgang zerstören, den es gerade selbst
+    // ausgelöst hat: ein vollständiger Re-Render tauscht die gesamte
+    // Kartenoberfläche aus (siehe _render()/_revokeObjectUrls()), das
+    // laufende <audio>-Element wird dabei aus dem sichtbaren DOM entfernt
+    // (spielt technisch weiter, aber ohne jede sichtbare Bedienleiste) bzw.
+    // - falls der Refresh noch VOR dem Laden der Aufnahme eintrifft - der
+    // "Lädt …"-Button wird zurückgesetzt, während der ursprüngliche Klick-
+    // Handler noch auf das inzwischen losgelöste alte DOM-Element zeigt,
+    // sodass die fertige Aufnahme dort landet, wo sie niemand mehr sieht.
+    // Reproduzierbar bei JEDER Wiedergabe im Anrufbeantworter-Tab, sobald
+    // `auto_mark_read` aktiv ist (dort ist `message.Index` immer bekannt,
+    // der Refresh also garantiert) - über die Weiterverarbeitungs-Zeile nur,
+    // wenn der Anruf zusätzlich eindeutig einer Anrufbeantworter-Nachricht
+    // zugeordnet werden konnte. Fix: einen laufenden oder gerade erst
+    // gestarteten Wiedergabevorgang erkennen und den Re-Render in diesem
+    // Fall verschieben, statt die Karte trotzdem neu aufzubauen - bewusst
+    // OHNE `_lastSignature` zu aktualisieren, damit der nächste reguläre
+    // hass-Push (der ohnehin bald eintrifft) die inzwischen verpasste
+    // Aktualisierung (z. B. den verschwundenen "Neu"-Status) sauber
+    // nachholt, sobald die Wiedergabe nicht mehr aktiv ist.
+    if (this._hasActiveMediaPlayback()) {
+      return;
+    }
     this._lastSignature = signature;
     this._render();
+  }
+
+  // Erkennt eine laufende ODER gerade erst angestoßene (noch ladende)
+  // Wiedergabe, sowohl im Anrufbeantworter-Tab (.voicemail-player-slot) als
+  // auch in der Weiterverarbeitungs-Zeile (.row-processing) - siehe
+  // set hass() oben für den Grund. `.row-processing:not(.clickable)` deckt
+  // dort sowohl den "Lädt …"-Zwischenzustand als auch die fertige
+  // <audio>-Wiedergabe ab, da playCallRecording() die "clickable"-Klasse
+  // beim Laden entfernt und nie wieder hinzufügt. Ein bereits ZU ENDE
+  // gespieltes <audio>-Element (`.ended === true`) zählt bewusst NICHT mehr
+  // als aktiv - sonst würde _catchUpRender() nach dem natürlichen Ende der
+  // Wiedergabe für immer blockiert bleiben, da das <audio>-Element (mit
+  // sichtbarer Bedienleiste zum Nachhören) im DOM bestehen bleibt.
+  _hasActiveMediaPlayback() {
+    if (!this.shadowRoot) return false;
+    if (this.shadowRoot.querySelector(".voicemail-play-btn[disabled]")) return true;
+    if (this.shadowRoot.querySelector(".row-processing[data-media-url]:not(.clickable)")) {
+      const rowAudio = this.shadowRoot.querySelector(".row-processing-player");
+      if (!rowAudio || !rowAudio.ended) return true;
+    }
+    const voicemailAudio = this.shadowRoot.querySelector(".voicemail-player-slot audio");
+    if (voicemailAudio && !voicemailAudio.ended) return true;
+    return false;
+  }
+
+  // Wird aufgerufen, sobald eine Wiedergabe natürlich endet (audio "ended",
+  // siehe playVoicemail()/playCallRecording()) oder fehlschlägt - holt einen
+  // währenddessen zurückgehaltenen Re-Render jetzt nach, falls sich die
+  // Signatur inzwischen geändert hat (z. B. der "Neu"-Status durch
+  // auto_mark_read). Kein Effekt, falls sich nichts geändert hat oder
+  // inzwischen eine ANDERE Wiedergabe läuft (dann bleibt es weiterhin
+  // zurückgehalten, bis auch die vorbei ist).
+  _catchUpRender() {
+    if (!this._hass || !this._config) return;
+    if (this._hasActiveMediaPlayback()) return;
+    const signature = this._computeSignature();
+    if (signature !== this._lastSignature) {
+      this._lastSignature = signature;
+      this._render();
+    }
   }
 
   get hass() {
@@ -1357,7 +1453,12 @@ class FritzboxAnrufeCard extends HTMLElement {
 
     this.shadowRoot.querySelectorAll(".voicemail-play-btn").forEach((btn) => {
       btn.addEventListener("click", () =>
-        playVoicemail(this._hass, btn, (url) => this._objectUrls.push(url))
+        playVoicemail(
+          this._hass,
+          btn,
+          (url) => this._objectUrls.push(url),
+          () => this._catchUpRender()
+        )
       );
     });
 
@@ -1396,7 +1497,12 @@ class FritzboxAnrufeCard extends HTMLElement {
         // let its own controls handle further clicks instead of re-triggering.
         if (row.querySelector("audio")) return;
         if (row.dataset.mediaUrl) {
-          playCallRecording(this._hass, row, (url) => this._objectUrls.push(url));
+          playCallRecording(
+            this._hass,
+            row,
+            (url) => this._objectUrls.push(url),
+            () => this._catchUpRender()
+          );
           return;
         }
         if (row.dataset.targetTab) {
