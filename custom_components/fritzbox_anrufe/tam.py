@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 51c5a8600a5963575a5c88f6dd3142300b59c69b082b18108c8ff1015721256a
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): c0e9d34e6cd4702ad550b29a88e633ffdedf304b6d854978674daa2ca6839009
 """Wrapper around the FRITZ!Box answering machine (TAM) TR-064 API.
 
 EXPERIMENTAL - message list confirmed working on real hardware; audio
@@ -114,6 +114,16 @@ ACTION_MARK_MESSAGE = "MarkMessage"
 # Some FRITZ!OS versions expose more than one answering machine ("TAM
 # index" 0, 1, ...). We only support the first/default one for now.
 DEFAULT_TAM_INDEX = "0"
+
+# Seit v1.0.6b1: optionaler zweiter Anrufbeantworter (CONF_SECOND_TAM in
+# const.py). Reuses the already-hardware-confirmed GetMessageList action
+# (see FritzTam below) with a different NewIndex - deliberately avoids
+# calling GetInfo, whose exact output argument names could not be
+# confirmed (see project history). If a FRITZ!Box has no second TAM at
+# this index, GetMessageList simply returns no usable URL and the second
+# sensor ends up unavailable - same graceful-failure behaviour as the
+# primary TAM, never blocks integration setup.
+SECOND_TAM_INDEX = "1"
 
 # See the module docstring: the exact output parameter name of
 # GetMessageList could not be confirmed against real hardware, so both

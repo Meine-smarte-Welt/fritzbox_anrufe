@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 85bb4d0d44d565ee28d7d247d58b0fff2242eee7435fd2e9dc62f12bb5998077
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): a75f0afd54dead47a0b04776a215d8a805c754f87d84f6016d2c8204ae576aa0
 """Constants for the AVM Fritz!Box call monitor integration."""
 
 from enum import StrEnum
@@ -180,3 +180,40 @@ def conf_call_log_days(call_type: str) -> str:
 # Bewusst auf Integrations- statt Karten-Ebene angesiedelt - siehe README.
 CONF_AUTO_MARK_READ = "auto_mark_read"
 DEFAULT_AUTO_MARK_READ = False
+
+# Event (seit v1.0.6b0): gefeuert von FritzTamCoordinator, sobald beim
+# Abruf der Anrufbeantworter-Nachrichtenliste eine gegenüber dem
+# vorherigen Abruf neue Nachrichten-ID entdeckt wird - siehe voicemail.py.
+# Bewusst NICHT beim allerersten Abruf nach einem (Neu-)Start gefeuert,
+# sonst gäbe es bei jedem Home-Assistant-Neustart Events für längst
+# bekannte, nur noch nicht abgehörte Nachrichten. Direkt als
+# Automations-Auslöser nutzbar, ohne die messages-Attributliste selbst per
+# Vorlage auf neu hinzugekommene Einträge vergleichen zu müssen - siehe
+# README.
+EVENT_NEW_VOICEMAIL_MESSAGE = f"{DOMAIN}_new_voicemail_message"
+
+# --- Spam-Erkennung (seit v1.0.6b1) -------------------------------------
+# Die FRITZ!Box liefert über TR-064 KEIN natives Spam-/KI-Erkennungsfeld -
+# siehe spam.py für die ausführliche Begründung. CONF_SPAM_NUMBERS ist eine
+# vom Nutzer im Options-Flow gepflegte Liste von Nummern/Vorwahlen
+# (Präfix-Abgleich), analog zu CONF_PREFIXES oben - bewusst keine eigene
+# DEFAULT_SPAM_NUMBERS-Konstante, options.get() liefert dann None/leer.
+CONF_SPAM_NUMBERS = "spam_numbers"
+
+# --- Zweiter Anrufbeantworter (seit v1.0.6b1) ---------------------------
+# Manche FRITZ!Box-Modelle/-Konfigurationen erlauben einen zweiten
+# Anrufbeantworter ("TAM-Index" 1) zusätzlich zum ersten (Index 0, siehe
+# tam.py:DEFAULT_TAM_INDEX). Standardmäßig AUS, da die meisten Nutzer nur
+# einen Anrufbeantworter eingerichtet haben - siehe config_flow.py.
+CONF_SECOND_TAM = "second_tam_enabled"
+DEFAULT_SECOND_TAM = False
+
+# Zweiter Anrufbeantworter-Sensor (fritzbox_anrufe_anrufbeantworter_2) -
+# eigener translation_key/Icon, siehe sensor.py/strings.json/icons.json.
+CALL_TYPE_VOICEMAIL_2 = "anrufbeantworter_2"
+
+# Eigene Proxy-Route für den zweiten Anrufbeantworter (siehe http.py:
+# FritzBoxTam2MediaView) - bewusst getrennt von TAM_MEDIA_URL_BASE, damit
+# der bereits an echter Hardware bestätigte Wiedergabe-Pfad des ersten
+# Anrufbeantworters unangetastet bleibt.
+TAM2_MEDIA_URL_BASE = "/api/fritzbox_anrufe/tam2_media"

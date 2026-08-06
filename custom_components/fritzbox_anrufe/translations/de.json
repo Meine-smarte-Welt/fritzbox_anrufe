@@ -63,16 +63,36 @@
           "talking": "Gespräch läuft"
         },
         "state_attributes": {
-          "accepted": { "name": "Angenommen" },
-          "closed": { "name": "Beendet" },
-          "device": { "name": "Gerät" },
-          "duration": { "name": "Dauer" },
-          "from": { "name": "Anrufernummer" },
-          "from_name": { "name": "Anrufername" },
-          "initiated": { "name": "Initiiert" },
-          "prefixes": { "name": "Präfixe" },
-          "to": { "name": "Angerufene Nummer" },
-          "to_name": { "name": "Angerufener Name" },
+          "accepted": {
+            "name": "Angenommen"
+          },
+          "closed": {
+            "name": "Beendet"
+          },
+          "device": {
+            "name": "Gerät"
+          },
+          "duration": {
+            "name": "Dauer"
+          },
+          "from": {
+            "name": "Anrufernummer"
+          },
+          "from_name": {
+            "name": "Anrufername"
+          },
+          "initiated": {
+            "name": "Initiiert"
+          },
+          "prefixes": {
+            "name": "Präfixe"
+          },
+          "to": {
+            "name": "Angerufene Nummer"
+          },
+          "to_name": {
+            "name": "Angerufener Name"
+          },
           "type": {
             "name": "Typ",
             "state": {
@@ -80,33 +100,55 @@
               "outgoing": "Ausgehend"
             }
           },
-          "vip": { "name": "Wichtig" },
-          "with": { "name": "Mit Nummer" },
-          "with_name": { "name": "Mit Name" }
+          "vip": {
+            "name": "Wichtig"
+          },
+          "with": {
+            "name": "Mit Nummer"
+          },
+          "with_name": {
+            "name": "Mit Name"
+          }
         }
       },
       "fritzbox_anrufe_eingehend": {
         "name": "Angenommene Anrufe {phonebook_name}",
         "state_attributes": {
-          "calls": { "name": "Anrufe" }
+          "calls": {
+            "name": "Anrufe"
+          }
         }
       },
       "fritzbox_anrufe_ausgehend": {
         "name": "Ausgehende Anrufe {phonebook_name}",
         "state_attributes": {
-          "calls": { "name": "Anrufe" }
+          "calls": {
+            "name": "Anrufe"
+          }
         }
       },
       "fritzbox_anrufe_verpasst": {
         "name": "Verpasste Anrufe {phonebook_name}",
         "state_attributes": {
-          "calls": { "name": "Anrufe" }
+          "calls": {
+            "name": "Anrufe"
+          }
         }
       },
       "fritzbox_anrufe_anrufbeantworter": {
         "name": "Anrufbeantworter {phonebook_name}",
         "state_attributes": {
-          "messages": { "name": "Nachrichten" }
+          "messages": {
+            "name": "Nachrichten"
+          }
+        }
+      },
+      "fritzbox_anrufe_anrufbeantworter_2": {
+        "name": "Anrufbeantworter 2 {phonebook_name}",
+        "state_attributes": {
+          "messages": {
+            "name": "Nachrichten"
+          }
         }
       }
     }
@@ -137,13 +179,17 @@
           "call_log_limit_type_verpasst": "Verpasste Anrufe: Modus",
           "call_log_count_verpasst": "Verpasste Anrufe: Anzahl (falls 'Anzahl Anrufe' gewählt)",
           "call_log_days_verpasst": "Verpasste Anrufe: Anzahl Tage (falls 'Anzahl Tage' gewählt)",
-          "auto_mark_read": "Nach Wiedergabe automatisch als gelesen markieren"
+          "auto_mark_read": "Nach Wiedergabe automatisch als gelesen markieren",
+          "spam_numbers": "Spam-Nummern/-Vorwahlen (kommagetrennte Liste)",
+          "second_tam_enabled": "Zweiten Anrufbeantworter aktivieren"
         },
         "data_description": {
           "call_log_limit_type_eingehend": "Bestimmt, ob der Sensor fritzbox_anrufe_eingehend (Angenommene Anrufe) nach Anzahl oder nach Zeitraum begrenzt wird.",
           "call_log_limit_type_ausgehend": "Bestimmt, ob der Sensor fritzbox_anrufe_ausgehend nach Anzahl oder nach Zeitraum begrenzt wird.",
           "call_log_limit_type_verpasst": "Bestimmt, ob der Sensor fritzbox_anrufe_verpasst nach Anzahl oder nach Zeitraum begrenzt wird.",
-          "auto_mark_read": "Wenn aktiviert, wird beim Abspielen einer Anrufbeantworter-Nachricht über diese Integration (Dashboard-Karte oder Service) die 'Neu'-Markierung auch direkt auf der FRITZ!Box entfernt - wie bei echter FRITZ!Box-Hardware/-Apps. Standardmäßig aus, da dies einen von allen Geräten/Apps geteilten Zustand auf der Box ändert (z. B. auch die Anzahl ungelesener Nachrichten in FRITZ!App Fon), nicht nur dieses Dashboard. Experimentell, siehe README."
+          "auto_mark_read": "Wenn aktiviert, wird beim Abspielen einer Anrufbeantworter-Nachricht über diese Integration (Dashboard-Karte oder Service) die 'Neu'-Markierung auch direkt auf der FRITZ!Box entfernt - wie bei echter FRITZ!Box-Hardware/-Apps. Standardmäßig aus, da dies einen von allen Geräten/Apps geteilten Zustand auf der Box ändert (z. B. auch die Anzahl ungelesener Nachrichten in FRITZ!App Fon), nicht nur dieses Dashboard. Experimentell, siehe README.",
+          "spam_numbers": "Ein Anruf oder eine Anrufbeantworter-Nachricht wird als Spam markiert, wenn die Nummer mit einem dieser Einträge als Präfix übereinstimmt, ODER wenn die FRITZ!Box den Anruf bereits selbst blockiert hat. Die FRITZ!Box hat keine native, automatische Spam-Erkennung - diese Liste wird von dir gepflegt. Leer lassen, um dich nur auf die eigene Sperrliste der FRITZ!Box zu verlassen.",
+          "second_tam_enabled": "Wenn deine FRITZ!Box einen zweiten Anrufbeantworter konfiguriert hat, aktiviere dies, um auch dessen Nachrichten als zweiten Sensor (fritzbox_anrufe_anrufbeantworter_2) abzurufen. Richte eine zweite Karteninstanz auf diesen Sensor, um ihn anzuzeigen - siehe README."
         }
       }
     }
@@ -151,25 +197,11 @@
   "services": {
     "delete_voicemail_message": {
       "name": "Anrufbeantworter-Nachricht löschen",
-      "description": "Löscht eine einzelne Anrufbeantworter-Nachricht UNWIDERRUFLICH von der FRITZ!Box (kein Papierkorb). Experimentell, siehe README.",
+      "description": "Löscht eine Anrufbeantworter-Nachricht unwiderruflich von der FRITZ!Box. Es gibt kein Undo - die FRITZ!Box selbst hat keinen Papierkorb für diese Nachrichten.",
       "fields": {
         "message_id": {
           "name": "Nachrichten-ID",
-          "description": "Die 'id' der Nachricht (siehe messages-Attribut des Anrufbeantworter-Sensors, oder der Papierkorb-Button auf der Dashboard-Karte)."
-        }
-      }
-    },
-    "mark_voicemail_message_read": {
-      "name": "Anrufbeantworter-Nachricht als gelesen/neu markieren",
-      "description": "Setzt oder entfernt die 'Neu'-Markierung einer Anrufbeantworter-Nachricht direkt auf der FRITZ!Box. Experimentell, siehe README.",
-      "fields": {
-        "message_id": {
-          "name": "Nachrichten-ID",
-          "description": "Die 'id' der Nachricht (siehe messages-Attribut)."
-        },
-        "read": {
-          "name": "Gelesen",
-          "description": "true = als gelesen markieren (Standard), false = wieder als neu markieren."
+          "description": "Die ID der Nachricht, zu finden im 'messages'-Attribut des fritzbox_anrufe-Anrufbeantworter-Sensors."
         }
       }
     }

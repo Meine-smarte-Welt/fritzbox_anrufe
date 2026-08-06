@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 99755697a3d5e8109801e9a87d37a3d4a29ff63f73036c4451749beb4886f7b7
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 1f510c4c463e393e49aea56b9f116a48ca090e0ca9a73890128a1c9bd2c6f5fc
 """The fritzbox_anrufe integration."""
 
 from dataclasses import dataclass
@@ -26,14 +26,18 @@ from .const import (
     CALL_TYPE_MISSED,
     CALL_TYPE_OUTGOING,
     CALL_TYPE_VOICEMAIL,
+    CALL_TYPE_VOICEMAIL_2,
     CONF_PHONEBOOK,
     CONF_PREFIXES,
+    CONF_SECOND_TAM,
+    DEFAULT_SECOND_TAM,
     DOMAIN,
     PLATFORMS,
     SERIAL_NUMBER,
+    TAM2_MEDIA_URL_BASE,
 )
-from .http import FritzBoxCallMediaView, FritzBoxTamMediaView
-from .tam import FritzTam
+from .http import FritzBoxCallMediaView, FritzBoxTam2MediaView, FritzBoxTamMediaView
+from .tam import SECOND_TAM_INDEX, FritzTam
 from .voicemail import FritzTamCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -205,9 +209,21 @@ def _async_register_tam_view(hass: HomeAssistant) -> None:
     hass.data[_TAM_VIEW_REGISTERED_KEY] = True
     hass.http.register_view(FritzBoxTamMediaView())
     hass.http.register_view(FritzBoxCallMediaView())
+    # Seit v1.0.6b1 - eigene View für den zweiten Anrufbeantworter, siehe
+    # http.py:FritzBoxTam2MediaView. Immer registriert (kostet nichts,
+    # liefert einfach 404, solange kein zweiter Anrufbeantworter
+    # konfiguriert ist), damit spätere Aktivierung per Options-Flow ohne
+    # HA-Neustart funktioniert.
+    hass.http.register_view(FritzBoxTam2MediaView())
 
 
-def _async_reserve_entity_ids(hass: HomeAssistant, config_entry: ConfigEntry, unique_id: str) -> None:
+def _async_reserve_entity_ids(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    unique_id: str,
+    *,
+    second_tam_enabled: bool = False,
+) -> None:
     """Reserve fixed, language-neutral entity_ids for the fritzbox_anrufe sensors.
 
     Home Assistant computes an entity's entity_id from its (translated,
@@ -227,6 +243,10 @@ def _async_reserve_entity_ids(hass: HomeAssistant, config_entry: ConfigEntry, un
     -> "Entity ID"). With more than one FRITZ!Box account configured, the
     second/third account's sensors get "_2"/"_3" suffixes, same as any
     other Home Assistant entity_id collision.
+
+    ``second_tam_enabled`` (seit v1.0.6b1) reserviert zusätzlich den
+    entity_id des zweiten Anrufbeantworter-Sensors, nur wenn der zweite
+    Anrufbeantworter per Options-Flow aktiviert wurde.
     """
     registry = er.async_get(hass)
     reservations = {
@@ -236,6 +256,8 @@ def _async_reserve_entity_ids(hass: HomeAssistant, config_entry: ConfigEntry, un
         f"{unique_id}-{CALL_TYPE_MISSED}": f"{DOMAIN}_{CALL_TYPE_MISSED}",
         f"{unique_id}-{CALL_TYPE_VOICEMAIL}": f"{DOMAIN}_{CALL_TYPE_VOICEMAIL}",
     }
+    if second_tam_enabled:
+        reservations[f"{unique_id}-{CALL_TYPE_VOICEMAIL_2}"] = f"{DOMAIN}_{CALL_TYPE_VOICEMAIL_2}"
     for sensor_unique_id, suggested_object_id in reservations.items():
         registry.async_get_or_create(
             "sensor",
@@ -257,6 +279,9 @@ class FritzBoxRuntimeData:
     phonebook: FritzBoxPhonebook
     call_log_coordinator: FritzCallLogCoordinator
     tam_coordinator: FritzTamCoordinator | None = None
+    # Seit v1.0.6b1 - zweiter Anrufbeantworter, nur gesetzt wenn per
+    # Options-Flow (CONF_SECOND_TAM) aktiviert, siehe async_setup_entry.
+    tam_coordinator_2: FritzTamCoordinator | None = None
 
 
 type FritzBoxCallMonitorConfigEntry = ConfigEntry[FritzBoxRuntimeData]
@@ -306,6 +331,26 @@ async def async_setup_entry(
     tam_coordinator = FritzTamCoordinator(hass, config_entry, fritz_tam)
     await tam_coordinator.async_refresh()
 
+    # Zweiter Anrufbeantworter (seit v1.0.6b1, optional - siehe
+    # const.py:CONF_SECOND_TAM). Reuses the same, already-authenticated
+    # TR-064 connection, nur mit anderem TAM-Index (tam.py:
+    # SECOND_TAM_INDEX). async_refresh() statt
+    # async_config_entry_first_refresh() - genau wie beim ersten
+    # Anrufbeantworter blockiert ein FRITZ!Box, die gar keinen zweiten
+    # Anrufbeantworter hat, damit niemals das Setup.
+    second_tam_enabled = config_entry.options.get(CONF_SECOND_TAM, DEFAULT_SECOND_TAM)
+    tam_coordinator_2: FritzTamCoordinator | None = None
+    if second_tam_enabled:
+        fritz_tam_2 = FritzTam(fc=fritzbox_phonebook.fph.fc, index=SECOND_TAM_INDEX)
+        tam_coordinator_2 = FritzTamCoordinator(
+            hass,
+            config_entry,
+            fritz_tam_2,
+            media_url_base=TAM2_MEDIA_URL_BASE,
+            tam_label="2",
+        )
+        await tam_coordinator_2.async_refresh()
+
     # Reuse the already-authenticated TR-064 connection opened for the
     # phonebook lookup instead of opening a second one just for the call list.
     fritz_call = FritzCall(fc=fritzbox_phonebook.fph.fc)
@@ -320,12 +365,15 @@ async def async_setup_entry(
     await call_log_coordinator.async_refresh()
 
     unique_id = f"{config_entry.data[SERIAL_NUMBER]}-{config_entry.data[CONF_PHONEBOOK]}"
-    _async_reserve_entity_ids(hass, config_entry, unique_id)
+    _async_reserve_entity_ids(
+        hass, config_entry, unique_id, second_tam_enabled=second_tam_enabled
+    )
 
     config_entry.runtime_data = FritzBoxRuntimeData(
         phonebook=fritzbox_phonebook,
         call_log_coordinator=call_log_coordinator,
         tam_coordinator=tam_coordinator,
+        tam_coordinator_2=tam_coordinator_2,
     )
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 

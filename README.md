@@ -67,6 +67,9 @@ mitgelieferte Dashboard-Karte.
   FRITZ!Box ein zweiter Anrufbeantworter eingerichtet, kann dessen
   Nachrichtenliste als eigener Sensor abgerufen werden, siehe
   [Zweiter Anrufbeantworter](#zweiter-anrufbeantworter-seit-version-106b1-optional).
+  Seit Version 1.0.6b2 zeigt die Dashboard-Karte ihn optional direkt mit an
+  (`entity_voicemail_2`, gemischt oder in getrennten Abschnitten), statt nur
+  über eine zweite Karteninstanz.
 - Alternative: einfache YAML-Tabellenkarte auf Basis von `flex-table-card`
   (siehe [`examples/dashboard_flex_table.yaml`](examples/dashboard_flex_table.yaml)).
 
@@ -367,16 +370,35 @@ zweite Sensor einfach dauerhaft "nicht verfügbar" - das blockiert die
 Anrufbeantworter bei fehlender Berechtigung oder unbestätigter
 TR-064-API-Form (siehe [Bekannte Einschränkungen](#bekannte-einschränkungen)).
 
-**Kein eigener zweiter Tab auf der Dashboard-Karte:** Die mitgelieferte
-Karte zeigt weiterhin nur einen Anrufbeantworter-Tab. Um den zweiten
-Anrufbeantworter im Dashboard zu sehen, eine zweite Karteninstanz
-hinzufügen und deren `entity_voicemail` auf
-`sensor.fritzbox_anrufe_anrufbeantworter_2` zeigen lassen (die anderen
-Kategorien der zweiten Karteninstanz lassen sich über die
-Kategorien-Einstellungen ausblenden, falls nur der Anrufbeantworter
-gezeigt werden soll). Eine echte zweite Tab-Ansicht innerhalb einer
-einzigen Karteninstanz ist eine mögliche künftige Erweiterung, aber (noch)
-nicht umgesetzt.
+**Auf der Dashboard-Karte anzeigen (seit Version 1.0.6b2):** Die
+mitgelieferte Karte kann den zweiten Anrufbeantworter direkt in derselben
+Karte mit anzeigen - weiterhin unter demselben Anrufbeantworter-Tab, kein
+zusätzliches, sechstes Symbol in der Icon-Leiste. Dafür im Editor (oder per
+YAML) `entity_voicemail_2` auf `sensor.fritzbox_anrufe_anrufbeantworter_2`
+setzen; `voicemail_2_mode` bestimmt dann, WIE beide Listen dargestellt
+werden:
+
+- **`merged`** (Standard): eine gemeinsame, chronologisch gemischte Liste -
+  jede Nachricht bekommt ein kleines "AB 1"/"AB 2"-Badge, damit erkennbar
+  bleibt, von welchem Anrufbeantworter sie stammt.
+- **`separate`**: zwei eigene, überschriebene Abschnitte ("Anrufbeantworter
+  1"/"Anrufbeantworter 2") untereinander, jeweils unvermischt - ohne Badge,
+  da die Überschriften bereits eindeutig trennen.
+
+Löschen (`show_delete_button`) und Spam-Ausblenden (`hide_spam`)
+funktionieren in beiden Modi unverändert für beide Anrufbeantworter, auch
+wenn deren Nachrichten-IDs sich überschneiden (die FRITZ!Box zählt bei
+jedem Anrufbeantworter unabhängig ab 0) - die Karte unterscheidet intern
+anhand des jeweiligen Sensors.
+
+Ohne gesetztes `entity_voicemail_2` verhält sich die Karte exakt wie vor
+Version 1.0.6b2 (eine einzelne Liste, kein Badge). Alternativ - z. B. für
+zwei optisch komplett unabhängige Kartenwidgets an unterschiedlichen
+Stellen im Dashboard - funktioniert weiterhin auch eine zweite, eigene
+Karteninstanz mit `entity_voicemail: sensor.fritzbox_anrufe_anrufbeantworter_2`
+(die andere Kategorien über die Kategorien-Einstellungen ausblendet, falls
+gewünscht). Eine echte zweite Tab-Ansicht (sechstes Icon in der Leiste)
+bleibt eine mögliche künftige Erweiterung, aber (noch) nicht umgesetzt.
 
 ## Einstellungen (Optionen)
 
@@ -466,6 +488,7 @@ entity_eingehend: sensor.fritz_box_7590_eingehende_anrufe
 entity_ausgehend: sensor.fritz_box_7590_ausgehende_anrufe
 entity_verpasst: sensor.fritz_box_7590_verpasste_anrufe
 entity_voicemail: sensor.fritz_box_7590_anrufbeantworter  # optional, experimentell
+entity_voicemail_2: sensor.fritz_box_7590_anrufbeantworter_2  # optional, seit Version 1.0.6b2
 max_rows: 10
 show_alle: true
 show_eingehend: true
@@ -495,6 +518,12 @@ show_delete_button: false
 # Integrations-Optionen definiert, siehe
 # https://github.com/Meine-smarte-Welt/fritzbox_anrufe#spam-erkennung-seit-version-106b1-optional
 hide_spam: false
+# Darstellung mit zweitem Anrufbeantworter (seit Version 1.0.6b2, optional,
+# nur mit gesetztem entity_voicemail_2) - "merged" mischt beide
+# Nachrichtenlisten chronologisch mit einem "AB 1"/"AB 2"-Badge pro
+# Nachricht, "separate" zeigt stattdessen zwei eigene, überschriebene
+# Abschnitte untereinander.
+voicemail_2_mode: merged
 # Farben (seit Version 1.0.4, optional) - CSS-Farbwert (Hex, rgb()/rgba(),
 # hsl(), oder eine Theme-Variable wie var(--accent-color)); leer/weggelassen
 # = bisherige Standardfarbe.
@@ -515,8 +544,9 @@ color_icon_anrufbeantworter: ""
 **Grafischer Editor:** Statt die Karte per YAML zu konfigurieren, kann sie
 über die normale Lovelace-Karten-Auswahl bearbeitet werden ("Karte
 bearbeiten" → es öffnet sich automatisch ein Home-Assistant-Standardformular
-statt des YAML-Editors). Dort lassen sich Titel, alle fünf Sensoren sowie die
-Zeilenanzahl per Eingabefeld/Entity-Picker setzen. Die tatsächlichen
+statt des YAML-Editors). Dort lassen sich Titel, alle sechs Sensoren
+(inkl. des seit Version 1.0.6b2 optionalen zweiten Anrufbeantworters) sowie
+die Zeilenanzahl per Eingabefeld/Entity-Picker setzen. Die tatsächlichen
 Entity-IDs findest du unter Einstellungen → Geräte & Dienste → Entitäten
 (Suche nach "Anrufe"/"Call monitor"/"Anrufbeantworter"). Seit Version 1.0.4
 ist der Editor in aufklappbare Abschnitte gruppiert (Sensoren, Kategorien,
@@ -755,6 +785,17 @@ solche Einträge stattdessen komplett aus der Anrufliste bzw. der
 Nachrichtenliste aus, sowohl auf dem "Alle"/"Gesamt"-Tab als auch auf den
 Einzelkategorien.
 
+### Zweiten Anrufbeantworter anzeigen (seit Version 1.0.6b2, optional)
+
+Mit gesetztem `entity_voicemail_2` (siehe
+[Zweiter Anrufbeantworter](#zweiter-anrufbeantworter-seit-version-106b1-optional))
+zeigt der Anrufbeantworter-Tab beide Nachrichtenlisten. `voicemail_2_mode`
+wählt zwischen `merged` (Standard, eine gemeinsame chronologische Liste mit
+"AB 1"/"AB 2"-Badge je Nachricht) und `separate` (zwei eigene, überschriebene
+Abschnitte untereinander, unvermischt). Papierkorb-Button und
+Spam-Ausblenden funktionieren dabei für beide Anrufbeantworter wie gewohnt.
+Ohne `entity_voicemail_2` ändert sich am bisherigen Verhalten nichts.
+
 ### Variante 2: flex-table-card (YAML, spaltenweise ein-/ausblendbar)
 
 Für eine klassische, tabellarische Darstellung mit frei konfigurierbaren
@@ -949,12 +990,30 @@ die dortigen Maintainer den Fehler beheben.
   Entwicklungsumgebung) noch nicht an echter Hardware mit tatsächlich
   konfiguriertem zweiten Anrufbeantworter verifiziert - bei fehlender
   Hardware-Unterstützung bleibt der zweite Sensor einfach dauerhaft "nicht
-  verfügbar", ohne die übrige Integration zu beeinträchtigen. Außerdem gibt
-  es (noch) keinen eigenen zweiten Tab in der Dashboard-Karte - siehe
-  [Zweiter Anrufbeantworter](#zweiter-anrufbeantworter-seit-version-106b1-optional)
-  für die empfohlene Umgehung (zweite Karteninstanz).
+  verfügbar", ohne die übrige Integration zu beeinträchtigen. Es gibt
+  weiterhin keinen eigenen sechsten Tab/Icon in der Kartenkopfzeile dafür -
+  seit Version 1.0.6b2 lässt sich der zweite Anrufbeantworter aber direkt
+  im bestehenden Anrufbeantworter-Tab mit anzeigen (`entity_voicemail_2`),
+  siehe [Zweiten Anrufbeantworter anzeigen](#zweiten-anrufbeantworter-anzeigen-seit-version-106b2-optional).
 
 ## Versionshistorie
+
+- **1.0.6b2** (Vorabversion): Der zweite Anrufbeantworter (siehe 1.0.6b1
+  unten) lässt sich jetzt direkt in derselben Dashboard-Karte mit anzeigen,
+  statt nur über eine zweite Karteninstanz - neues, optionales Karten-Feld
+  `entity_voicemail_2`. `voicemail_2_mode` bestimmt die Darstellung:
+  `merged` (Standard, eine gemeinsame chronologische Liste mit "AB 1"/"AB
+  2"-Badge je Nachricht) oder `separate` (zwei eigene, überschriebene
+  Abschnitte untereinander). Weiterhin nur EIN Anrufbeantworter-Tab, kein
+  zusätzliches, sechstes Icon in der Kopfzeile - siehe
+  [Zweiten Anrufbeantworter anzeigen](#zweiten-anrufbeantworter-anzeigen-seit-version-106b2-optional).
+  Rein clientseitige Änderung an der Karte (`www/fritzbox-anrufe-card.js`) -
+  keine Änderung an der Integration selbst nötig, da beide zugrunde
+  liegenden Sensoren bereits seit 1.0.6b1 existieren. Nebeneffekt: eine
+  Anrufbeantworter-Nachricht mit Index 0 (die jeweils erste Nachricht)
+  bekommt jetzt korrekt einen Papierkorb-Button angezeigt - vorher verhinderte
+  eine Wahrheitswert-Prüfung auf die (bei Index 0 falsy) rohe Nachrichten-ID
+  das unbeabsichtigt.
 
 - **1.0.6b1** (Vorabversion): Zwei neue, unabhängig voneinander nutzbare
   Fähigkeiten. **Spam-Erkennung** (siehe
@@ -1164,7 +1223,7 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.0.6b1) |
+| Datei | SHA256 (Version 1.0.6b2) |
 | --- | --- |
 | `__init__.py` | `1f510c4c463e393e49aea56b9f116a48ca090e0ca9a73890128a1c9bd2c6f5fc` |
 | `base.py` | `a1a7b2c272431b63c5ce68264b3e0e34e0a9f7935fb9c6a73e1ce8dbbb633752` |
@@ -1177,8 +1236,8 @@ die komplette Datei, z. B. `sha256sum manifest.json`).
 | `tam.py` | `c0e9d34e6cd4702ad550b29a88e633ffdedf304b6d854978674daa2ca6839009` |
 | `voicemail.py` | `e0dcc988b2670810740cfe007eb0ddf1c91dec82bcf6b63c7aba07f58dcd700e` |
 | `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
-| `www/fritzbox-anrufe-card.js` | `f723e373f4d49830ab5d902dbcde0de54ab58e8a08d3fefe5e3d8b91299b1314` |
-| `manifest.json` | `08da90298d9f0b8e33af7dc53559d0100f5b1e6364b95614d6d0036c65a7292c` |
+| `www/fritzbox-anrufe-card.js` | `5545bcb449a6b4b86bd81d7f0e99a64b0cf5c2122b30ef09c5198078801d52f4` |
+| `manifest.json` | `46ce37b65d7809acbbc94dfc3450ed01c6eb84d21e08d8b82240b2e99e00fe33` |
 | `strings.json` | `eaedc2f668460566db8d23e303fbf03e72af80cdfcedafbee4e940bfc9bd3449` |
 | `translations/de.json` | `643a3eff2e1452f37dcabb859569cf4f711c2b8eb480d68f1c33f93466eea9eb` |
 | `translations/en.json` | `eaedc2f668460566db8d23e303fbf03e72af80cdfcedafbee4e940bfc9bd3449` |

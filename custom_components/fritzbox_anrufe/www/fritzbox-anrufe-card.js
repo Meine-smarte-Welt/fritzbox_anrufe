@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 3158a8e234a143c39e5845c3c312a4640820b59c700c6774f101e1c65119b2ad
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 5545bcb449a6b4b86bd81d7f0e99a64b0cf5c2122b30ef09c5198078801d52f4
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -182,6 +182,32 @@
  * hinterlassen" - both pairs collapse into one shared outcome each for
  * now).
  *
+ * v1.0.6b2: zweiter Anrufbeantworter DIREKT in derselben Karte (statt nur
+ * über eine zweite Karteninstanz, siehe v1.0.6b1). Neues, optionales Feld
+ * `entity_voicemail_2` - sobald gesetzt, holt die Karte zusätzlich dessen
+ * `messages`-Attribut (rein clientseitig, keine Änderung an der Integration
+ * nötig, da `sensor.fritzbox_anrufe_anrufbeantworter_2` bereits seit 1.0.6b1
+ * existiert) und zeigt beide Nachrichtenlisten weiterhin unter derselben
+ * "Anrufbeantworter"-Kategorie (kein zusätzlicher Tab). `voicemail_2_mode`
+ * bestimmt WIE: `merged` (Standard) mischt beide Listen chronologisch in
+ * eine gemeinsame Liste, jede Nachricht bekommt ein kleines "AB 1"/"AB
+ * 2"-Badge (analog zum Spam-Badge, siehe TAM_BADGE_STYLES); `separate`
+ * zeigt stattdessen zwei klar überschriebene Abschnitte untereinander,
+ * jeweils unvermischt. Beides bleibt bei leerem `entity_voicemail_2` exakt
+ * beim bisherigen 1.0.6b1-Verhalten - siehe CONFIG_DEFAULTS.
+ *
+ * Da die Nachrichten-`id` (FRITZ!Box-eigener TamMessage.Index) je
+ * Anrufbeantworter unabhängig bei 0 zählt, können beide Listen kollidierende
+ * IDs enthalten - für Lösch-/Bestätigungs-UI-Status verwendet die Karte
+ * daher intern einen zusammengesetzten Schlüssel `"<tam>:<id>"`
+ * (FritzboxAnrufeCard._voicemailsFor()); an den `delete_voicemail_message`-
+ * Service geht weiterhin die rohe, unveränderte `id` zusammen mit der
+ * jeweils korrekten `entity_id`. Als kleiner Nebeneffekt behebt der neue,
+ * garantiert nicht-leere Schlüssel eine vorher bestehende Lücke: eine
+ * Nachricht mit Index 0 (erste Nachricht überhaupt) bekam wegen einer
+ * Wahrheitswert-Prüfung auf die (dann falsy) rohe `id` bislang nie einen
+ * Papierkorb-Button angezeigt.
+ *
  * Example card configuration (YAML):
  *
  *   type: custom:fritzbox-anrufe-card
@@ -191,6 +217,8 @@
  *   entity_ausgehend: sensor.fritz_box_7590_ausgehende_anrufe
  *   entity_verpasst: sensor.fritz_box_7590_verpasste_anrufe
  *   entity_voicemail: sensor.fritz_box_7590_anrufbeantworter
+ *   entity_voicemail_2: sensor.fritz_box_7590_anrufbeantworter_2  # optional, seit 1.0.6b2
+ *   voicemail_2_mode: merged  # "merged" oder "separate", nur relevant mit entity_voicemail_2
  *   max_rows: 10
  *   show_alle: true
  *   show_eingehend: true
@@ -492,6 +520,23 @@ const CONFIG_DEFAULTS = {
   // unwiderruflich (die FRITZ!Box selbst hat keinen Papierkorb dafür), das
   // soll niemand versehentlich freigeschaltet bekommen.
   show_delete_button: false,
+  // Spam-Anrufe/-Nachrichten ausblenden (seit v1.0.6b1) - siehe spam.py in
+  // der Integration für die Definition von "Spam" (Kombination aus FRITZ!Box-
+  // eigener Sperrliste und einer vom Nutzer gepflegten Nummernliste).
+  // Standardmäßig aus, damit bestehende Dashboards nach einem Update
+  // optisch unverändert bleiben, exakt wie die anderen show_*-Schalter.
+  hide_spam: false,
+  // Zweiter Anrufbeantworter in derselben Karte (seit v1.0.6b1 gibt es
+  // dafür bereits einen eigenen Sensor, seit v1.0.6b2 kann diese Karte ihn
+  // direkt mit anzeigen statt nur über eine zweite Karteninstanz) - siehe
+  // Moduldoku oben. Leer = kein zweiter Anrufbeantworter, exakt das
+  // bisherige Verhalten.
+  entity_voicemail_2: "",
+  // "merged" (Standard) mischt beide Nachrichtenlisten chronologisch mit
+  // "AB 1"/"AB 2"-Badge, "separate" zeigt zwei getrennte Abschnitte
+  // untereinander - siehe Moduldoku oben. Ohne entity_voicemail_2 ohne
+  // jede Wirkung.
+  voicemail_2_mode: "merged",
   // Farben (seit v1.0.4) - leer = bisheriger, fester Theme-Farbwert (siehe
   // COLOR_CONFIG_KEYS oben für die jeweiligen Standardwerte).
   color_tab_active: "",
@@ -555,6 +600,11 @@ function renderVoicemailRows(messages, opts) {
     // siehe FritzboxAnrufeCard._confirmDeleteMessageId.
     showDeleteButton: false,
     confirmDeleteId: null,
+    // Zweiter Anrufbeantworter, "merged"-Modus (seit v1.0.6b2, siehe
+    // Moduldoku oben) - zeigt bei gesetztem msg._tam ein kleines "AB
+    // 1"/"AB 2"-Badge. Ungenutzt (und ohne jede Auswirkung), solange
+    // entity_voicemail_2 nicht konfiguriert ist.
+    showTamLabel: false,
     ...(opts || {}),
   };
   const list = (messages || []).slice(0, options.maxRows);
@@ -567,13 +617,21 @@ function renderVoicemailRows(messages, opts) {
     <div class="voicemail-rows">
       ${list
         .map((msg) => {
-          const confirming = options.showDeleteButton && msg.id && options.confirmDeleteId === msg.id;
+          // Zusammengesetzter Schlüssel (seit v1.0.6b2, siehe
+          // FritzboxAnrufeCard._voicemailsFor()) statt der rohen `id` -
+          // eindeutig auch bei kollidierenden IDs zwischen zwei
+          // Anrufbeantwortern, und (Nebeneffekt) garantiert nicht-leer, auch
+          // bei Index 0 (siehe Moduldoku oben).
+          const key = msg._key !== undefined ? msg._key : msg.id;
+          const confirming = options.showDeleteButton && key !== undefined && key !== null && options.confirmDeleteId === key;
           return `
         <div class="voicemail-row ${msg.new ? "unread" : ""}">
           <div class="voicemail-main">
             <div class="voicemail-primary">
               <span class="voicemail-name">${escapeHtml(msg.name || msg.number || "Unbekannt")}</span>
+              ${options.showTamLabel && msg._tam ? `<span class="voicemail-badge tam-badge">AB ${escapeHtml(msg._tam)}</span>` : ""}
               ${msg.new ? '<span class="voicemail-badge">neu</span>' : ""}
+              ${msg.spam ? '<span class="voicemail-badge spam-badge">Spam</span>' : ""}
             </div>
             <div class="voicemail-secondary">
               ${options.showNumber ? `<span>${escapeHtml(msg.number || "")}</span>` : ""}
@@ -593,9 +651,9 @@ function renderVoicemailRows(messages, opts) {
                 : `<span class="voicemail-no-audio">Kein Wiedergabelink</span>`
             }
             ${
-              options.showDeleteButton && msg.id
+              options.showDeleteButton && key !== undefined && key !== null
                 ? confirming
-                  ? `<div class="voicemail-delete-confirm" data-message-id="${escapeHtml(msg.id)}">
+                  ? `<div class="voicemail-delete-confirm" data-key="${escapeHtml(key)}" data-message-id="${escapeHtml(msg.id)}" data-entity-id="${escapeHtml(msg._entityId || "")}">
                        <span>Wirklich löschen?</span>
                        <button class="voicemail-delete-confirm-yes" type="button" title="Löschen bestätigen">
                          <ha-icon icon="mdi:check"></ha-icon>
@@ -604,7 +662,7 @@ function renderVoicemailRows(messages, opts) {
                          <ha-icon icon="mdi:close"></ha-icon>
                        </button>
                      </div>`
-                  : `<button class="voicemail-delete-btn" type="button" data-message-id="${escapeHtml(msg.id)}" title="Nachricht löschen">
+                  : `<button class="voicemail-delete-btn" type="button" data-key="${escapeHtml(key)}" title="Nachricht löschen">
                        <ha-icon icon="mdi:trash-can-outline"></ha-icon>
                      </button>`
                 : ""
@@ -668,6 +726,39 @@ const VOICEMAIL_ROWS_STYLES = `
     font-size: 0.7em;
     text-transform: uppercase;
     background: var(--fba-color-playback);
+    color: var(--text-primary-color, #fff);
+    border-radius: 4px;
+    padding: 1px 6px;
+  }
+  /* Spam-Badge (seit v1.0.6b1) - eigene Farbe (Fehler-/Warnfarbe), damit sie
+     sich von der "neu"-Markierung (.voicemail-badge, Playback-Farbe) und dem
+     entsprechenden Anruf-Badge unten (.spam-badge) unterscheidet. */
+  .voicemail-badge.spam-badge,
+  .row-badge.spam-badge {
+    background: var(--fba-color-error);
+  }
+  /* "AB 1"/"AB 2"-Badge (seit v1.0.6b2, nur im "merged"-Modus des zweiten
+     Anrufbeantworters) - bewusst neutral/unauffällig (Sekundärfarben statt
+     einer der bestehenden Akzentfarben), da es sich um reine
+     Herkunftsinformation handelt, nicht um einen Status wie "neu"/"Spam". */
+  .voicemail-badge.tam-badge {
+    background: var(--secondary-background-color, rgba(0, 0, 0, 0.12));
+    color: var(--primary-text-color, #212121);
+  }
+  /* Getrennte Abschnitte (seit v1.0.6b2, "separate"-Modus des zweiten
+     Anrufbeantworters) - siehe FritzboxAnrufeCard._renderVoicemailRows(). */
+  .voicemail-section:not(:last-child) { margin-bottom: 18px; }
+  .voicemail-section-title {
+    font-weight: 600;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--secondary-text-color, #727272);
+    margin-bottom: 8px;
+  }
+  .row-badge {
+    font-size: 0.7em;
+    text-transform: uppercase;
     color: var(--text-primary-color, #fff);
     border-radius: 4px;
     padding: 1px 6px;
@@ -1018,6 +1109,7 @@ class FritzboxAnrufeCard extends HTMLElement {
       entity_ausgehend: guess("ausgehend"),
       entity_verpasst: guess("verpasst"),
       entity_voicemail: guess("anrufbeantworter") || guess("voicemail"),
+      entity_voicemail_2: guess("anrufbeantworter_2") || guess("voicemail_2"),
     };
   }
 
@@ -1059,6 +1151,7 @@ class FritzboxAnrufeCard extends HTMLElement {
       this._config.entity_ausgehend,
       this._config.entity_verpasst,
       this._config.entity_voicemail,
+      this._config.entity_voicemail_2,
     ].filter(Boolean);
     const statePart = ids
       .map((id) => {
@@ -1117,14 +1210,46 @@ class FritzboxAnrufeCard extends HTMLElement {
       calls = this._applyOwnNumberFilter(calls);
       calls = this._sortEntries(calls);
     }
+    // Spam ausblenden (seit v1.0.6b1) - siehe hide_spam in CONFIG_DEFAULTS.
+    // Bewusst NACH der max_rows-unabhängigen Sortierung/Own-Number-Filterung
+    // oben, aber VOR dem finalen slice(), damit ausgeblendete Spam-Einträge
+    // nicht die Zeilenzahl auffüllen, sondern durch die nächsten regulären
+    // Einträge ersetzt werden.
+    if (this._config.hide_spam) {
+      calls = calls.filter((call) => !call.spam);
+    }
     return calls.slice(0, maxRows);
   }
 
-  _voicemails() {
-    const stateObj = this._entityState(this._config.entity_voicemail);
+  // Nachrichten eines Anrufbeantworter-Sensors, getaggt mit `_tam`
+  // ("1"/"2"), `_entityId` (für den delete_voicemail_message-Service-Call)
+  // und `_key` (zusammengesetzter, garantiert nicht-leerer UI-Status-
+  // Schlüssel "<tam>:<id>" - siehe Moduldoku oben zum v1.0.6b2-Nebeneffekt
+  // bei Index 0). Rein clientseitig, keine Änderung an den Sensor-Attributen
+  // selbst nötig.
+  _voicemailsFor(entityId, tamLabel) {
+    const stateObj = this._entityState(entityId);
     if (!stateObj) return [];
     const messages = stateObj.attributes ? stateObj.attributes.messages : undefined;
-    return Array.isArray(messages) ? messages : [];
+    if (!Array.isArray(messages)) return [];
+    return messages.map((msg) => ({
+      ...msg,
+      _tam: tamLabel,
+      _entityId: entityId,
+      _key: `${tamLabel}:${msg.id}`,
+    }));
+  }
+
+  _voicemails() {
+    return this._voicemailsFor(this._config.entity_voicemail, "1");
+  }
+
+  // Zweiter Anrufbeantworter (seit v1.0.6b2, siehe Moduldoku oben) - leeres
+  // Array ohne konfiguriertes entity_voicemail_2, exakt wie bei jedem
+  // anderen optionalen Sensor dieser Karte.
+  _voicemails2() {
+    if (!this._config.entity_voicemail_2) return [];
+    return this._voicemailsFor(this._config.entity_voicemail_2, "2");
   }
 
   _liveStateObj() {
@@ -1283,6 +1408,7 @@ class FritzboxAnrufeCard extends HTMLElement {
               <div class="row-primary">
                 ${cfg.show_name ? `<span class="row-name">${escapeHtml(call.name || call.number || "Unbekannt")}</span>` : ""}
                 ${cfg.show_vip && call.vip ? '<ha-icon class="vip" icon="mdi:star"></ha-icon>' : ""}
+                ${call.spam ? '<span class="row-badge spam-badge">Spam</span>' : ""}
               </div>
               <div class="row-secondary">
                 ${cfg.show_number ? `<span class="row-number">${escapeHtml(call.number || "")}</span>` : ""}
@@ -1303,28 +1429,93 @@ class FritzboxAnrufeCard extends HTMLElement {
     `;
   }
 
-  _renderVoicemailRows() {
-    const maxRows = Number(this._config.max_rows) || 10;
-    let messages = this._voicemails();
-    // Kein own_number-Filter hier (siehe _availableOwnNumbers()) - nur die
-    // Sortierung gilt auch für Anrufbeantworter-Nachrichten. Ansonsten
-    // dieselbe "unverändert, solange show_filter_bar aus ist"-Regel wie in
-    // _visibleCalls().
-    if (this._config.show_filter_bar) {
-      messages = this._sortEntries(messages);
+  // Gemeinsame Aufbereitung (Sortierung/optimistisches Ausblenden gelöschter
+  // Nachrichten/Spam-Filter) für eine einzelne Nachrichtenliste - identisch
+  // zum bisherigen (Vor-1.0.6b2-)Verhalten, wenn `sort` true bleibt.
+  // `sort: false` (seit v1.0.6b2, "merged"-Modus) überlässt die Sortierung
+  // stattdessen dem Aufrufer, der beide Listen erst zusammenführt und dann
+  // EINMAL gemeinsam sortiert - kein own_number-Filter hier (siehe
+  // _availableOwnNumbers()), nur die Sortierung gilt auch für
+  // Anrufbeantworter-Nachrichten.
+  _prepareVoicemails(messages, { sort = true } = {}) {
+    let list = messages;
+    if (sort && this._config.show_filter_bar) {
+      list = this._sortEntries(list);
     }
     // Optimistisch ausgeblendete, gerade erst gelöschte Nachrichten (seit
     // v1.0.5b3) - siehe _deleteVoicemailMessage(). Verschwinden endgültig,
     // sobald der Coordinator-Refresh sie tatsächlich aus den Sensordaten
     // entfernt hat; bei einem fehlgeschlagenen Löschversuch werden sie
-    // wieder eingeblendet.
+    // wieder eingeblendet. Seit v1.0.6b2 über den zusammengesetzten `_key`
+    // (siehe _voicemailsFor()), nicht mehr die rohe `id`.
     if (this._pendingDeletedMessageIds && this._pendingDeletedMessageIds.size) {
-      messages = messages.filter((msg) => !this._pendingDeletedMessageIds.has(msg.id));
+      list = list.filter((msg) => !this._pendingDeletedMessageIds.has(msg._key));
     }
-    return renderVoicemailRows(messages, {
+    // Spam ausblenden (seit v1.0.6b1) - siehe hide_spam in CONFIG_DEFAULTS
+    // und die analoge Filterung in _visibleCalls().
+    if (this._config.hide_spam) {
+      list = list.filter((msg) => !msg.spam);
+    }
+    return list;
+  }
+
+  // Anrufbeantworter-Tab-Inhalt. Ohne konfigurierten zweiten Anrufbeantworter
+  // (entity_voicemail_2, seit v1.0.6b2) exakt das bisherige Verhalten: eine
+  // einzelne Liste. Mit zweitem Anrufbeantworter je nach voicemail_2_mode
+  // entweder chronologisch gemischt mit "AB 1"/"AB 2"-Badge ("merged",
+  // Standard - wie die "Alle"-Sammelansicht bei den Anrufen, siehe
+  // _visibleCalls()) oder als zwei getrennte, überschriebene Abschnitte
+  // untereinander ("separate") - siehe Moduldoku oben.
+  _renderVoicemailRows() {
+    const maxRows = Number(this._config.max_rows) || 10;
+
+    if (!this._config.entity_voicemail_2) {
+      const messages = this._prepareVoicemails(this._voicemails());
+      return renderVoicemailRows(messages, {
+        maxRows,
+        showDeleteButton: !!this._config.show_delete_button,
+        confirmDeleteId: this._confirmDeleteMessageId,
+      });
+    }
+
+    if (this._config.voicemail_2_mode === "separate") {
+      const primary = this._prepareVoicemails(this._voicemails());
+      const secondary = this._prepareVoicemails(this._voicemails2());
+      const rowOpts = {
+        maxRows,
+        showDeleteButton: !!this._config.show_delete_button,
+        confirmDeleteId: this._confirmDeleteMessageId,
+      };
+      return `
+        <div class="voicemail-section">
+          <div class="voicemail-section-title">Anrufbeantworter 1</div>
+          ${renderVoicemailRows(primary, rowOpts)}
+        </div>
+        <div class="voicemail-section">
+          <div class="voicemail-section-title">Anrufbeantworter 2</div>
+          ${renderVoicemailRows(secondary, rowOpts)}
+        </div>
+      `;
+    }
+
+    // "merged" (Standard): Sortierung erst NACH dem Zusammenführen, sonst
+    // wären beide Quellen nur hintereinandergehängt statt tatsächlich
+    // chronologisch gemischt - dieselbe Reihenfolge wie bei der
+    // "Alle"-Sammelansicht der Anrufe (_visibleCalls()): immer nach Datum
+    // sortiert als Grundordnung, bei aktiver Filter-/Sortierleiste
+    // stattdessen die dort gewählte Sortierung.
+    const primary = this._prepareVoicemails(this._voicemails(), { sort: false });
+    const secondary = this._prepareVoicemails(this._voicemails2(), { sort: false });
+    let merged = [...primary, ...secondary];
+    merged.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+    if (this._config.show_filter_bar) {
+      merged = this._sortEntries(merged);
+    }
+    return renderVoicemailRows(merged, {
       maxRows,
       showDeleteButton: !!this._config.show_delete_button,
       confirmDeleteId: this._confirmDeleteMessageId,
+      showTamLabel: true,
     });
   }
 
@@ -1383,19 +1574,25 @@ class FritzboxAnrufeCard extends HTMLElement {
   // blendet die Zeile bei einem fehlgeschlagenen Service-Call (z. B. TR-064-
   // Fehler auf der FRITZ!Box) wieder ein - das Löschen selbst ist
   // unwiderruflich, das optimistische Ausblenden hier ist es bewusst nicht.
-  async _deleteVoicemailMessage(messageId) {
-    if (!this._config || !this._config.entity_voicemail || !this._hass) return;
-    this._pendingDeletedMessageIds.add(messageId);
+  //
+  // `key` (seit v1.0.6b2, der zusammengesetzte "<tam>:<id>"-Schlüssel aus
+  // _voicemailsFor()) für den optimistischen UI-Status, `messageId`/
+  // `entityId` unverändert die rohen Werte für den eigentlichen
+  // Service-Call - bei nur einem Anrufbeantworter entspricht `entityId`
+  // weiterhin exakt `this._config.entity_voicemail`.
+  async _deleteVoicemailMessage(key, messageId, entityId) {
+    if (!entityId || !this._hass) return;
+    this._pendingDeletedMessageIds.add(key);
     this._render();
     try {
       await this._hass.callService("fritzbox_anrufe", "delete_voicemail_message", {
         message_id: messageId,
-        entity_id: this._config.entity_voicemail,
+        entity_id: entityId,
       });
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("fritzbox_anrufe: Löschen der Anrufbeantworter-Nachricht fehlgeschlagen", err);
-      this._pendingDeletedMessageIds.delete(messageId);
+      this._pendingDeletedMessageIds.delete(key);
       this._render();
     }
   }
@@ -1469,7 +1666,7 @@ class FritzboxAnrufeCard extends HTMLElement {
     // Nachricht (ein erneuter Re-Render tauscht die anderen Zeilen nicht an).
     this.shadowRoot.querySelectorAll(".voicemail-delete-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
-        this._confirmDeleteMessageId = btn.dataset.messageId;
+        this._confirmDeleteMessageId = btn.dataset.key;
         this._render();
       });
     });
@@ -1482,10 +1679,12 @@ class FritzboxAnrufeCard extends HTMLElement {
     this.shadowRoot.querySelectorAll(".voicemail-delete-confirm-yes").forEach((btn) => {
       btn.addEventListener("click", () => {
         const wrap = btn.closest(".voicemail-delete-confirm");
+        const key = wrap && wrap.dataset.key;
         const messageId = wrap && wrap.dataset.messageId;
+        const entityId = wrap && wrap.dataset.entityId;
         this._confirmDeleteMessageId = null;
-        if (messageId) {
-          this._deleteVoicemailMessage(messageId);
+        if (key && messageId && entityId) {
+          this._deleteVoicemailMessage(key, messageId, entityId);
         } else {
           this._render();
         }
@@ -1705,6 +1904,8 @@ const EDITOR_LABELS = {
   entity_ausgehend: "Sensor: Ausgehende Anrufe",
   entity_verpasst: "Sensor: Verpasste Anrufe",
   entity_voicemail: "Sensor: Anrufbeantworter (optional)",
+  entity_voicemail_2: "Sensor: Zweiter Anrufbeantworter (optional)",
+  voicemail_2_mode: "Darstellung mit zweitem Anrufbeantworter",
   max_rows: "Max. Zeilen",
   show_alle: "Kategorie 'Gesamt' (Alle) anzeigen",
   show_eingehend: "Kategorie 'Angenommen' anzeigen",
@@ -1724,6 +1925,7 @@ const EDITOR_LABELS = {
   show_processing_verpasst: "Weiterverarbeitung bei 'Verpasst' anzeigen",
   show_filter_bar: "Filter-/Sortierleiste auf der Karte anzeigen",
   show_delete_button: "Papierkorb-Button zum Löschen von Anrufbeantworter-Nachrichten anzeigen",
+  hide_spam: "Als Spam erkannte Anrufe/Nachrichten ausblenden",
   // Farben (seit v1.0.4, seit v1.0.4b1 nicht mehr über <ha-form> gerendert)
   // sind hier absichtlich NICHT mehr gelistet - siehe COLOR_EDITOR_FIELDS
   // und FritzboxAnrufeCardEditor._buildColorSection() weiter unten.
@@ -1737,6 +1939,10 @@ const EDITOR_HELPERS = {
     "Zeigt auf der Karte eine Leiste zum Filtern nach eigener Rufnummer (nur Anrufliste, nicht Anrufbeantworter) und zum Sortieren (Datum/Dauer/Name).",
   show_delete_button:
     "EXPERIMENTELL: Löschen ist unwiderruflich - die FRITZ!Box selbst hat keinen Papierkorb dafür. Vor dem endgültigen Löschen erscheint eine Bestätigung.",
+  hide_spam:
+    "Spam wird über die Integrationseinstellungen definiert (FRITZ!Box-eigene Sperrliste und/oder eine von dir gepflegte Nummernliste) - siehe Einstellungen -> Geräte & Dienste -> FRITZ!Box Anrufe -> Konfigurieren.",
+  voicemail_2_mode:
+    "Nur mit gesetztem 'Sensor: Zweiter Anrufbeantworter'. 'Gemischt' zeigt beide Nachrichtenlisten chronologisch gemeinsam mit einem AB-1/AB-2-Badge, 'Getrennt' zeigt zwei eigene Abschnitte untereinander.",
 };
 
 function computeEditorLabel(schemaItem) {
@@ -1769,6 +1975,7 @@ const EDITOR_SCHEMA = [
       { name: "entity_ausgehend", selector: { entity: { domain: "sensor" } } },
       { name: "entity_verpasst", selector: { entity: { domain: "sensor" } } },
       { name: "entity_voicemail", selector: { entity: { domain: "sensor" } } },
+      { name: "entity_voicemail_2", selector: { entity: { domain: "sensor" } } },
     ],
   },
   {
@@ -1810,6 +2017,19 @@ const EDITOR_SCHEMA = [
       { name: "show_vip", selector: { boolean: {} } },
       { name: "show_filter_bar", selector: { boolean: {} } },
       { name: "show_delete_button", selector: { boolean: {} } },
+      { name: "hide_spam", selector: { boolean: {} } },
+      {
+        name: "voicemail_2_mode",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "merged", label: "Gemischt (eine Liste, mit AB-1/AB-2-Badge)" },
+              { value: "separate", label: "Getrennt (zwei Abschnitte untereinander)" },
+            ],
+          },
+        },
+      },
     ],
   },
   {

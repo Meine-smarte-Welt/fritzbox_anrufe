@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 1c99bf1c0bd7c45999d30d8e36d3e280bce3f93207293e417db9a9fb0bb5e4f4
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): f2b8a0695882ae21c781bb4ea9cd1bbe09468b095705d787238c511c3c42d152
 """Config flow for fritzbox_anrufe."""
 
 from __future__ import annotations
@@ -32,6 +32,8 @@ from .const import (
     CONF_AUTO_MARK_READ,
     CONF_PHONEBOOK,
     CONF_PREFIXES,
+    CONF_SECOND_TAM,
+    CONF_SPAM_NUMBERS,
     DEFAULT_AUTO_MARK_READ,
     DEFAULT_CALL_LOG_COUNT,
     DEFAULT_CALL_LOG_DAYS,
@@ -39,6 +41,7 @@ from .const import (
     DEFAULT_HOST,
     DEFAULT_PHONEBOOK,
     DEFAULT_PORT,
+    DEFAULT_SECOND_TAM,
     DEFAULT_USERNAME,
     DOMAIN,
     FRITZ_ATTR_NAME,
@@ -416,6 +419,26 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
                 default=options.get(CONF_AUTO_MARK_READ, DEFAULT_AUTO_MARK_READ),
             )
         ] = selector.BooleanSelector()
+        # Spam-Erkennung (seit v1.0.6b1) - Freitextliste von Nummern/
+        # Vorwahlen, Präfix-Abgleich, siehe spam.py. Mirrors exakt das
+        # bestehende CONF_PREFIXES-Muster oben (keine eigene DEFAULT-
+        # Konstante, options.get() liefert None/leer).
+        schema[
+            vol.Optional(
+                CONF_SPAM_NUMBERS,
+                description={"suggested_value": options.get(CONF_SPAM_NUMBERS)},
+            )
+        ] = str
+        # Zweiter Anrufbeantworter (seit v1.0.6b1, Standard AUS) - siehe
+        # const.py:CONF_SECOND_TAM/tam.py:SECOND_TAM_INDEX. Dank
+        # OptionsFlowWithReload (Basisklasse dieser Klasse) löst eine
+        # Änderung hier automatisch einen Reload des Config-Entry aus.
+        schema[
+            vol.Optional(
+                CONF_SECOND_TAM,
+                default=options.get(CONF_SECOND_TAM, DEFAULT_SECOND_TAM),
+            )
+        ] = selector.BooleanSelector()
         return vol.Schema(schema)
 
     async def async_step_init(
@@ -441,11 +464,15 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
                 errors={"base": ConnectResult.MALFORMED_PREFIXES},
             )
 
+        spam_numbers_input: str | None = user_input.get(CONF_SPAM_NUMBERS)
+
         return self.async_create_entry(
             title="",
             data={
                 CONF_PREFIXES: self._get_list_of_prefixes(prefixes),
                 CONF_AUTO_MARK_READ: user_input.get(CONF_AUTO_MARK_READ, DEFAULT_AUTO_MARK_READ),
+                CONF_SPAM_NUMBERS: self._get_list_of_prefixes(spam_numbers_input) or [],
+                CONF_SECOND_TAM: user_input.get(CONF_SECOND_TAM, DEFAULT_SECOND_TAM),
                 **_parse_history_input(user_input),
             },
         )

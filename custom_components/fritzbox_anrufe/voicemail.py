@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): c6f9db1242d95e8197aabfefd7506b54302c3c6bbd2a01cb190da9771786ccb8
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): e0dcc988b2670810740cfe007eb0ddf1c91dec82bcf6b63c7aba07f58dcd700e
 """Coordinator + audio access for the FRITZ!Box answering machine (TAM).
 
 EXPERIMENTAL - see the module docstring in :mod:`.tam` for details on what
@@ -7,7 +7,7 @@ could and could not be verified against real hardware while building this.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 import logging
 import mimetypes
 
@@ -19,7 +19,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import CONF_AUTO_MARK_READ, DEFAULT_AUTO_MARK_READ
+from .const import (
+    CONF_AUTO_MARK_READ,
+    CONF_SPAM_NUMBERS,
+    DEFAULT_AUTO_MARK_READ,
+    EVENT_NEW_VOICEMAIL_MESSAGE,
+    TAM_MEDIA_URL_BASE,
+)
+from .spam import is_spam_number, parse_spam_patterns
 from .tam import FritzTam, TamMessage
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,17 +44,31 @@ class FritzTamCoordinator(DataUpdateCoordinator[list[TamMessage]]):
     """
 
     def __init__(
-        self, hass: HomeAssistant, config_entry: ConfigEntry, fritz_tam: FritzTam
+        self,
+        hass: HomeAssistant,
+        config_entry: ConfigEntry,
+        fritz_tam: FritzTam,
+        media_url_base: str = TAM_MEDIA_URL_BASE,
+        tam_label: str = "1",
     ) -> None:
-        """Initialize the TAM coordinator."""
+        """Initialize the TAM coordinator.
+
+        ``media_url_base``/``tam_label`` (seit v1.0.6b1) unterscheiden eine
+        Instanz für den zweiten Anrufbeantworter (siehe __init__.py) von der
+        primären, bereits an echter Hardware bestätigten Instanz - Default-
+        Werte entsprechen exakt dem bisherigen Verhalten für den ersten
+        Anrufbeantworter, damit bestehende Setups unverändert bleiben.
+        """
         super().__init__(
             hass,
             _LOGGER,
-            name="fritzbox_anrufe tam",
+            name=f"fritzbox_anrufe tam {tam_label}",
             update_interval=TAM_UPDATE_INTERVAL,
         )
         self.config_entry = config_entry
         self._fritz_tam = fritz_tam
+        self._media_url_base = media_url_base
+        self._tam_label = tam_label
         # Only used as a *fallback* sid source for recording downloads
         # (see fetch_audio/_sid_candidates below) - also conveniently
         # provides router_url, the FRITZ!Box's normal web-UI origin
@@ -56,9 +77,16 @@ class FritzTamCoordinator(DataUpdateCoordinator[list[TamMessage]]):
         self._http = FritzHttp(fritz_tam.fc)
 
     async def _async_update_data(self) -> list[TamMessage]:
-        """Fetch the current answering-machine messages (executor job)."""
+        """Fetch the current answering-machine messages (executor job).
+
+        ``self.data`` still holds the *previous* successful result while
+        this runs (the base class only overwrites it once this coroutine
+        returns) - captured up front so newly-arrived messages can be
+        detected by comparing against it, see :meth:`_fire_new_message_events`.
+        """
+        previous_messages = self.data
         try:
-            return await self.hass.async_add_executor_job(self._fritz_tam.get_messages)
+            messages = await self.hass.async_add_executor_job(self._fritz_tam.get_messages)
         except FritzSecurityError as ex:
             raise UpdateFailed(
                 "Dem FRITZ!Box-Konto fehlt die Berechtigung 'Sprachnachrichten,"
@@ -69,6 +97,70 @@ class FritzTamCoordinator(DataUpdateCoordinator[list[TamMessage]]):
             raise UpdateFailed(
                 f"Fehler beim Abrufen der Anrufbeantworter-Nachrichten: {ex}"
             ) from ex
+        # Seit v1.0.6b1: siehe spam.py/call_log.py - für Nachrichten gibt es
+        # kein REJECTED_CALL_TYPE-Äquivalent, hier zählt ausschließlich der
+        # Abgleich gegen die vom Nutzer gepflegte Spam-Nummernliste.
+        spam_patterns = parse_spam_patterns(self.config_entry.options.get(CONF_SPAM_NUMBERS))
+        for message in messages:
+            message.spam = is_spam_number(message.Number, spam_patterns)
+        if previous_messages is not None:
+            self._fire_new_message_events(previous_messages, messages)
+        return messages
+
+    def _fire_new_message_events(
+        self, previous_messages: list[TamMessage], current_messages: list[TamMessage]
+    ) -> None:
+        """Fire EVENT_NEW_VOICEMAIL_MESSAGE for every genuinely new message.
+
+        "New" here means: its ``Index`` was not present in the *previous*
+        successful poll - deliberately independent of the FRITZ!Box's own
+        "New"/unread flag (:attr:`TamMessage.new`), which could in theory
+        already be cleared again by the time this poll runs (e.g. someone
+        listened to it directly on the FRITZ!Box in between, or
+        ``auto_mark_read`` cleared it after a playback through this
+        integration). Comparing message IDs against the previous poll is
+        what actually answers "did a message arrive since we last looked",
+        which is what this event promises - not "is currently unread".
+
+        Only called when ``previous_messages`` is not ``None`` (see
+        :meth:`_async_update_data`), i.e. never on the very first poll
+        after a (re)start - otherwise every message already sitting on the
+        FRITZ!Box, however old, would fire an event on every Home
+        Assistant restart.
+        """
+        previous_ids = {
+            message.Index for message in previous_messages if message.Index is not None
+        }
+        for message in current_messages:
+            if message.Index is not None and message.Index not in previous_ids:
+                self._fire_new_message_event(message)
+
+    def _fire_new_message_event(self, message: TamMessage) -> None:
+        """Fire one EVENT_NEW_VOICEMAIL_MESSAGE for a newly-arrived message."""
+        media_url = (
+            f"{self._media_url_base}/{self.config_entry.entry_id}/{message.Index}"
+            if message.Path
+            else None
+        )
+        self.hass.bus.async_fire(
+            EVENT_NEW_VOICEMAIL_MESSAGE,
+            {
+                "entry_id": self.config_entry.entry_id,
+                "message_id": message.Index,
+                "number": message.Number or None,
+                "name": message.Name or None,
+                "date": message.date.isoformat() if isinstance(message.date, datetime) else None,
+                "duration": str(message.duration)
+                if isinstance(message.duration, timedelta)
+                else None,
+                "media_url": media_url,
+                # Seit v1.0.6b1 - siehe __init__.py (tam_label unterscheidet
+                # ersten/zweiten Anrufbeantworter) und spam.py (spam-Flag,
+                # additive Felder, brechen bestehende Automatisierungen nicht).
+                "tam": self._tam_label,
+                "spam": getattr(message, "spam", False),
+            },
+        )
 
     def get_message(self, message_id: str) -> TamMessage | None:
         """Look up one currently-known message by its raw ``Index`` string."""

@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 4920ee78d0450b7efe4ffcdbbcbc8dec43ab91c17dd15ac1c11964dbab343e92
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 723f4125f20b06452dc7d142d250ddb1f5a7e4bb96659564713fc47c47b8b695
 """Sensor to monitor incoming/outgoing phone calls on a Fritz!Box router."""
 
 from collections.abc import Mapping
@@ -34,6 +34,7 @@ from .const import (
     CALL_TYPE_LIVE,
     CALL_TYPE_OUTGOING,
     CALL_TYPE_VOICEMAIL,
+    CALL_TYPE_VOICEMAIL_2,
     CALL_TYPES,
     CONF_PHONEBOOK,
     CONF_PREFIXES,
@@ -41,6 +42,7 @@ from .const import (
     MANUFACTURER,
     POST_CALL_REFRESH_DELAY_SECONDS,
     SERIAL_NUMBER,
+    TAM2_MEDIA_URL_BASE,
     TAM_MEDIA_URL_BASE,
     FritzState,
 )
@@ -141,12 +143,40 @@ async def async_setup_entry(
                 fritzbox_phonebook=fritzbox_phonebook,
                 device_info=device_info,
                 config_entry_id=config_entry.entry_id,
+                translation_key=f"{DOMAIN}_{CALL_TYPE_VOICEMAIL}",
+                media_url_base=TAM_MEDIA_URL_BASE,
+            )
+        )
+
+    # Zweiter Anrufbeantworter-Sensor (seit v1.0.6b1, optional - siehe
+    # const.py:CONF_SECOND_TAM/__init__.py). Nur eine zweite Backend-Entity,
+    # bewusst OHNE eigenen zweiten Tab in der Dashboard-Karte - deren
+    # entity_voicemail-Konfigurationsfeld ist bereits generisch genug, um
+    # per zweiter Karteninstanz auf diesen Sensor zu zeigen (siehe README).
+    tam_coordinator_2 = runtime_data.tam_coordinator_2
+    if tam_coordinator_2 is not None:
+        entities.append(
+            FritzBoxVoicemailSensor(
+                coordinator=tam_coordinator_2,
+                unique_id=f"{unique_id}-{CALL_TYPE_VOICEMAIL_2}",
+                phonebook_name=config_entry.title,
+                fritzbox_phonebook=fritzbox_phonebook,
+                device_info=device_info,
+                config_entry_id=config_entry.entry_id,
+                translation_key=f"{DOMAIN}_{CALL_TYPE_VOICEMAIL_2}",
+                media_url_base=TAM2_MEDIA_URL_BASE,
             )
         )
 
     async_add_entities(entities)
 
-    if tam_coordinator is not None:
+    if tam_coordinator is not None or tam_coordinator_2 is not None:
+        # async_register_entity_service() registers the service once per
+        # platform, not once per entity - it is dispatched at call time to
+        # whichever entity_id the service call actually targets (each
+        # FritzBoxVoicemailSensor instance holds its own self.coordinator),
+        # so this single registration already covers both the first and a
+        # possible second Anrufbeantworter-Sensor.
         platform = entity_platform.async_get_current_platform()
         platform.async_register_entity_service(
             SERVICE_DELETE_VOICEMAIL_MESSAGE,
@@ -305,6 +335,11 @@ class FritzBoxCallSensor(SensorEntity):
         call.Path = None
         call.outcome = CALL_OUTCOME_NOT_CONNECTED
         call.tam_message = None
+        # Ein selbst getätigter, fehlgeschlagener Anruf kann per Definition
+        # kein Spam sein - seit v1.0.6b1 wird call.spam auch für "echte"
+        # (TR-064) Anrufe gesetzt (siehe call_log.py:_fetch_calls), daher
+        # muss es hier für diese synthetischen Einträge ebenfalls existieren.
+        call.spam = False
         self._call_log_coordinator.add_synthetic_outgoing_call(call)
 
     def set_attributes(self, attributes: Mapping[str, str | bool]) -> None:
@@ -431,6 +466,8 @@ class FritzBoxCallListSensor(CoordinatorEntity[FritzCallLogCoordinator], SensorE
             "vip": contact.vip if contact else False,
             "outcome": outcome,
             "media_url": media_url,
+            # Seit v1.0.6b1 - siehe call_log.py:_fetch_calls/spam.py.
+            "spam": bool(getattr(call, "spam", False)),
         }
 
 
@@ -457,13 +494,22 @@ class FritzBoxVoicemailSensor(CoordinatorEntity[FritzTamCoordinator], SensorEnti
         fritzbox_phonebook: FritzBoxPhonebook,
         device_info: DeviceInfo,
         config_entry_id: str,
+        translation_key: str = f"{DOMAIN}_{CALL_TYPE_VOICEMAIL}",
+        media_url_base: str = TAM_MEDIA_URL_BASE,
     ) -> None:
-        """Initialize the answering-machine sensor."""
+        """Initialize the answering-machine sensor.
+
+        ``translation_key``/``media_url_base`` (seit v1.0.6b1) lassen diese
+        Klasse ein zweites Mal für den zweiten Anrufbeantworter instanzi-
+        ieren (siehe async_setup_entry oben) - Default-Werte entsprechen
+        exakt dem bisherigen Verhalten für den ersten Anrufbeantworter.
+        """
         super().__init__(coordinator)
         self._fritzbox_phonebook = fritzbox_phonebook
         self._config_entry_id = config_entry_id
+        self._media_url_base = media_url_base
 
-        self._attr_translation_key = f"{DOMAIN}_{CALL_TYPE_VOICEMAIL}"
+        self._attr_translation_key = translation_key
         self._attr_translation_placeholders = {"phonebook_name": phonebook_name}
         self._attr_unique_id = unique_id
         self._attr_device_info = device_info
@@ -493,7 +539,7 @@ class FritzBoxVoicemailSensor(CoordinatorEntity[FritzTamCoordinator], SensorEnti
 
         duration = message.duration
         media_url = (
-            f"{TAM_MEDIA_URL_BASE}/{self._config_entry_id}/{message.Index}"
+            f"{self._media_url_base}/{self._config_entry_id}/{message.Index}"
             if message.Path
             else None
         )
@@ -511,6 +557,8 @@ class FritzBoxVoicemailSensor(CoordinatorEntity[FritzTamCoordinator], SensorEnti
             "new": bool(message.new),
             "vip": contact.vip if contact else False,
             "media_url": media_url,
+            # Seit v1.0.6b1 - siehe voicemail.py:_async_update_data/spam.py.
+            "spam": bool(getattr(message, "spam", False)),
         }
 
     async def async_delete_voicemail_message(self, message_id: str) -> None:

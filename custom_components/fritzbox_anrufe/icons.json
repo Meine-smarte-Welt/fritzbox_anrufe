@@ -20,6 +20,9 @@
       },
       "fritzbox_anrufe_anrufbeantworter": {
         "default": "mdi:voicemail"
+      },
+      "fritzbox_anrufe_anrufbeantworter_2": {
+        "default": "mdi:voicemail"
       }
     }
   }

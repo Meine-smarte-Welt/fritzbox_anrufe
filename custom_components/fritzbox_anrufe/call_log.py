@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 6aa893cfade2130766a65beaa8b97c5a62e73c850e49b676cf1ba9fd7fb8da0d
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): c7115af494200e8a19dae9efaed855680b4ac8186b81788aeacb6c5aae8721f9
 """Coordinator to poll the FRITZ!Box call list (incoming/outgoing/missed).
 
 Unlike the call monitor (TCP port 1012), which only streams live call
@@ -90,6 +90,7 @@ from .const import (
     CALL_TYPE_MISSED,
     CALL_TYPE_OUTGOING,
     CALL_TYPES,
+    CONF_SPAM_NUMBERS,
     DEFAULT_CALL_LOG_COUNT,
     DEFAULT_CALL_LOG_DAYS,
     DEFAULT_CALL_LOG_LIMIT_TYPE,
@@ -99,6 +100,7 @@ from .const import (
     conf_call_log_days,
     conf_call_log_limit_type,
 )
+from .spam import is_spam_number, parse_spam_patterns
 from .tam import TamMessage
 from .voicemail import FritzTamCoordinator
 
@@ -331,6 +333,13 @@ class FritzCallLogCoordinator(DataUpdateCoordinator[CallLogData]):
         confirmed Anrufbeantworter media proxy instead of the newer,
         unconfirmed call-list one whenever a confident match exists (see
         ``sensor.py:_call_to_dict``).
+
+        Seit v1.0.6b1 wird zusätzlich ``call.spam`` gesetzt - siehe
+        ``spam.py`` für die Begründung, warum das kein natives FRITZ!Box-
+        Signal ist, sondern eine Kombination aus dem bereits vorhandenen
+        REJECTED_CALL_TYPE (die Box hat den Anruf selbst blockiert) und
+        einem Abgleich gegen die vom Nutzer gepflegte Spam-Nummernliste
+        (CONF_SPAM_NUMBERS).
         """
         raw_calls = self._fritz_call.get_calls(
             calltype=ALL_CALL_TYPES,
@@ -340,6 +349,7 @@ class FritzCallLogCoordinator(DataUpdateCoordinator[CallLogData]):
         tam_messages: list[TamMessage] = (
             (self._tam_coordinator.data if self._tam_coordinator is not None else None) or []
         )
+        spam_patterns = parse_spam_patterns(self.config_entry.options.get(CONF_SPAM_NUMBERS))
 
         unsorted_by_type: dict[str, list[Call]] = {call_type: [] for call_type in CALL_TYPES}
         for call in raw_calls:
@@ -351,6 +361,9 @@ class FritzCallLogCoordinator(DataUpdateCoordinator[CallLogData]):
                 continue
             call.outcome = outcome
             call.tam_message = matched_message
+            call.spam = call.type == REJECTED_CALL_TYPE or is_spam_number(
+                call.Caller, spam_patterns
+            ) or is_spam_number(call.Called, spam_patterns)
             unsorted_by_type[bucket].append(call)
 
         # Failed outgoing dial attempts the FRITZ!Box's own TR-064 call
