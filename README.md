@@ -13,6 +13,8 @@ mitgelieferte Dashboard-Karte.
 - [Installation](#installation)
 - [Einrichtung](#einrichtung)
 - [Sensoren](#sensoren)
+- [Spam-Erkennung](#spam-erkennung-seit-version-106b1-optional)
+- [Zweiter Anrufbeantworter](#zweiter-anrufbeantworter-seit-version-106b1-optional)
 - [Einstellungen (Optionen)](#einstellungen-optionen)
 - [Dashboard-Karte](#dashboard-karte)
 - [Icon](#icon)
@@ -48,6 +50,23 @@ mitgelieferte Dashboard-Karte.
   direkt im Dashboard (siehe [Bekannte Einschränkungen](#bekannte-einschränkungen)),
   als 5. Symbol/Tab in der Kartenkopfzeile - nicht als Bereich unterhalb der
   Anrufliste.
+- Neues Event `fritzbox_anrufe_new_voicemail_message` (seit Version
+  1.0.6b0), gefeuert sobald eine bislang unbekannte
+  Anrufbeantworter-Nachricht eintrifft - direkt als Automations-Auslöser
+  nutzbar, ohne die `messages`-Attributliste selbst per Vorlage auf neue
+  Einträge vergleichen zu müssen, siehe
+  [Event bei neuer Anrufbeantworter-Nachricht](#event-bei-neuer-anrufbeantworter-nachricht-seit-version-106b0).
+- **Spam-Erkennung** (seit Version 1.0.6b1, optional): Anrufe und
+  Anrufbeantworter-Nachrichten werden als Spam markiert, wenn die FRITZ!Box
+  sie bereits selbst blockiert hat UND/ODER die Nummer mit einer selbst
+  gepflegten Liste übereinstimmt - die FRITZ!Box hat dafür keine eigene,
+  automatische Erkennung, siehe
+  [Spam-Erkennung](#spam-erkennung-seit-version-106b1-optional). Spam-Einträge
+  lassen sich auf der Dashboard-Karte optional ausblenden (`hide_spam`).
+- **Zweiter Anrufbeantworter** (seit Version 1.0.6b1, optional): Ist auf der
+  FRITZ!Box ein zweiter Anrufbeantworter eingerichtet, kann dessen
+  Nachrichtenliste als eigener Sensor abgerufen werden, siehe
+  [Zweiter Anrufbeantworter](#zweiter-anrufbeantworter-seit-version-106b1-optional).
 - Alternative: einfache YAML-Tabellenkarte auf Basis von `flex-table-card`
   (siehe [`examples/dashboard_flex_table.yaml`](examples/dashboard_flex_table.yaml)).
 
@@ -260,6 +279,105 @@ lassen - sie werden dann mit der festen entity_id neu angelegt. Bei mehr
 als einem FRITZ!Box-Konto bekommt das zweite/dritte Konto automatisch die
 Endungen `_2`/`_3` (normales Home-Assistant-Verhalten bei ID-Kollisionen).
 
+### Event bei neuer Anrufbeantworter-Nachricht (seit Version 1.0.6b0)
+
+Sobald der Anrufbeantworter-Sensor beim regulären Abruf der
+Nachrichtenliste (alle 5 Minuten, oder mit kurzer Verzögerung direkt nach
+einem Anruf, siehe oben) eine Nachricht entdeckt, die beim vorherigen
+Abruf noch nicht bekannt war, feuert die Integration zusätzlich zur
+aktualisierten `messages`-Attributliste ein eigenes Home-Assistant-Event
+`fritzbox_anrufe_new_voicemail_message` - direkt als Automations-Auslöser
+nutzbar, ohne selbst per Vorlage (Template) die alte gegen die neue
+`messages`-Liste auf neu hinzugekommene Einträge vergleichen zu müssen.
+
+Beim allerersten Abruf nach einem (Neu-)Start von Home Assistant wird
+bewusst **kein** Event gefeuert - sonst gäbe es bei jedem Neustart Events
+für längst bekannte, nur noch nicht abgehörte Nachrichten. Ab dem zweiten
+erfolgreichen Abruf danach gilt eine Nachricht als "neu", sobald ihre ID
+beim vorherigen Abruf noch nicht bekannt war - unabhängig vom "Neu"-Status
+der Nachricht selbst (der könnte theoretisch schon wieder gelöscht sein,
+z. B. weil sie zwischenzeitlich direkt an der FRITZ!Box abgehört wurde).
+
+Das Event-Datenobjekt (`event_data`) enthält:
+
+| Feld | Bedeutung |
+| --- | --- |
+| `entry_id` | ID des Integrations-Eintrags (bei mehreren FRITZ!Box-Konten zur Unterscheidung) |
+| `message_id` | Rohe FRITZ!Box-Nachrichten-ID (entspricht `messages[].id`) |
+| `number` | Rufnummer des Anrufers, falls von der FRITZ!Box übermittelt |
+| `name` | Name des Anrufers, falls von der FRITZ!Box übermittelt - **kein** Abgleich mit dem Home-Assistant-Telefonbuch dieser Integration, anders als das `name`-Feld in `messages` |
+| `date` | Zeitpunkt der Nachricht (ISO-Zeitstempel) |
+| `duration` | Länge der Aufnahme |
+| `media_url` | Home-Assistant-interne, authentifizierte URL zum Abspielen (wie bei `messages[].media_url`), `null` falls die FRITZ!Box keinen Aufnahmepfad übermittelt hat |
+
+Beispiel-Automation (Push-Benachrichtigung mit Anrufername/-nummer):
+
+```yaml
+trigger:
+  - trigger: event
+    event_type: fritzbox_anrufe_new_voicemail_message
+action:
+  - action: notify.mobile_app_dein_handy
+    data:
+      title: "Neue Anrufbeantworter-Nachricht"
+      message: "{{ trigger.event.data.name or trigger.event.data.number or 'Unbekannt' }}"
+```
+
+### Spam-Erkennung (seit Version 1.0.6b1, optional)
+
+**Wichtig:** Die FRITZ!Box selbst hat über die TR-064-Schnittstelle keine
+eigene, automatische Spam-/KI-Erkennung - anders als der Name "Spam-
+Erkennung" vermuten lassen könnte, liefert `GetCallList` kein natives
+Feld dafür. Diese Integration kombiniert stattdessen zwei Signale zu
+einem Gesamturteil "ist das Spam":
+
+1. **Die FRITZ!Box hat den Anruf bereits selbst blockiert** (z. B. über
+   eine eigene Telefonbuch-/Rufsperre-Regel, die auch von Drittanbieter-
+   Tools wie PhoneBlock oder SpamBlockUp befüllt worden sein kann).
+2. **Die Nummer stimmt mit einer selbst gepflegten Liste** von
+   Spam-Nummern/-Vorwahlen überein (Options-Flow, `spam_numbers`,
+   kommagetrennt) - Präfix-Abgleich, es reicht also z. B. eine Vorwahl wie
+   `0900` für alle Nummern, die damit beginnen.
+
+Ein Anruf oder eine Anrufbeantworter-Nachricht gilt als Spam, sobald
+**mindestens eines** der beiden Signale zutrifft. Ohne konfigurierte Liste
+(`spam_numbers` leer) wirkt ausschließlich das erste Signal. Das Ergebnis
+steht als `spam`-Feld (`true`/`false`) in den `calls`- und
+`messages`-Attributlisten der jeweiligen Sensoren sowie im Event-Payload
+von `fritzbox_anrufe_new_voicemail_message` zur Verfügung - nutzbar für
+eigene Automatisierungen (z. B. Spam-Anrufe von Push-Benachrichtigungen
+ausschließen) und für die mitgelieferte Dashboard-Karte, die Spam-Einträge
+optional mit einem Badge markiert oder ganz ausblendet (`hide_spam`, siehe
+[Dashboard-Karte](#dashboard-karte)).
+
+### Zweiter Anrufbeantworter (seit Version 1.0.6b1, optional)
+
+Manche FRITZ!Box-Modelle/-Konfigurationen erlauben einen zweiten
+Anrufbeantworter zusätzlich zum ersten. Wird die Option **Zweiten
+Anrufbeantworter aktivieren** (`second_tam_enabled`, Options-Flow,
+standardmäßig aus) eingeschaltet, ruft die Integration zusätzlich dessen
+Nachrichtenliste ab und legt dafür einen eigenen, zweiten Sensor
+(`fritzbox_anrufe_anrufbeantworter_2`) mit denselben Fähigkeiten wie der
+erste an (Wiedergabe, Löschen, automatisch als gelesen markieren, Event bei
+neuer Nachricht mit zusätzlichem `tam: "2"`-Feld im Payload).
+
+Hat die eigene FRITZ!Box gar keinen zweiten Anrufbeantworter, bleibt der
+zweite Sensor einfach dauerhaft "nicht verfügbar" - das blockiert die
+übrige Integration zu keinem Zeitpunkt, genau wie beim ersten
+Anrufbeantworter bei fehlender Berechtigung oder unbestätigter
+TR-064-API-Form (siehe [Bekannte Einschränkungen](#bekannte-einschränkungen)).
+
+**Kein eigener zweiter Tab auf der Dashboard-Karte:** Die mitgelieferte
+Karte zeigt weiterhin nur einen Anrufbeantworter-Tab. Um den zweiten
+Anrufbeantworter im Dashboard zu sehen, eine zweite Karteninstanz
+hinzufügen und deren `entity_voicemail` auf
+`sensor.fritzbox_anrufe_anrufbeantworter_2` zeigen lassen (die anderen
+Kategorien der zweiten Karteninstanz lassen sich über die
+Kategorien-Einstellungen ausblenden, falls nur der Anrufbeantworter
+gezeigt werden soll). Eine echte zweite Tab-Ansicht innerhalb einer
+einzigen Karteninstanz ist eine mögliche künftige Erweiterung, aber (noch)
+nicht umgesetzt.
+
 ## Einstellungen (Optionen)
 
 Über Einstellungen → Geräte & Dienste → FRITZ!Box Anrufe → "Konfigurieren"
@@ -273,17 +391,23 @@ lassen sich jederzeit ändern:
     (nur wirksam im Modus "Anzahl Anrufe").
   - *Tage*: Zahl zwischen 1 und 90 (nur wirksam im Modus "Anzahl Tage").
 - **Nach Wiedergabe automatisch als gelesen markieren** (seit Version
-  1.0.5, `auto_mark_read`, standardmäßig aus, EXPERIMENTELL): sobald eine
+  1.0.5, `auto_mark_read`, standardmäßig aus): sobald eine
   Anrufbeantworter-Nachricht über diese Integration abgespielt wurde,
   entfernt die FRITZ!Box selbst das "Neu"-Kennzeichen - genau wie beim
   Abhören direkt an einem FRITZ!Box-Gerät oder in FRITZ!App Fon (TR-064-
   Aktion `MarkMessage`, siehe
-  [Automatisch als gelesen markieren](#automatisch-als-gelesen-markieren-seit-version-105-optional-experimentell)).
+  [Automatisch als gelesen markieren](#automatisch-als-gelesen-markieren-seit-version-105-optional)).
   Bewusst auf dieser Integrations-Ebene statt als Karten-Option angesiedelt,
   da dabei tatsächlicher, von allen Apps/Dashboards gemeinsam genutzter
   Zustand auf der FRITZ!Box geändert wird (u. a. auch die Anzahl ungelesener
   Nachrichten in FRITZ!App Fon) - nicht nur die Darstellung dieser einen
   Karte.
+- **Spam-Nummern/-Vorwahlen** (seit Version 1.0.6b1, `spam_numbers`,
+  kommagetrennte Liste, standardmäßig leer): siehe
+  [Spam-Erkennung](#spam-erkennung-seit-version-106b1-optional).
+- **Zweiten Anrufbeantworter aktivieren** (seit Version 1.0.6b1,
+  `second_tam_enabled`, standardmäßig aus): siehe
+  [Zweiter Anrufbeantworter](#zweiter-anrufbeantworter-seit-version-106b1-optional).
 
 ## Dashboard-Karte
 
@@ -364,8 +488,13 @@ show_processing_verpasst: false
 # bleiben.
 show_filter_bar: false
 # Papierkorb-Button für Anrufbeantworter-Nachrichten (seit Version 1.0.5,
-# optional, EXPERIMENTELL) - standardmäßig aus: Löschen ist unwiderruflich.
+# optional) - standardmäßig aus: Löschen ist unwiderruflich.
 show_delete_button: false
+# Als Spam erkannte Anrufe/Nachrichten ausblenden (seit Version 1.0.6b1,
+# optional) - standardmäßig aus. Was als Spam gilt, wird über die
+# Integrations-Optionen definiert, siehe
+# https://github.com/Meine-smarte-Welt/fritzbox_anrufe#spam-erkennung-seit-version-106b1-optional
+hide_spam: false
 # Farben (seit Version 1.0.4, optional) - CSS-Farbwert (Hex, rgb()/rgba(),
 # hsl(), oder eine Theme-Variable wie var(--accent-color)); leer/weggelassen
 # = bisherige Standardfarbe.
@@ -566,7 +695,7 @@ im Home-Assistant-Log erscheint eine Meldung wie *"Login attempt or request
 with invalid authentication ... /api/fritzbox_anrufe/tam_media/..."* vom
 `http.ban`-Modul - das war das Verhalten vor diesem Fix.
 
-### Anrufbeantworter-Nachrichten löschen (seit Version 1.0.5, optional, EXPERIMENTELL)
+### Anrufbeantworter-Nachrichten löschen (seit Version 1.0.5, optional)
 
 Ein neuer, standardmäßig ausgeblendeter Papierkorb-Button (`show_delete_button`)
 löscht eine Anrufbeantworter-Nachricht unwiderruflich von der FRITZ!Box (TR-064-
@@ -584,11 +713,12 @@ umgesetzt, den auch eigene Automatisierungen nutzen können - die dafür
 nötige, zuvor nur intern verwendete Nachrichten-ID steht jetzt als `id`-Feld
 im `messages`-Attribut des Anrufbeantworter-Sensors.
 
-**EXPERIMENTELL:** Wie bei jeder neuen Anrufbeantworter-Funktion in diesem
-Projekt noch nicht an eigener Hardware bestätigt - bitte zunächst mit
-unwichtigen Nachrichten testen.
+**Bestätigt:** Von Thorsten an eigener Hardware erfolgreich getestet -
+`DeleteMessage` funktioniert wie erwartet. Da der Löschvorgang trotzdem
+unwiderruflich bleibt, empfiehlt sich bei Unsicherheit weiterhin ein erster
+Test mit einer unwichtigen Nachricht.
 
-### Automatisch als gelesen markieren (seit Version 1.0.5, optional, EXPERIMENTELL)
+### Automatisch als gelesen markieren (seit Version 1.0.5, optional)
 
 Über die Einstellungen der Integration (siehe
 [Einstellungen (Optionen)](#einstellungen-optionen)) lässt sich `auto_mark_read`
@@ -609,9 +739,21 @@ nicht unterbrochen wird, erkennt die Karte aktive/gerade gestartete
 Wiedergaben und verschiebt eine fällige Neudarstellung, bis die Wiedergabe
 endet - unabhängig davon, ob `auto_mark_read` aktiviert ist oder nicht.
 
-**EXPERIMENTELL:** Wie bei jeder neuen Anrufbeantworter-Funktion in diesem
-Projekt noch nicht an eigener Hardware bestätigt - bitte zunächst mit
-unwichtigen Nachrichten testen.
+**Bestätigt:** Von Thorsten an eigener Hardware erfolgreich getestet -
+`MarkMessage` funktioniert wie erwartet, das "Neu"-Kennzeichen verschwindet
+nach der Wiedergabe.
+
+### Spam ausblenden (seit Version 1.0.6b1, optional)
+
+Anrufe und Anrufbeantworter-Nachrichten, die als Spam erkannt wurden (siehe
+[Spam-Erkennung](#spam-erkennung-seit-version-106b1-optional)), bekommen auf
+der Karte standardmäßig ein kleines rotes "Spam"-Badge neben dem
+Namen/der Nummer - genau wie das bestehende "neu"-Badge bei
+Anrufbeantworter-Nachrichten, nur in der Fehlerfarbe statt der
+Wiedergabefarbe. Der Schalter `hide_spam` (standardmäßig aus) blendet
+solche Einträge stattdessen komplett aus der Anrufliste bzw. der
+Nachrichtenliste aus, sowohl auf dem "Alle"/"Gesamt"-Tab als auch auf den
+Einzelkategorien.
 
 ### Variante 2: flex-table-card (YAML, spaltenweise ein-/ausblendbar)
 
@@ -778,20 +920,78 @@ die dortigen Maintainer den Fehler beheben.
   nicht etwas, das diese Integration umgehen könnte. Die Sortierung
   (Datum/Dauer/Name) ist davon nicht betroffen und funktioniert auf jedem
   Tab, einschließlich Anrufbeantworter.
-- **Anrufbeantworter-Nachrichten löschen - unwiderruflich, EXPERIMENTELL**
+- **Anrufbeantworter-Nachrichten löschen - unwiderruflich**
   (seit Version 1.0.5): Die TR-064-Aktion `DeleteMessage` löscht sofort und
   endgültig - die FRITZ!Box selbst hat dafür keinen Papierkorb. Der Button
   ist deshalb standardmäßig ausgeblendet (`show_delete_button: false`) und
-  zeigt vor dem eigentlichen Löschen eine Bestätigung. Wie jede neue
-  Anrufbeantworter-Funktion in diesem Projekt noch nicht an eigener Hardware
-  bestätigt.
+  zeigt vor dem eigentlichen Löschen eine Bestätigung.
+- **Event bei neuer Anrufbeantworter-Nachricht - noch nicht an eigener
+  Hardware bestätigt** (seit Version 1.0.6b0): Die Erkennung vergleicht bei
+  jedem Abruf der Nachrichtenliste die aktuellen Nachrichten-IDs mit denen
+  des vorherigen Abrufs - technisch unabhängig von den bereits an echter
+  Hardware bestätigten TR-064-Aktionen (`GetMessageList` selbst wird
+  unverändert genutzt), aber als komplett neue Logik dieser Version wie
+  üblich zunächst unbestätigt. `name`/`number` im Event-Payload stammen
+  direkt von der FRITZ!Box, ohne Abgleich mit dem Home-Assistant-Telefonbuch
+  dieser Integration - bei einem unbekannten Anrufer bleiben beide Felder
+  ggf. leer.
+- **Spam-Erkennung - kein natives FRITZ!Box-Signal** (seit Version 1.0.6b1):
+  Wie unter [Spam-Erkennung](#spam-erkennung-seit-version-106b1-optional)
+  beschrieben, gibt es keine automatische, KI-/datenbankbasierte
+  Spam-Erkennung der FRITZ!Box selbst. Ohne konfigurierte `spam_numbers`
+  erkennt diese Integration nur Anrufe, die die FRITZ!Box bereits selbst
+  blockiert hat - alles andere erfordert eine selbst gepflegte Liste.
+- **Zweiter Anrufbeantworter - TAM-Index 1 unbestätigt, kein eigener
+  Karten-Tab** (seit Version 1.0.6b1): Die Existenz eines zweiten,
+  über den TAM-Index "1" ansprechbaren Anrufbeantworters stützt sich auf
+  Hinweise in der TR-064-Dokumentation sowie den bereits bestehenden Code-
+  Kommentar in `tam.py`, ist aber (mangels passender Testhardware in dieser
+  Entwicklungsumgebung) noch nicht an echter Hardware mit tatsächlich
+  konfiguriertem zweiten Anrufbeantworter verifiziert - bei fehlender
+  Hardware-Unterstützung bleibt der zweite Sensor einfach dauerhaft "nicht
+  verfügbar", ohne die übrige Integration zu beeinträchtigen. Außerdem gibt
+  es (noch) keinen eigenen zweiten Tab in der Dashboard-Karte - siehe
+  [Zweiter Anrufbeantworter](#zweiter-anrufbeantworter-seit-version-106b1-optional)
+  für die empfohlene Umgehung (zweite Karteninstanz).
 
 ## Versionshistorie
 
+- **1.0.6b1** (Vorabversion): Zwei neue, unabhängig voneinander nutzbare
+  Fähigkeiten. **Spam-Erkennung** (siehe
+  [Spam-Erkennung](#spam-erkennung-seit-version-106b1-optional)): Anrufe und
+  Anrufbeantworter-Nachrichten werden als Spam markiert (neues `spam`-Feld
+  in `calls`/`messages` sowie im Event-Payload), wenn die FRITZ!Box den
+  Anruf bereits selbst blockiert hat und/oder die Nummer mit einer neuen,
+  selbst gepflegten Options-Flow-Liste (`spam_numbers`) übereinstimmt - die
+  FRITZ!Box hat dafür keine eigene, automatische Erkennung. Die
+  Dashboard-Karte kann Spam-Einträge markieren (Badge) oder komplett
+  ausblenden (`hide_spam`, standardmäßig aus, siehe
+  [Spam ausblenden](#spam-ausblenden-seit-version-106b1-optional)).
+  **Zweiter Anrufbeantworter** (siehe
+  [Zweiter Anrufbeantworter](#zweiter-anrufbeantworter-seit-version-106b1-optional)):
+  neue Options-Flow-Einstellung `second_tam_enabled` (standardmäßig aus)
+  richtet bei Bedarf einen zweiten Anrufbeantworter-Sensor
+  (`fritzbox_anrufe_anrufbeantworter_2`) mit denselben Fähigkeiten wie der
+  erste ein (Wiedergabe, Löschen, automatisch als gelesen markieren, eigenes
+  Event) - noch ohne eigenen zweiten Tab in der Karte, stattdessen per
+  zweiter Karteninstanz nutzbar. Beide Fähigkeiten wurden auf Wunsch
+  gebündelt in dieser einen Version umgesetzt.
+
+- **1.0.6b0** (Vorabversion): Neues Event `fritzbox_anrufe_new_voicemail_message`,
+  gefeuert sobald beim Abruf der Anrufbeantworter-Nachrichtenliste eine
+  gegenüber dem vorherigen Abruf neue Nachrichten-ID entdeckt wird - direkt
+  als Automations-Auslöser nutzbar (z. B. für eine Push-Benachrichtigung
+  mit Anrufername/-nummer), ohne die `messages`-Attributliste selbst per
+  Vorlage auf neu hinzugekommene Einträge vergleichen zu müssen, siehe
+  [Event bei neuer Anrufbeantworter-Nachricht](#event-bei-neuer-anrufbeantworter-nachricht-seit-version-106b0).
+  Beim allerersten Abruf nach einem Neustart wird bewusst kein Event
+  gefeuert, um keine Benachrichtigungen für längst bekannte, nur noch nicht
+  abgehörte Nachrichten auszulösen. Die Erkennung selbst ist noch nicht an
+  Thorstens eigener Hardware bestätigt.
 - **1.0.5**: Anrufbeantworter-Nachrichten lassen sich jetzt direkt über die
   Dashboard-Karte löschen (neuer Papierkorb-Button, `show_delete_button`,
   standardmäßig aus - siehe
-  [Anrufbeantworter-Nachrichten löschen](#anrufbeantworter-nachrichten-löschen-seit-version-105-optional-experimentell)),
+  [Anrufbeantworter-Nachrichten löschen](#anrufbeantworter-nachrichten-löschen-seit-version-105-optional)),
   unwiderruflich über die TR-064-Aktion `DeleteMessage`, mit Bestätigung vor
   dem eigentlichen Löschen und einem neuen
   `fritzbox_anrufe.delete_voicemail_message`-Entity-Service für eigene
@@ -801,7 +1001,7 @@ die dortigen Maintainer den Fehler beheben.
   Integration automatisch auf der FRITZ!Box selbst als gelesen, genau wie
   beim Abhören an einem FRITZ!Box-eigenen Gerät (TR-064-Aktion
   `MarkMessage` - siehe
-  [Automatisch als gelesen markieren](#automatisch-als-gelesen-markieren-seit-version-105-optional-experimentell)).
+  [Automatisch als gelesen markieren](#automatisch-als-gelesen-markieren-seit-version-105-optional)).
   Anders als die rein optischen `show_*`-Kartenoptionen sitzt dieser
   Schalter bewusst auf Integrations- statt Kartenebene, weil er
   tatsächlichen, von allen Apps/Dashboards geteilten Zustand auf der Box
@@ -811,9 +1011,8 @@ die dortigen Maintainer den Fehler beheben.
   Kartenaktualisierung aus, die eine noch laufende Audiowiedergabe nicht
   unterbrechen darf; die entsprechende Schutzlogik wurde von Anfang an
   gemeinsam mit dieser Funktion gebaut und getestet, nicht erst als
-  Korrektur nachgereicht. Wie jede neue Anrufbeantworter-Funktion in
-  diesem Projekt bislang EXPERIMENTELL, noch nicht an eigener Hardware
-  bestätigt.
+  Korrektur nachgereicht. Beide Fähigkeiten wurden von Thorsten an eigener
+  Hardware erfolgreich getestet und bestätigt.
 - **1.0.4**: Individuelle farbliche Gestaltung der Dashboard-Karte über den
   grafischen Editor (neuer Bereich "Farben", zwölf `color_*`-Schlüssel für
   Tab-Farbe, VIP-Stern, Zeilen-Icons, Live-Banner, Weiterverarbeitungs-Icons
@@ -965,24 +1164,25 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.0.5) |
+| Datei | SHA256 (Version 1.0.6b1) |
 | --- | --- |
-| `__init__.py` | `99755697a3d5e8109801e9a87d37a3d4a29ff63f73036c4451749beb4886f7b7` |
+| `__init__.py` | `1f510c4c463e393e49aea56b9f116a48ca090e0ca9a73890128a1c9bd2c6f5fc` |
 | `base.py` | `a1a7b2c272431b63c5ce68264b3e0e34e0a9f7935fb9c6a73e1ce8dbbb633752` |
-| `call_log.py` | `6aa893cfade2130766a65beaa8b97c5a62e73c850e49b676cf1ba9fd7fb8da0d` |
-| `config_flow.py` | `1c99bf1c0bd7c45999d30d8e36d3e280bce3f93207293e417db9a9fb0bb5e4f4` |
-| `const.py` | `85bb4d0d44d565ee28d7d247d58b0fff2242eee7435fd2e9dc62f12bb5998077` |
-| `http.py` | `707f0b7ada7a1b27b19b2ab4b6429dc76faf3b3f67541db2451c4e286f26322c` |
-| `sensor.py` | `4920ee78d0450b7efe4ffcdbbcbc8dec43ab91c17dd15ac1c11964dbab343e92` |
-| `tam.py` | `51c5a8600a5963575a5c88f6dd3142300b59c69b082b18108c8ff1015721256a` |
-| `voicemail.py` | `c6f9db1242d95e8197aabfefd7506b54302c3c6bbd2a01cb190da9771786ccb8` |
+| `call_log.py` | `c7115af494200e8a19dae9efaed855680b4ac8186b81788aeacb6c5aae8721f9` |
+| `config_flow.py` | `f2b8a0695882ae21c781bb4ea9cd1bbe09468b095705d787238c511c3c42d152` |
+| `const.py` | `a75f0afd54dead47a0b04776a215d8a805c754f87d84f6016d2c8204ae576aa0` |
+| `http.py` | `36c5b0ea06ebc7da649150bfed7d5cc195f6ff2751c5c5cf31e12dad8f933b52` |
+| `sensor.py` | `723f4125f20b06452dc7d142d250ddb1f5a7e4bb96659564713fc47c47b8b695` |
+| `spam.py` | `2e300431c40ce61953fc92a4e92e661caa7c825b26683a3ce6d70c6ebc04872b` |
+| `tam.py` | `c0e9d34e6cd4702ad550b29a88e633ffdedf304b6d854978674daa2ca6839009` |
+| `voicemail.py` | `e0dcc988b2670810740cfe007eb0ddf1c91dec82bcf6b63c7aba07f58dcd700e` |
 | `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
-| `www/fritzbox-anrufe-card.js` | `3158a8e234a143c39e5845c3c312a4640820b59c700c6774f101e1c65119b2ad` |
-| `manifest.json` | `b23c8751ac84a64c122a45190ac41ac79212e5cba8e3b14a1f2f910ad20fdde6` |
-| `strings.json` | `0f94761b93515e158fd344e00586ea3d8a7b980fa0aa306cdb5e9f9c90cff9c3` |
-| `translations/de.json` | `789d5d58dd0cf61b056624601bdb3bba9690df15ce45e91226ce690342697270` |
-| `translations/en.json` | `0f94761b93515e158fd344e00586ea3d8a7b980fa0aa306cdb5e9f9c90cff9c3` |
-| `icons.json` | `9d6c00c4c10b849524b99b6f6bd6849b74c3caa9c0bbce509ac942722b89113f` |
+| `www/fritzbox-anrufe-card.js` | `f723e373f4d49830ab5d902dbcde0de54ab58e8a08d3fefe5e3d8b91299b1314` |
+| `manifest.json` | `08da90298d9f0b8e33af7dc53559d0100f5b1e6364b95614d6d0036c65a7292c` |
+| `strings.json` | `eaedc2f668460566db8d23e303fbf03e72af80cdfcedafbee4e940bfc9bd3449` |
+| `translations/de.json` | `643a3eff2e1452f37dcabb859569cf4f711c2b8eb480d68f1c33f93466eea9eb` |
+| `translations/en.json` | `eaedc2f668460566db8d23e303fbf03e72af80cdfcedafbee4e940bfc9bd3449` |
+| `icons.json` | `8db2810bdf50239b9834f66089d7b292affc261168b0ff81d0872c25c8259e07` |
 
 ## Fehlerbehebung
 
