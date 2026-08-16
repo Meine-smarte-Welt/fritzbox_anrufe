@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 05dd6054182e5ea860767fdcb17f9271ca6d84588baec7f2bd6936a38e2154d6
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 0bfc65be75b44090a11bc8521e32dd815ae19e556d429620f39b5d9be31aa9f2
 """Config flow for fritzbox_anrufe."""
 
 from __future__ import annotations
@@ -428,10 +428,13 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
         """
         options = self.config_entry.options
         schema: dict[Any, Any] = {
+            # Bugfix-Historie (seit v1.1.1) siehe ausführlicher Kommentar bei
+            # CONF_SPAM_NUMBERS weiter unten - derselbe Validator-Aufbau,
+            # hier nur kurz gehalten, um Dopplung zu vermeiden.
             vol.Optional(
                 CONF_PREFIXES,
                 description={"suggested_value": options.get(CONF_PREFIXES)},
-            ): vol.Any(None, str),
+            ): vol.Any(None, selector.TextSelector()),
         }
         schema.update(_history_schema_dict(options))
         # Anrufbeantworter: nach Wiedergabe automatisch als gelesen markieren
@@ -451,39 +454,61 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
         # bestehende CONF_PREFIXES-Muster oben (keine eigene DEFAULT-
         # Konstante, options.get() liefert None/leer).
         #
-        # Bugfix (seit v1.1.1): der Validator war bislang das nackte
-        # ``str``-Voluptuous-Schema, das NUR echte Strings akzeptiert. Ein
-        # leer gelassenes optionales Textfeld schickt das Home-Assistant-
-        # Frontend aber als ``null`` mit (nicht etwa als leerer String, und
-        # der Schlüssel fehlt auch nicht einfach im user_input-Dict) -
-        # dagegen schlug die Validierung mit "expected str" fehl, obwohl
-        # das Feld laut ``vol.Optional`` gar nicht ausgefüllt werden muss.
-        # ``vol.Any(None, str)`` lässt beide Fälle zu; die nachgelagerte
-        # Verarbeitung (``_get_list_of_prefixes``) behandelt ``None``
-        # bereits korrekt. Betraf denselben Schema-Aufbau auch bei
-        # CONF_PREFIXES oben, dort nur nicht aufgefallen, weil dieses Feld
-        # bei den meisten Installationen bereits befüllt ist.
+        # Bugfix-Historie (seit v1.1.1) - DREI Anläufe für dasselbe Feld,
+        # jeweils an einer anderen Stelle im Home-Assistant-Formular-Stack
+        # gescheitert:
         #
-        # Nachtrag: die ARGUMENT-REIHENFOLGE ist hier entscheidend, nicht
-        # nur Kosmetik. Home Assistants ``voluptuous_serialize.convert()``
-        # (wandelt das Schema serverseitig in die vom Frontend darstellbare
-        # Formularbeschreibung um) erkennt ausschließlich das Muster
-        # ``vol.Any(None, <typ>)`` als "optionales Feld dieses Typs"
-        # (identisch zu Home Assistants eigenem ``vol.Maybe()``-Helper) -
-        # ``vol.Any(<typ>, None)`` (Reihenfolge vertauscht) fällt durch
-        # jeden bekannten Fall und lässt ``convert()`` mit
-        # ``ValueError: Unable to convert schema`` abbrechen. Das führte in
-        # einem ersten Fix-Versuch dazu, dass der "Grundeinstellungen"-
-        # Schritt selbst nicht mehr aufrufbar war (leerer "Fehler"-Dialog
-        # ohne Text) - obwohl die reine Eingabevalidierung (nur relevant
-        # BEIM SPEICHERN, nicht beim erstmaligen Anzeigen des Formulars)
-        # mit dieser Reihenfolge durchaus funktioniert hätte.
+        # 1. Der Validator war ursprünglich das nackte ``str``-Voluptuous-
+        #    Schema, das NUR echte Strings akzeptiert. Ein leer gelassenes
+        #    optionales Textfeld schickt das Home-Assistant-Frontend aber
+        #    als ``null`` mit (nicht als leerer String, und der Schlüssel
+        #    fehlt auch nicht einfach im user_input-Dict) - dagegen schlug
+        #    die Validierung mit "expected str" fehl.
+        # 2. Fix-Versuch ``vol.Any(str, None)`` (Reihenfolge: Typ zuerst)
+        #    behob (1), brach aber das erstmalige ANZEIGEN des Formulars:
+        #    Home Assistants ``voluptuous_serialize.convert()`` (wandelt
+        #    das Schema serverseitig in die vom Frontend darstellbare
+        #    Formularbeschreibung um) erkennt ausschließlich das Muster
+        #    ``vol.Any(None, <typ>)`` - ``None`` ZUERST - als "optionales
+        #    Feld dieses Typs" (identisch zu Home Assistants eigenem
+        #    ``vol.Maybe()``-Helper). Die vertauschte Reihenfolge fiel durch
+        #    jeden bekannten Fall und ließ ``convert()`` mit
+        #    ``ValueError: Unable to convert schema`` abbrechen - sichtbar
+        #    als leerer, textloser "Fehler"-Dialog beim Öffnen von
+        #    "Grundeinstellungen".
+        # 3. Fix-Versuch ``vol.Any(None, str)`` (Reihenfolge korrigiert)
+        #    behob (2) - das Formular ließ sich wieder öffnen UND leere
+        #    Felder validierten wieder korrekt (siehe Tests unten) - aber
+        #    beim tatsächlichen Speichern kam serverseitig für dieses Feld
+        #    dennoch gelegentlich ein NICHT-String-Wert an (voluptuous:
+        #    "not a valid value", Pfad korrekt auf ``spam_numbers``
+        #    zurückgeführt - siehe ``_map_error_to_schema_errors`` in
+        #    Home Assistants ``data_entry_flow.py``). Vermutete Ursache:
+        #    die Kombination "nacktes ``type: string`` + ``allow_none``"
+        #    (ohne begleitenden ``selector``-Schlüssel im serialisierten
+        #    Formularfeld) ist in Home Assistants Frontend (``ha-form``)
+        #    offenbar kein gut unterstützter, häufig genutzter Formularfeld-
+        #    Typ - im Gegensatz zur Kombination "richtiger Selector +
+        #    allow_none", die in echten Home-Assistant-Core-Integrationen
+        #    für nullable Textfelder der Standard ist.
+        #
+        # FINALER FIX: ``vol.Any(None, selector.TextSelector())`` statt
+        # ``vol.Any(None, str)`` - liefert bei der Serialisierung ein
+        # echtes ``selector: {text: {...}}``-Feld (plus ``allow_none``),
+        # denselben, gut erprobten Rendering-Pfad wie jedes andere
+        # Selector-Feld dieses Formulars (``auto_mark_read``, die
+        # Verlaufstiefe-Dropdowns). ``vol.Any`` prüft ``None`` weiterhin
+        # per Gleichheitsvergleich ZUERST, bevor der eigentliche
+        # ``TextSelector`` überhaupt aufgerufen wird - ein ``None``-Wert
+        # erreicht dessen eigene (strengere) Validierung also nie. Die
+        # nachgelagerte Verarbeitung (``_get_list_of_prefixes()``)
+        # behandelt ``None`` unverändert korrekt.
         schema[
             vol.Optional(
                 CONF_SPAM_NUMBERS,
                 description={"suggested_value": options.get(CONF_SPAM_NUMBERS)},
             )
-        ] = vol.Any(None, str)
+        ] = vol.Any(None, selector.TextSelector())
         return vol.Schema(schema)
 
     async def async_step_init(
