@@ -23,6 +23,15 @@
       },
       "fritzbox_anrufe_anrufbeantworter_2": {
         "default": "mdi:voicemail"
+      },
+      "fritzbox_anrufe_anrufbeantworter_3": {
+        "default": "mdi:voicemail"
+      },
+      "fritzbox_anrufe_anrufbeantworter_4": {
+        "default": "mdi:voicemail"
+      },
+      "fritzbox_anrufe_anrufbeantworter_5": {
+        "default": "mdi:voicemail"
       }
     },
     "switch": {
@@ -30,6 +39,15 @@
         "default": "mdi:answering-machine"
       },
       "fritzbox_anrufe_anrufbeantworter_2_schalter": {
+        "default": "mdi:answering-machine"
+      },
+      "fritzbox_anrufe_anrufbeantworter_3_schalter": {
+        "default": "mdi:answering-machine"
+      },
+      "fritzbox_anrufe_anrufbeantworter_4_schalter": {
+        "default": "mdi:answering-machine"
+      },
+      "fritzbox_anrufe_anrufbeantworter_5_schalter": {
         "default": "mdi:answering-machine"
       }
     }

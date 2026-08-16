@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 298cb8356ccce40f3521873bd62fa65ffdc48e0461d047023b8cb203b0ad8b9b
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6
 """Wrapper around the FRITZ!Box answering machine (TAM) TR-064 API.
 
 EXPERIMENTAL - message list confirmed working on real hardware; audio
@@ -143,6 +143,15 @@ DEFAULT_TAM_INDEX = "0"
 # sensor ends up unavailable - same graceful-failure behaviour as the
 # primary TAM, never blocks integration setup.
 SECOND_TAM_INDEX = "1"
+
+# Seit v1.1.1: bis zu 5 Anrufbeantworter (const.py:MAX_TAM_COUNT). Slot-Index
+# (0-basiert) = Listenindex hier - DEFAULT_TAM_INDEX/SECOND_TAM_INDEX oben
+# entsprechen exakt TAM_INDICES[0]/TAM_INDICES[1] und bleiben als eigene,
+# benannte Konstanten bestehen, da sie bereits an anderer Stelle referenziert
+# werden. Indizes 2-4 (dritter bis fünfter Anrufbeantworter) sind - wie
+# bereits Index 1 - eine reine Annahme (fortlaufende TAM-Indizierung),
+# NICHT unabhängig bestätigt; siehe README/Projekthistorie zu v1.1.1.
+TAM_INDICES = (DEFAULT_TAM_INDEX, SECOND_TAM_INDEX, "2", "3", "4")
 
 # See the module docstring: the exact output parameter name of
 # GetMessageList could not be confirmed against real hardware, so both

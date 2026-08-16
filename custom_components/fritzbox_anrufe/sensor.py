@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 97d3e46cd09ff18e397376702f6f9dd07ab550799c910e638705c08f9cd4721f
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 4116f337557a8eea43d8a85f47293928e20651c04d7b6516e5bf8b1e6a5a1b90
 """Sensor to monitor incoming/outgoing phone calls on a Fritz!Box router."""
 
 from collections.abc import Mapping
@@ -33,16 +33,15 @@ from .const import (
     CALL_OUTCOME_NOT_CONNECTED,
     CALL_TYPE_LIVE,
     CALL_TYPE_OUTGOING,
-    CALL_TYPE_VOICEMAIL,
-    CALL_TYPE_VOICEMAIL_2,
     CALL_TYPES,
+    CALL_TYPES_VOICEMAIL,
     CONF_PHONEBOOK,
     CONF_PREFIXES,
     DOMAIN,
     POST_CALL_REFRESH_DELAY_SECONDS,
     SERIAL_NUMBER,
-    TAM2_MEDIA_URL_BASE,
     TAM_MEDIA_URL_BASE,
+    TAM_MEDIA_URL_BASES,
     FritzState,
 )
 from .tam import TamMessage
@@ -79,7 +78,13 @@ async def async_setup_entry(
     runtime_data: FritzBoxRuntimeData = config_entry.runtime_data
     fritzbox_phonebook = runtime_data.phonebook
     call_log_coordinator = runtime_data.call_log_coordinator
-    tam_coordinator = runtime_data.tam_coordinator
+    tam_coordinators = runtime_data.tam_coordinators
+    # Slot 1 (immer vorhanden, siehe __init__.py:MIN_TAM_COUNT) - einzige
+    # Instanz, die FritzBoxCallSensor für den post-call-Refresh kennt (siehe
+    # dessen Docstring weiter unten); zusätzliche Slots (2-5) werden separat
+    # über die Schleife unten in eigene FritzBoxVoicemailSensor-Entities
+    # übersetzt.
+    tam_coordinator = tam_coordinators[0] if tam_coordinators else None
 
     phonebook_id: int = config_entry.data[CONF_PHONEBOOK]
     prefixes: list[str] | None = config_entry.options.get(CONF_PREFIXES)
@@ -117,53 +122,38 @@ async def async_setup_entry(
 
     entities: list[SensorEntity] = [live_sensor, *call_list_sensors]
 
-    # Anrufbeantworter-Sensor (EXPERIMENTELL, siehe tam.py). Nur hinzufügen,
-    # wenn der Coordinator tatsächlich erstellt werden konnte - er wird nie
-    # None sein (siehe __init__.py), das defensive `is not None` schützt
-    # nur gegen künftige Änderungen an dieser Voraussetzung.
-    if tam_coordinator is not None:
-        entities.append(
-            FritzBoxVoicemailSensor(
-                coordinator=tam_coordinator,
-                unique_id=f"{unique_id}-{CALL_TYPE_VOICEMAIL}",
-                phonebook_name=config_entry.title,
-                fritzbox_phonebook=fritzbox_phonebook,
-                device_info=device_info,
-                config_entry_id=config_entry.entry_id,
-                translation_key=f"{DOMAIN}_{CALL_TYPE_VOICEMAIL}",
-                media_url_base=TAM_MEDIA_URL_BASE,
-            )
-        )
-
-    # Zweiter Anrufbeantworter-Sensor (seit v1.0.6b1, optional - siehe
-    # const.py:CONF_SECOND_TAM/__init__.py). Nur eine zweite Backend-Entity,
-    # bewusst OHNE eigenen zweiten Tab in der Dashboard-Karte - deren
+    # Anrufbeantworter-Sensoren (EXPERIMENTELL, siehe tam.py) - ein Sensor
+    # pro konfiguriertem Slot (seit v1.1.1 bis zu 5, vorher fest 1 oder 2 -
+    # siehe const.py:MAX_TAM_COUNT/CALL_TYPES_VOICEMAIL). Slot 1 (Index 0)
+    # ist immer vorhanden (__init__.py:MIN_TAM_COUNT); bewusst weiterhin
+    # OHNE eigene Tabs in der Dashboard-Karte für Slot 2-5 - deren
     # entity_voicemail-Konfigurationsfeld ist bereits generisch genug, um
-    # per zweiter Karteninstanz auf diesen Sensor zu zeigen (siehe README).
-    tam_coordinator_2 = runtime_data.tam_coordinator_2
-    if tam_coordinator_2 is not None:
+    # per weiterer Karteninstanz auf jeden dieser Sensoren zu zeigen (siehe
+    # README, gleiches Muster wie bereits seit v1.0.6b1 für Slot 2).
+    for slot, coordinator in enumerate(tam_coordinators):
+        call_type = CALL_TYPES_VOICEMAIL[slot]
         entities.append(
             FritzBoxVoicemailSensor(
-                coordinator=tam_coordinator_2,
-                unique_id=f"{unique_id}-{CALL_TYPE_VOICEMAIL_2}",
+                coordinator=coordinator,
+                unique_id=f"{unique_id}-{call_type}",
                 phonebook_name=config_entry.title,
                 fritzbox_phonebook=fritzbox_phonebook,
                 device_info=device_info,
                 config_entry_id=config_entry.entry_id,
-                translation_key=f"{DOMAIN}_{CALL_TYPE_VOICEMAIL_2}",
-                media_url_base=TAM2_MEDIA_URL_BASE,
+                translation_key=f"{DOMAIN}_{call_type}",
+                media_url_base=TAM_MEDIA_URL_BASES[slot],
             )
         )
 
     async_add_entities(entities)
 
-    if tam_coordinator is not None or tam_coordinator_2 is not None:
+    if tam_coordinators:
         # async_register_entity_service() registers the service once per
         # platform, not once per entity - it is dispatched at call time to
         # whichever entity_id the service call actually targets (each
         # FritzBoxVoicemailSensor instance holds its own self.coordinator),
-        # so this single registration already covers both the first and a
-        # possible second Anrufbeantworter-Sensor.
+        # so this single registration already covers every configured
+        # Anrufbeantworter-Sensor (Slot 1-5).
         platform = entity_platform.async_get_current_platform()
         platform.async_register_entity_service(
             SERVICE_DELETE_VOICEMAIL_MESSAGE,
@@ -481,7 +471,7 @@ class FritzBoxVoicemailSensor(CoordinatorEntity[FritzTamCoordinator], SensorEnti
         fritzbox_phonebook: FritzBoxPhonebook,
         device_info: DeviceInfo,
         config_entry_id: str,
-        translation_key: str = f"{DOMAIN}_{CALL_TYPE_VOICEMAIL}",
+        translation_key: str = f"{DOMAIN}_{CALL_TYPES_VOICEMAIL[0]}",
         media_url_base: str = TAM_MEDIA_URL_BASE,
     ) -> None:
         """Initialize the answering-machine sensor.

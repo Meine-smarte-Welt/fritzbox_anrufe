@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 36c5b0ea06ebc7da649150bfed7d5cc195f6ff2751c5c5cf31e12dad8f933b52
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): a5823e4d0838b8783484179dbdbe17290bd484017ccc38001a29e57463d999cf
 """Authenticated proxy view for FRITZ!Box answering-machine (TAM) audio.
 
 EXPERIMENTAL - see :mod:`.tam`. The FRITZ!Box audio recording itself
@@ -19,8 +19,9 @@ from requests.exceptions import RequestException
 
 from homeassistant.components.http import KEY_HASS, HomeAssistantView
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.core import HomeAssistant
 
-from .const import CALL_MEDIA_URL_BASE, DOMAIN, TAM2_MEDIA_URL_BASE, TAM_MEDIA_URL_BASE
+from .const import CALL_MEDIA_URL_BASE, DOMAIN, TAM_MEDIA_URL_BASE, TAM_MEDIA_URL_BASES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,28 +85,37 @@ class FritzBoxTamMediaView(HomeAssistantView):
         ):
             return web.Response(status=404)
 
-        tam_coordinator = getattr(entry.runtime_data, "tam_coordinator", None)
+        tam_coordinators = getattr(entry.runtime_data, "tam_coordinators", [])
+        tam_coordinator = tam_coordinators[0] if tam_coordinators else None
         return await _serve_tam_message(hass, tam_coordinator, message_id)
 
 
-class FritzBoxTam2MediaView(HomeAssistantView):
-    """Stream one message's audio recording from the SECOND answering machine.
+class _FritzBoxTamSlotMediaView(HomeAssistantView):
+    """Stream one message's audio recording from TAM slot 2-5 (seit v1.1.1).
 
-    Seit v1.0.6b1 - siehe const.py:CONF_SECOND_TAM/__init__.py. Bewusst als
-    eigenständige View mit eigenem URL-Schema (TAM2_MEDIA_URL_BASE), NICHT
-    als Parameter an FritzBoxTamMediaView, damit der bereits an echter
-    Hardware bestätigte Wiedergabe-Pfad des ersten Anrufbeantworters
-    unangetastet bleibt.
+    Generalisiert die vormals fest ausprogrammierte, nur für Slot 2
+    existierende ``FritzBoxTam2MediaView`` auf bis zu 5 Slots
+    (const.py:MAX_TAM_COUNT) - eine Instanz pro zusätzlichem Slot,
+    registriert von :func:`register_additional_tam_views` unten. Bewusst
+    weiterhin als eigene View mit eigenem, festem URL-Schema PRO SLOT
+    (nicht ein einziger dynamischer ``{tam_slot}``-URL-Parameter), damit der
+    bereits an echter Hardware bestätigte Wiedergabe-Pfad des ersten
+    Anrufbeantworters (:class:`FritzBoxTamMediaView` oben) unangetastet
+    bleibt.
     """
 
-    url = f"{TAM2_MEDIA_URL_BASE}/{{entry_id}}/{{message_id}}"
-    name = "api:fritzbox_anrufe:tam2_media"
     requires_auth = True
+
+    def __init__(self, slot_index: int, media_url_base: str) -> None:
+        """``slot_index`` ist 0-basiert (1 = zweiter AB, ..., 4 = fünfter AB)."""
+        self._slot_index = slot_index
+        self.url = f"{media_url_base}/{{entry_id}}/{{message_id}}"
+        self.name = f"api:fritzbox_anrufe:tam{slot_index + 1}_media"
 
     async def get(
         self, request: web.Request, entry_id: str, message_id: str
     ) -> web.Response:
-        """Return the audio bytes for one second-TAM message, if available."""
+        """Return the audio bytes for one message of this TAM slot, if any."""
         hass = request.app[KEY_HASS]
 
         entry = hass.config_entries.async_get_entry(entry_id)
@@ -116,8 +126,25 @@ class FritzBoxTam2MediaView(HomeAssistantView):
         ):
             return web.Response(status=404)
 
-        tam_coordinator_2 = getattr(entry.runtime_data, "tam_coordinator_2", None)
-        return await _serve_tam_message(hass, tam_coordinator_2, message_id)
+        tam_coordinators = getattr(entry.runtime_data, "tam_coordinators", [])
+        tam_coordinator = (
+            tam_coordinators[self._slot_index]
+            if len(tam_coordinators) > self._slot_index
+            else None
+        )
+        return await _serve_tam_message(hass, tam_coordinator, message_id)
+
+
+def register_additional_tam_views(hass: HomeAssistant) -> None:
+    """Register the (always-present, 404-until-configured) views for slot 2-5.
+
+    Aufgerufen von ``__init__.py:_async_register_tam_view`` - immer alle 4
+    zusätzlichen Slots registriert, unabhängig von der tatsächlich
+    konfigurierten Anzahl (``tam_count``), damit eine spätere Erhöhung per
+    Options-Flow ohne HA-Neustart sofort funktioniert.
+    """
+    for slot_index, media_url_base in enumerate(TAM_MEDIA_URL_BASES[1:], start=1):
+        hass.http.register_view(_FritzBoxTamSlotMediaView(slot_index, media_url_base))
 
 
 class FritzBoxCallMediaView(HomeAssistantView):
@@ -154,7 +181,8 @@ class FritzBoxCallMediaView(HomeAssistantView):
             return web.Response(status=404)
 
         call_log_coordinator = getattr(entry.runtime_data, "call_log_coordinator", None)
-        tam_coordinator = getattr(entry.runtime_data, "tam_coordinator", None)
+        tam_coordinators = getattr(entry.runtime_data, "tam_coordinators", [])
+        tam_coordinator = tam_coordinators[0] if tam_coordinators else None
         if call_log_coordinator is None or tam_coordinator is None:
             return web.Response(status=404)
 

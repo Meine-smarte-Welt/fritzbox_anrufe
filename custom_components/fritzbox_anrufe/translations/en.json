@@ -150,6 +150,30 @@
             "name": "Messages"
           }
         }
+      },
+      "fritzbox_anrufe_anrufbeantworter_3": {
+        "name": "Answering machine 3 {phonebook_name}",
+        "state_attributes": {
+          "messages": {
+            "name": "Messages"
+          }
+        }
+      },
+      "fritzbox_anrufe_anrufbeantworter_4": {
+        "name": "Answering machine 4 {phonebook_name}",
+        "state_attributes": {
+          "messages": {
+            "name": "Messages"
+          }
+        }
+      },
+      "fritzbox_anrufe_anrufbeantworter_5": {
+        "name": "Answering machine 5 {phonebook_name}",
+        "state_attributes": {
+          "messages": {
+            "name": "Messages"
+          }
+        }
       }
     },
     "switch": {
@@ -158,6 +182,15 @@
       },
       "fritzbox_anrufe_anrufbeantworter_2_schalter": {
         "name": "Answering machine 2 on/off {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufbeantworter_3_schalter": {
+        "name": "Answering machine 3 on/off {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufbeantworter_4_schalter": {
+        "name": "Answering machine 4 on/off {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufbeantworter_5_schalter": {
+        "name": "Answering machine 5 on/off {phonebook_name}"
       }
     }
   },
@@ -176,6 +209,13 @@
     "step": {
       "init": {
         "title": "Configure FRITZ!Box Anrufe",
+        "menu_options": {
+          "general_settings": "General settings",
+          "manage_tams": "Manage answering machines"
+        }
+      },
+      "general_settings": {
+        "title": "General settings",
         "data": {
           "prefixes": "Prefixes (comma-separated list)",
           "call_log_limit_type_eingehend": "Answered calls: mode",
@@ -188,16 +228,23 @@
           "call_log_count_verpasst": "Missed calls: number of calls (if 'Number of calls' selected)",
           "call_log_days_verpasst": "Missed calls: number of days (if 'Number of days' selected)",
           "auto_mark_read": "Automatically mark as read after playback",
-          "spam_numbers": "Spam numbers/prefixes (comma-separated list)",
-          "second_tam_enabled": "Enable second answering machine"
+          "spam_numbers": "Spam numbers/prefixes (comma-separated list)"
         },
         "data_description": {
           "call_log_limit_type_eingehend": "Whether the fritzbox_anrufe_eingehend sensor (Answered calls) is limited by count or by time period.",
           "call_log_limit_type_ausgehend": "Whether the outgoing-calls sensor is limited by count or by time period.",
           "call_log_limit_type_verpasst": "Whether the missed-calls sensor is limited by count or by time period.",
           "auto_mark_read": "When enabled, playing an answering-machine message through this integration (dashboard card or service) also clears its 'new' flag directly on the FRITZ!Box itself - matching real FRITZ!Box hardware/apps. Off by default, since this changes state shared by every device/app (e.g. also the unread count in FRITZ!App Fon), not just this dashboard. Experimental, see README.",
-          "spam_numbers": "A call or answering-machine message is flagged as spam if its number matches one of these entries as a prefix, OR if the FRITZ!Box itself already blocked the call. The FRITZ!Box has no native, automatic spam detection - this list is maintained by you. Leave empty to rely only on the FRITZ!Box's own block list.",
-          "second_tam_enabled": "If your FRITZ!Box has a second answering machine configured, enable this to also retrieve its messages as a second sensor (fritzbox_anrufe_anrufbeantworter_2). Point a second dashboard-card instance at that sensor to display it - see README."
+          "spam_numbers": "A call or answering-machine message is flagged as spam if its number matches one of these entries as a prefix, OR if the FRITZ!Box itself already blocked the call. The FRITZ!Box has no native, automatic spam detection - this list is maintained by you. Leave empty to rely only on the FRITZ!Box's own block list."
+        }
+      },
+      "manage_tams": {
+        "title": "Manage answering machines",
+        "description": "Currently configured: {count} of up to 5 answering machines. The first answering machine is confirmed on real hardware; every additional one (answering machine 2 and above) is experimental - see README.",
+        "menu_options": {
+          "add_tam": "Add another answering machine",
+          "remove_tam": "Remove an answering machine",
+          "tams_done": "Done"
         }
       }
     }

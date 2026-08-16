@@ -150,6 +150,30 @@
             "name": "Nachrichten"
           }
         }
+      },
+      "fritzbox_anrufe_anrufbeantworter_3": {
+        "name": "Anrufbeantworter 3 {phonebook_name}",
+        "state_attributes": {
+          "messages": {
+            "name": "Nachrichten"
+          }
+        }
+      },
+      "fritzbox_anrufe_anrufbeantworter_4": {
+        "name": "Anrufbeantworter 4 {phonebook_name}",
+        "state_attributes": {
+          "messages": {
+            "name": "Nachrichten"
+          }
+        }
+      },
+      "fritzbox_anrufe_anrufbeantworter_5": {
+        "name": "Anrufbeantworter 5 {phonebook_name}",
+        "state_attributes": {
+          "messages": {
+            "name": "Nachrichten"
+          }
+        }
       }
     },
     "switch": {
@@ -158,6 +182,15 @@
       },
       "fritzbox_anrufe_anrufbeantworter_2_schalter": {
         "name": "Anrufbeantworter 2 Ein/Aus {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufbeantworter_3_schalter": {
+        "name": "Anrufbeantworter 3 Ein/Aus {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufbeantworter_4_schalter": {
+        "name": "Anrufbeantworter 4 Ein/Aus {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufbeantworter_5_schalter": {
+        "name": "Anrufbeantworter 5 Ein/Aus {phonebook_name}"
       }
     }
   },
@@ -176,6 +209,13 @@
     "step": {
       "init": {
         "title": "FRITZ!Box Anrufe konfigurieren",
+        "menu_options": {
+          "general_settings": "Grundeinstellungen",
+          "manage_tams": "Anrufbeantworter verwalten"
+        }
+      },
+      "general_settings": {
+        "title": "Grundeinstellungen",
         "data": {
           "prefixes": "Präfixe (kommagetrennte Liste)",
           "call_log_limit_type_eingehend": "Angenommene Anrufe: Modus",
@@ -188,16 +228,23 @@
           "call_log_count_verpasst": "Verpasste Anrufe: Anzahl (falls 'Anzahl Anrufe' gewählt)",
           "call_log_days_verpasst": "Verpasste Anrufe: Anzahl Tage (falls 'Anzahl Tage' gewählt)",
           "auto_mark_read": "Nach Wiedergabe automatisch als gelesen markieren",
-          "spam_numbers": "Spam-Nummern/-Vorwahlen (kommagetrennte Liste)",
-          "second_tam_enabled": "Zweiten Anrufbeantworter aktivieren"
+          "spam_numbers": "Spam-Nummern/-Vorwahlen (kommagetrennte Liste)"
         },
         "data_description": {
           "call_log_limit_type_eingehend": "Bestimmt, ob der Sensor fritzbox_anrufe_eingehend (Angenommene Anrufe) nach Anzahl oder nach Zeitraum begrenzt wird.",
           "call_log_limit_type_ausgehend": "Bestimmt, ob der Sensor fritzbox_anrufe_ausgehend nach Anzahl oder nach Zeitraum begrenzt wird.",
           "call_log_limit_type_verpasst": "Bestimmt, ob der Sensor fritzbox_anrufe_verpasst nach Anzahl oder nach Zeitraum begrenzt wird.",
           "auto_mark_read": "Wenn aktiviert, wird beim Abspielen einer Anrufbeantworter-Nachricht über diese Integration (Dashboard-Karte oder Service) die 'Neu'-Markierung auch direkt auf der FRITZ!Box entfernt - wie bei echter FRITZ!Box-Hardware/-Apps. Standardmäßig aus, da dies einen von allen Geräten/Apps geteilten Zustand auf der Box ändert (z. B. auch die Anzahl ungelesener Nachrichten in FRITZ!App Fon), nicht nur dieses Dashboard. Experimentell, siehe README.",
-          "spam_numbers": "Ein Anruf oder eine Anrufbeantworter-Nachricht wird als Spam markiert, wenn die Nummer mit einem dieser Einträge als Präfix übereinstimmt, ODER wenn die FRITZ!Box den Anruf bereits selbst blockiert hat. Die FRITZ!Box hat keine native, automatische Spam-Erkennung - diese Liste wird von dir gepflegt. Leer lassen, um dich nur auf die eigene Sperrliste der FRITZ!Box zu verlassen.",
-          "second_tam_enabled": "Wenn deine FRITZ!Box einen zweiten Anrufbeantworter konfiguriert hat, aktiviere dies, um auch dessen Nachrichten als zweiten Sensor (fritzbox_anrufe_anrufbeantworter_2) abzurufen. Richte eine zweite Karteninstanz auf diesen Sensor, um ihn anzuzeigen - siehe README."
+          "spam_numbers": "Ein Anruf oder eine Anrufbeantworter-Nachricht wird als Spam markiert, wenn die Nummer mit einem dieser Einträge als Präfix übereinstimmt, ODER wenn die FRITZ!Box den Anruf bereits selbst blockiert hat. Die FRITZ!Box hat keine native, automatische Spam-Erkennung - diese Liste wird von dir gepflegt. Leer lassen, um dich nur auf die eigene Sperrliste der FRITZ!Box zu verlassen."
+        }
+      },
+      "manage_tams": {
+        "title": "Anrufbeantworter verwalten",
+        "description": "Aktuell konfiguriert: {count} von bis zu 5 Anrufbeantwortern. Der erste Anrufbeantworter ist an echter Hardware bestätigt; jeder weitere (Anrufbeantworter 2 und höher) ist experimentell - siehe README.",
+        "menu_options": {
+          "add_tam": "Weiteren Anrufbeantworter hinzufügen",
+          "remove_tam": "Anrufbeantworter entfernen",
+          "tams_done": "Fertig"
         }
       }
     }

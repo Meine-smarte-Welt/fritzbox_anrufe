@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 6ac8abda4371a1cfc94167028ea47cf12c9f15e46ef258db73548f1d0134d494
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 7cdbb0e5d3c5d1c8fa3cc5cad1cba6fa1f666b6c7eb1e034fbed40861b0e73c2
 """Switch to turn the FRITZ!Box answering machine (TAM) on/off.
 
 EXPERIMENTAL, seit v1.1.0 - siehe den Modul-Docstring in ``tam.py`` für die
@@ -47,12 +47,10 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from . import FritzBoxCallMonitorConfigEntry, FritzBoxRuntimeData
 from .base import build_device_info
 from .const import (
-    CALL_TYPE_VOICEMAIL,
-    CALL_TYPE_VOICEMAIL_2,
+    CALL_TYPES_VOICEMAIL,
     CONF_PHONEBOOK,
     SERIAL_NUMBER,
-    SWITCH_TRANSLATION_KEY_VOICEMAIL,
-    SWITCH_TRANSLATION_KEY_VOICEMAIL_2,
+    SWITCH_TRANSLATION_KEYS_VOICEMAIL,
 )
 from .voicemail import FritzTamCoordinator
 
@@ -66,10 +64,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up the fritzbox_anrufe answering-machine on/off switch(es).
 
-    Mirrors exactly the same "one entity for the primary TAM, a second only
-    if configured" structure sensor.py already uses for the Anrufbeantworter
-    sensors (see const.py:CONF_SECOND_TAM/__init__.py) - both switches share
-    the same Home Assistant device as every other entity of this account.
+    Seit v1.1.1: ein Schalter pro konfiguriertem Anrufbeantworter-Slot (bis
+    zu 5, siehe const.py:MAX_TAM_COUNT/CALL_TYPES_VOICEMAIL) - vormals fest
+    ein oder zwei Schalter. Mirrors exakt dieselbe, per Schleife über
+    runtime_data.tam_coordinators aufgebaute Struktur wie sensor.py für die
+    Anrufbeantworter-Sensoren - alle Schalter teilen sich dasselbe Home
+    Assistant Gerät wie jede andere Entity dieses Accounts.
     """
     runtime_data: FritzBoxRuntimeData = config_entry.runtime_data
     fritzbox_phonebook = runtime_data.phonebook
@@ -81,30 +81,15 @@ async def async_setup_entry(
 
     entities: list[SwitchEntity] = []
 
-    tam_coordinator = runtime_data.tam_coordinator
-    if tam_coordinator is not None:
+    for slot, coordinator in enumerate(runtime_data.tam_coordinators):
+        call_type = CALL_TYPES_VOICEMAIL[slot]
         entities.append(
             FritzBoxTamSwitch(
-                coordinator=tam_coordinator,
-                unique_id=f"{unique_id}-{CALL_TYPE_VOICEMAIL}-switch",
+                coordinator=coordinator,
+                unique_id=f"{unique_id}-{call_type}-switch",
                 phonebook_name=config_entry.title,
                 device_info=device_info,
-                translation_key=SWITCH_TRANSLATION_KEY_VOICEMAIL,
-            )
-        )
-
-    # Zweiter Anrufbeantworter-Schalter (nur wenn per Options-Flow
-    # aktiviert, siehe const.py:CONF_SECOND_TAM) - identisches Muster wie
-    # der zweite Anrufbeantworter-Sensor in sensor.py.
-    tam_coordinator_2 = runtime_data.tam_coordinator_2
-    if tam_coordinator_2 is not None:
-        entities.append(
-            FritzBoxTamSwitch(
-                coordinator=tam_coordinator_2,
-                unique_id=f"{unique_id}-{CALL_TYPE_VOICEMAIL_2}-switch",
-                phonebook_name=config_entry.title,
-                device_info=device_info,
-                translation_key=SWITCH_TRANSLATION_KEY_VOICEMAIL_2,
+                translation_key=SWITCH_TRANSLATION_KEYS_VOICEMAIL[slot],
             )
         )
 

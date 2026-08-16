@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): f2b8a0695882ae21c781bb4ea9cd1bbe09468b095705d787238c511c3c42d152
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 35737922b8f7d03479393539a9b61dedd6bfbae758d5f8a11f132d2b704d5bce
 """Config flow for fritzbox_anrufe."""
 
 from __future__ import annotations
@@ -32,8 +32,8 @@ from .const import (
     CONF_AUTO_MARK_READ,
     CONF_PHONEBOOK,
     CONF_PREFIXES,
-    CONF_SECOND_TAM,
     CONF_SPAM_NUMBERS,
+    CONF_TAM_COUNT,
     DEFAULT_AUTO_MARK_READ,
     DEFAULT_CALL_LOG_COUNT,
     DEFAULT_CALL_LOG_DAYS,
@@ -41,17 +41,19 @@ from .const import (
     DEFAULT_HOST,
     DEFAULT_PHONEBOOK,
     DEFAULT_PORT,
-    DEFAULT_SECOND_TAM,
     DEFAULT_USERNAME,
     DOMAIN,
     FRITZ_ATTR_NAME,
     FRITZ_ATTR_SERIAL_NUMBER,
     MAX_CALL_LOG_DAYS,
+    MAX_TAM_COUNT,
     MIN_CALL_LOG_DAYS,
+    MIN_TAM_COUNT,
     SERIAL_NUMBER,
     conf_call_log_count,
     conf_call_log_days,
     conf_call_log_limit_type,
+    migrated_tam_count,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -378,7 +380,32 @@ class FritzBoxCallMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
-    """Handle a fritzbox_anrufe options flow."""
+    """Handle a fritzbox_anrufe options flow.
+
+    Seit v1.1.1 kein einzelner flacher Formular-Schritt mehr, sondern ein
+    Menü mit zwei Zielen: die bisherigen Grundeinstellungen (Präfixe,
+    Verlaufstiefe, auto_mark_read, Spam-Nummern - siehe
+    async_step_general_settings) UND die neue Anrufbeantworter-Verwaltung
+    (async_step_manage_tams), die den vormals binären second_tam_enabled-
+    Schalter durch wiederholt anklickbare "Weiteren Anrufbeantworter
+    hinzufügen"/"entfernen"-Schaltflächen ersetzt (bis zu MAX_TAM_COUNT=5,
+    siehe const.py). Beide Zielschritte speichern unabhängig voneinander
+    und mergen dabei stets über die JEWEILS AKTUELLEN self.config_entry.
+    options, damit ein Speichern in einem Zweig die Einstellungen des
+    anderen nicht überschreibt (die Options-Flow-API ersetzt den gesamten
+    options-dict pro async_create_entry-Aufruf, kein automatisches Merge).
+    """
+
+    def __init__(self) -> None:
+        """Initialize per-flow working state for the TAM-Verwaltung-Menü.
+
+        ``_pending_tam_count`` hält den Zwischenstand über mehrere Schritte
+        des "Anrufbeantworter verwalten"-Untermenüs hinweg (siehe
+        async_step_manage_tams) - erst async_step_tams_done übernimmt ihn
+        tatsächlich in die gespeicherten Optionen. ``None`` bis zum ersten
+        Betreten dieses Untermenüs.
+        """
+        self._pending_tam_count: int | None = None
 
     @classmethod
     def _are_prefixes_valid(cls, prefixes: str | None) -> bool:
@@ -404,7 +431,7 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
             vol.Optional(
                 CONF_PREFIXES,
                 description={"suggested_value": options.get(CONF_PREFIXES)},
-            ): str,
+            ): vol.Any(str, None),
         }
         schema.update(_history_schema_dict(options))
         # Anrufbeantworter: nach Wiedergabe automatisch als gelesen markieren
@@ -423,34 +450,50 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
         # Vorwahlen, Präfix-Abgleich, siehe spam.py. Mirrors exakt das
         # bestehende CONF_PREFIXES-Muster oben (keine eigene DEFAULT-
         # Konstante, options.get() liefert None/leer).
+        #
+        # Bugfix (seit v1.1.1): der Validator war bislang das nackte
+        # ``str``-Voluptuous-Schema, das NUR echte Strings akzeptiert. Ein
+        # leer gelassenes optionales Textfeld schickt das Home-Assistant-
+        # Frontend aber als ``null`` mit (nicht etwa als leerer String, und
+        # der Schlüssel fehlt auch nicht einfach im user_input-Dict) -
+        # dagegen schlug die Validierung mit "expected str" fehl, obwohl
+        # das Feld laut ``vol.Optional`` gar nicht ausgefüllt werden muss.
+        # ``vol.Any(str, None)`` lässt beide Fälle zu; die nachgelagerte
+        # Verarbeitung (``_get_list_of_prefixes``) behandelt ``None``
+        # bereits korrekt. Betraf denselben Schema-Aufbau auch bei
+        # CONF_PREFIXES oben, dort nur nicht aufgefallen, weil dieses Feld
+        # bei den meisten Installationen bereits befüllt ist.
         schema[
             vol.Optional(
                 CONF_SPAM_NUMBERS,
                 description={"suggested_value": options.get(CONF_SPAM_NUMBERS)},
             )
-        ] = str
-        # Zweiter Anrufbeantworter (seit v1.0.6b1, Standard AUS) - siehe
-        # const.py:CONF_SECOND_TAM/tam.py:SECOND_TAM_INDEX. Dank
-        # OptionsFlowWithReload (Basisklasse dieser Klasse) löst eine
-        # Änderung hier automatisch einen Reload des Config-Entry aus.
-        schema[
-            vol.Optional(
-                CONF_SECOND_TAM,
-                default=options.get(CONF_SECOND_TAM, DEFAULT_SECOND_TAM),
-            )
-        ] = selector.BooleanSelector()
+        ] = vol.Any(str, None)
         return vol.Schema(schema)
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Manage the options."""
+        """Show the top-level menu: Grundeinstellungen vs. Anrufbeantworter verwalten."""
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["general_settings", "manage_tams"],
+        )
 
+    async def async_step_general_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Die bisherigen Grundeinstellungen - inhaltlich unverändert seit v1.1.0,
+
+        nur aus dem vormaligen "init"-Schritt hierher verschoben (siehe
+        Klassendocstring). Schließt den gesamten Options-Flow ab, sobald
+        gespeichert wird - identisch zum bisherigen Verhalten.
+        """
         option_schema = self._get_option_schema()
 
         if user_input is None:
             return self.async_show_form(
-                step_id="init",
+                step_id="general_settings",
                 data_schema=option_schema,
                 errors={},
             )
@@ -459,7 +502,7 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
 
         if not self._are_prefixes_valid(prefixes):
             return self.async_show_form(
-                step_id="init",
+                step_id="general_settings",
                 data_schema=option_schema,
                 errors={"base": ConnectResult.MALFORMED_PREFIXES},
             )
@@ -469,10 +512,87 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
         return self.async_create_entry(
             title="",
             data={
+                # Bestehende Optionen (insbesondere CONF_TAM_COUNT, siehe
+                # async_step_tams_done unten) bleiben erhalten - dieser
+                # Zweig überschreibt nur die hier tatsächlich gezeigten
+                # Felder, nicht den gesamten Optionen-Datensatz.
+                **self.config_entry.options,
                 CONF_PREFIXES: self._get_list_of_prefixes(prefixes),
                 CONF_AUTO_MARK_READ: user_input.get(CONF_AUTO_MARK_READ, DEFAULT_AUTO_MARK_READ),
                 CONF_SPAM_NUMBERS: self._get_list_of_prefixes(spam_numbers_input) or [],
-                CONF_SECOND_TAM: user_input.get(CONF_SECOND_TAM, DEFAULT_SECOND_TAM),
                 **_parse_history_input(user_input),
+            },
+        )
+
+    async def async_step_manage_tams(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Menü: 'Weiteren Anrufbeantworter hinzufügen'/'entfernen' per Klick.
+
+        Seit v1.1.1 - ersetzt den bisherigen einzelnen second_tam_enabled-
+        Schalter durch eine Anzahl (1-5, const.py:MAX_TAM_COUNT/
+        MIN_TAM_COUNT), gesteuert über wiederholt anklickbare
+        Schaltflächen statt eines einzelnen An/Aus-Reglers oder Zahlenfelds.
+        ``self._pending_tam_count`` hält den Zwischenstand, bis
+        async_step_tams_done ihn tatsächlich speichert - so lässt sich
+        mehrfach hintereinander hinzufügen/entfernen, bevor überhaupt ein
+        Config-Entry-Reload (OptionsFlowWithReload) ausgelöst wird.
+        """
+        if self._pending_tam_count is None:
+            self._pending_tam_count = migrated_tam_count(self.config_entry.options)
+
+        count = self._pending_tam_count
+        menu_options: list[str] = []
+        if count < MAX_TAM_COUNT:
+            menu_options.append("add_tam")
+        if count > MIN_TAM_COUNT:
+            menu_options.append("remove_tam")
+        menu_options.append("tams_done")
+
+        return self.async_show_menu(
+            step_id="manage_tams",
+            menu_options=menu_options,
+            description_placeholders={"count": str(count)},
+        )
+
+    async def async_step_add_tam(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Schaltfläche 'Weiteren Anrufbeantworter hinzufügen' - erhöht den Zwischenstand."""
+        assert self._pending_tam_count is not None
+        self._pending_tam_count = min(MAX_TAM_COUNT, self._pending_tam_count + 1)
+        return await self.async_step_manage_tams()
+
+    async def async_step_remove_tam(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Schaltfläche 'Anrufbeantworter entfernen' - verringert den Zwischenstand.
+
+        Entfernt immer den zuletzt hinzugefügten Slot (höchste Nummer) -
+        dieselbe "Slot 1 lässt sich nie deaktivieren"-Regel, die schon das
+        vormalige second_tam_enabled hatte. Ein bereits eingerichteter
+        Sensor/Schalter für den entfernten Slot wird dadurch NICHT sofort
+        aus der Entity-Registry gelöscht - er erscheint nach dem folgenden
+        Reload (OptionsFlowWithReload) einfach als "nicht verfügbar",
+        exakt das Verhalten, das second_tam_enabled=False vorher schon
+        hatte.
+        """
+        assert self._pending_tam_count is not None
+        self._pending_tam_count = max(MIN_TAM_COUNT, self._pending_tam_count - 1)
+        return await self.async_step_manage_tams()
+
+    async def async_step_tams_done(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Schaltfläche 'Fertig' - übernimmt den Zwischenstand in die Optionen."""
+        assert self._pending_tam_count is not None
+        return self.async_create_entry(
+            title="",
+            data={
+                # Bestehende Optionen (Präfixe, Verlaufstiefe, auto_mark_read,
+                # Spam-Nummern) bleiben erhalten - siehe
+                # async_step_general_settings für das Gegenstück.
+                **self.config_entry.options,
+                CONF_TAM_COUNT: self._pending_tam_count,
             },
         )

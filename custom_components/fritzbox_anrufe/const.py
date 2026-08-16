@@ -1,8 +1,9 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 971de1555ac94b528b119b6c64e18cb748e4cdba8a08d3d7b1028ecf8c9de077
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 69cadf3c875e12376cc945e1b072393f2459c6dc5763d484261b2afe031be0a6
 """Constants for the AVM Fritz!Box call monitor integration."""
 
+from collections.abc import Mapping
 from enum import StrEnum
-from typing import Final
+from typing import Any, Final
 
 from homeassistant.const import Platform
 
@@ -218,6 +219,56 @@ CALL_TYPE_VOICEMAIL_2 = "anrufbeantworter_2"
 # Anrufbeantworters unangetastet bleibt.
 TAM2_MEDIA_URL_BASE = "/api/fritzbox_anrufe/tam2_media"
 
+# --- Mehrere Anrufbeantworter, bis zu 5 (seit v1.1.1) -------------------
+# Löst die bisherige binäre Option CONF_SECOND_TAM (siehe oben) durch eine
+# Anzahl (1-5) ab, die im Options-Flow über wiederholt anklickbare
+# Schaltflächen "Weiteren Anrufbeantworter hinzufügen"/"entfernen" gesteuert
+# wird (siehe config_flow.py:async_step_manage_tams), statt eines einzelnen
+# An/Aus-Schalters. CONF_SECOND_TAM/DEFAULT_SECOND_TAM oben bleiben
+# unverändert als reine Migrationsquelle bestehen (siehe migrated_tam_count
+# unten) - bestehende Installationen mit second_tam_enabled=True werden
+# beim ersten Setup nach diesem Update automatisch auf tam_count=2
+# übernommen, ohne dass der Nutzer etwas tun muss.
+CONF_TAM_COUNT = "tam_count"
+DEFAULT_TAM_COUNT = 1
+MIN_TAM_COUNT: Final = 1
+MAX_TAM_COUNT: Final = 5
+
+# Slot 3-5 (Slot 1 = CALL_TYPE_VOICEMAIL, Slot 2 = CALL_TYPE_VOICEMAIL_2,
+# beide oben bereits vorhanden und bewusst unverändert, damit bestehende
+# Installationen mit nur einem/zwei Anrufbeantworter ihre entity_ids
+# behalten).
+CALL_TYPE_VOICEMAIL_3 = "anrufbeantworter_3"
+CALL_TYPE_VOICEMAIL_4 = "anrufbeantworter_4"
+CALL_TYPE_VOICEMAIL_5 = "anrufbeantworter_5"
+
+# Alle 5 möglichen Slots, in Reihenfolge - genutzt von __init__.py/
+# sensor.py/switch.py, um die konfigurierte Anzahl (tam_count) generisch
+# per Schleife statt handgeschriebener Einzelfälle je Slot aufzubauen.
+CALL_TYPES_VOICEMAIL: Final[tuple[str, str, str, str, str]] = (
+    CALL_TYPE_VOICEMAIL,
+    CALL_TYPE_VOICEMAIL_2,
+    CALL_TYPE_VOICEMAIL_3,
+    CALL_TYPE_VOICEMAIL_4,
+    CALL_TYPE_VOICEMAIL_5,
+)
+
+# Eigene Proxy-Routen für den dritten bis fünften Anrufbeantworter - gleiches
+# Muster wie TAM2_MEDIA_URL_BASE oben (bewusst je Slot eine eigene Route,
+# damit der bereits an echter Hardware bestätigte erste Wiedergabepfad
+# unangetastet bleibt, siehe http.py).
+TAM3_MEDIA_URL_BASE = "/api/fritzbox_anrufe/tam3_media"
+TAM4_MEDIA_URL_BASE = "/api/fritzbox_anrufe/tam4_media"
+TAM5_MEDIA_URL_BASE = "/api/fritzbox_anrufe/tam5_media"
+
+TAM_MEDIA_URL_BASES: Final[tuple[str, str, str, str, str]] = (
+    TAM_MEDIA_URL_BASE,
+    TAM2_MEDIA_URL_BASE,
+    TAM3_MEDIA_URL_BASE,
+    TAM4_MEDIA_URL_BASE,
+    TAM5_MEDIA_URL_BASE,
+)
+
 # --- Anrufbeantworter Ein/Aus-Schalter (seit v1.1.0) - EXPERIMENTELL ------
 # Schalter zum Ein-/Ausschalten des jeweiligen Anrufbeantworters über TR-064
 # (SetEnable, siehe tam.py:ACTION_SET_ENABLE) - das NewEnable-Argument ist
@@ -233,3 +284,36 @@ TAM2_MEDIA_URL_BASE = "/api/fritzbox_anrufe/tam2_media"
 # f"{DOMAIN}_{call_type}" bei den Sensoren oben.
 SWITCH_TRANSLATION_KEY_VOICEMAIL = f"{DOMAIN}_{CALL_TYPE_VOICEMAIL}_schalter"
 SWITCH_TRANSLATION_KEY_VOICEMAIL_2 = f"{DOMAIN}_{CALL_TYPE_VOICEMAIL_2}_schalter"
+# Slot 3-5 (seit v1.1.1) - gleiches Muster wie oben.
+SWITCH_TRANSLATION_KEY_VOICEMAIL_3 = f"{DOMAIN}_{CALL_TYPE_VOICEMAIL_3}_schalter"
+SWITCH_TRANSLATION_KEY_VOICEMAIL_4 = f"{DOMAIN}_{CALL_TYPE_VOICEMAIL_4}_schalter"
+SWITCH_TRANSLATION_KEY_VOICEMAIL_5 = f"{DOMAIN}_{CALL_TYPE_VOICEMAIL_5}_schalter"
+
+SWITCH_TRANSLATION_KEYS_VOICEMAIL: Final[tuple[str, str, str, str, str]] = (
+    SWITCH_TRANSLATION_KEY_VOICEMAIL,
+    SWITCH_TRANSLATION_KEY_VOICEMAIL_2,
+    SWITCH_TRANSLATION_KEY_VOICEMAIL_3,
+    SWITCH_TRANSLATION_KEY_VOICEMAIL_4,
+    SWITCH_TRANSLATION_KEY_VOICEMAIL_5,
+)
+
+
+def migrated_tam_count(options: Mapping[str, Any]) -> int:
+    """Anzahl konfigurierter Anrufbeantworter (1-5), inkl. Migration.
+
+    Seit v1.1.1 ersetzt CONF_TAM_COUNT die vormals binäre Option
+    CONF_SECOND_TAM. Für Installationen, die CONF_TAM_COUNT noch nicht in
+    ihren Optionen haben, wird die Anzahl einmalig aus dem alten Schlüssel
+    abgeleitet (True -> 2, False/fehlend -> 1). Rein lesend/pure - das
+    tatsächliche einmalige Zurückschreiben passiert in
+    __init__.py:async_setup_entry, damit der Options-Flow ab dem ersten
+    Öffnen nach dem Update bereits den korrekten Ausgangswert zeigt, statt
+    bei jedem Setup neu zu migrieren. Wird sowohl von __init__.py als auch
+    von config_flow.py genutzt (siehe dortige async_step_manage_tams) -
+    bewusst als reine, von ConfigEntry unabhängige Funktion hier in
+    const.py, statt in __init__.py, um einen Import von dort nach
+    config_flow.py (bzw. umgekehrt) zu vermeiden.
+    """
+    if CONF_TAM_COUNT in options:
+        return max(MIN_TAM_COUNT, min(MAX_TAM_COUNT, int(options[CONF_TAM_COUNT])))
+    return 2 if options.get(CONF_SECOND_TAM, DEFAULT_SECOND_TAM) else 1
