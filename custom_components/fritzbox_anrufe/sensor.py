@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 723f4125f20b06452dc7d142d250ddb1f5a7e4bb96659564713fc47c47b8b695
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 97d3e46cd09ff18e397376702f6f9dd07ab550799c910e638705c08f9cd4721f
 """Sensor to monitor incoming/outgoing phone calls on a Fritz!Box router."""
 
 from collections.abc import Mapping
@@ -25,7 +25,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import FritzBoxCallMonitorConfigEntry, FritzBoxRuntimeData
-from .base import Contact, FritzBoxPhonebook
+from .base import Contact, FritzBoxPhonebook, build_device_info
 from .call_log import FritzCallLogCoordinator
 from .const import (
     ATTR_PREFIXES,
@@ -39,7 +39,6 @@ from .const import (
     CONF_PHONEBOOK,
     CONF_PREFIXES,
     DOMAIN,
-    MANUFACTURER,
     POST_CALL_REFRESH_DELAY_SECONDS,
     SERIAL_NUMBER,
     TAM2_MEDIA_URL_BASE,
@@ -71,18 +70,6 @@ class CallState(StrEnum):
     IDLE = "idle"
 
 
-def _build_device_info(fritzbox_phonebook: FritzBoxPhonebook, unique_id: str) -> DeviceInfo:
-    """Build the shared device info for all sensors of one FRITZ!Box account."""
-    return DeviceInfo(
-        configuration_url=fritzbox_phonebook.fph.fc.address,
-        identifiers={(DOMAIN, unique_id)},
-        manufacturer=MANUFACTURER,
-        model=fritzbox_phonebook.fph.modelname,
-        name=fritzbox_phonebook.fph.modelname,
-        sw_version=fritzbox_phonebook.fph.fc.system_version,
-    )
-
-
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: FritzBoxCallMonitorConfigEntry,
@@ -101,7 +88,7 @@ async def async_setup_entry(
     port: int = config_entry.data[CONF_PORT]
 
     unique_id = f"{serial_number}-{phonebook_id}"
-    device_info = _build_device_info(fritzbox_phonebook, unique_id)
+    device_info = build_device_info(fritzbox_phonebook, unique_id)
 
     live_sensor = FritzBoxCallSensor(
         phonebook_name=config_entry.title,

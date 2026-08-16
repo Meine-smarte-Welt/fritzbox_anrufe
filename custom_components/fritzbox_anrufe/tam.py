@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): c0e9d34e6cd4702ad550b29a88e633ffdedf304b6d854978674daa2ca6839009
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 298cb8356ccce40f3521873bd62fa65ffdc48e0461d047023b8cb203b0ad8b9b
 """Wrapper around the FRITZ!Box answering machine (TAM) TR-064 API.
 
 EXPERIMENTAL - message list confirmed working on real hardware; audio
@@ -110,6 +110,25 @@ ACTION_DELETE_MESSAGE = "DeleteMessage"
 # identical, otherwise-confirmed service description - same "experimental,
 # not yet confirmed against this integration's own users' hardware" status.
 ACTION_MARK_MESSAGE = "MarkMessage"
+# SetEnable (seit v1.1.0): NICHT unabhängig über AVM's offizielle
+# TR-064-Spezifikation oder eine Community-Referenz bestätigt - jeder
+# Versuch, dies zu verifizieren (AVM-PDF, FHEM's 72_FRITZBOX.pm,
+# ip-phone-forum.de, forum.iobroker.net), scheiterte an
+# PROVENANCE_REQUIRED/ROBOTS_DISALLOWED-Fehlern in dieser Sandbox - selbe
+# Situation wie bereits bei GetInfo (siehe Projekthistorie zu v1.0.5b0 und
+# v1.0.6b1, deshalb wird GetInfo hier weiterhin bewusst NICHT verwendet).
+# Stattdessen rein durch die starke, innerhalb desselben X_AVM-DE_TAM1-
+# Diensts wiederholt bestätigte Namenskonvention hergeleitet: jede bereits
+# bestätigte Aktion dieses Diensts (GetMessageList/DeleteMessage/
+# MarkMessage) verwendet "NewIndex" für den TAM-Index und genau EIN
+# "New<Konzept>"-Argument für die eigentliche Nutzlast - "SetEnable" mit
+# "NewEnable" ("1"/"0", exakt dieselbe Konvention wie NewMarkedAsRead) folgt
+# diesem Muster exakt. EXPERIMENTELL, noch nicht an echter Hardware von
+# Nutzern dieser Integration bestätigt - siehe switch.py, das diese
+# Unsicherheit bewusst nie versucht durch eine Zustands-Rücklesung
+# (GetInfo) aufzulösen, sondern stattdessen als assumed_state-Schalter ohne
+# Rücklesung modelliert ist.
+ACTION_SET_ENABLE = "SetEnable"
 
 # Some FRITZ!OS versions expose more than one answering machine ("TAM
 # index" 0, 1, ...). We only support the first/default one for now.
@@ -292,6 +311,22 @@ class FritzTam:
                 "NewMessageIndex": index,
                 "NewMarkedAsRead": "1" if read else "0",
             },
+        )
+
+    def set_enable(self, enabled: bool) -> None:
+        """Turn this answering machine on/off via TR-064.
+
+        EXPERIMENTAL, ``NewEnable`` inferred by naming-convention analogy
+        only - see the ``ACTION_SET_ENABLE`` comment above for details, and
+        :mod:`.switch` for the caller-facing entity, which deliberately
+        never tries to read this state back from the box (no confirmed
+        ``GetInfo`` - see the module docstring - so ``assumed_state`` is
+        used instead).
+        """
+        self.fc.call_action(
+            SERVICE,
+            ACTION_SET_ENABLE,
+            arguments={"NewIndex": self.index, "NewEnable": "1" if enabled else "0"},
         )
 
     def get_message_list_sid(self) -> str | None:

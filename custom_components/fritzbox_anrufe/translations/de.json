@@ -151,6 +151,14 @@
           }
         }
       }
+    },
+    "switch": {
+      "fritzbox_anrufe_anrufbeantworter_schalter": {
+        "name": "Anrufbeantworter Ein/Aus {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufbeantworter_2_schalter": {
+        "name": "Anrufbeantworter 2 Ein/Aus {phonebook_name}"
+      }
     }
   },
   "selector": {

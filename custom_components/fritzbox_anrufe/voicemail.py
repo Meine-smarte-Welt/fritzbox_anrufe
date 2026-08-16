@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): e0dcc988b2670810740cfe007eb0ddf1c91dec82bcf6b63c7aba07f58dcd700e
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): b03e665eba0cb346c8877988da845a957a6737f9a8a6de8811fe2199a0e4e9b7
 """Coordinator + audio access for the FRITZ!Box answering machine (TAM).
 
 EXPERIMENTAL - see the module docstring in :mod:`.tam` for details on what
@@ -183,6 +183,21 @@ class FritzTamCoordinator(DataUpdateCoordinator[list[TamMessage]]):
         """
         await self.hass.async_add_executor_job(self._fritz_tam.delete_message, message_id)
         await self.async_request_refresh()
+
+    async def async_set_enabled(self, enabled: bool) -> None:
+        """Turn this answering machine on/off. BLOCKING call runs in executor.
+
+        EXPERIMENTAL, see :mod:`.tam` (``FritzTam.set_enable``) and
+        :mod:`.switch` for the caller-facing entity. Deliberately does NOT
+        call :meth:`async_request_refresh` afterwards, unlike
+        :meth:`delete_message` above - there is no confirmed way to read
+        this state back from the box (no ``GetInfo``, see project history),
+        so a coordinator refresh would not reflect it anyway. ``switch.py``
+        tracks its own optimistic on/off state instead. Any FRITZ!Box-side
+        error propagates to the caller as-is, exactly like ``delete_message``,
+        so the switch's own optimistic-update-with-revert logic can react to it.
+        """
+        await self.hass.async_add_executor_job(self._fritz_tam.set_enable, enabled)
 
     def maybe_auto_mark_read(self, message: TamMessage) -> None:
         """BLOCKING - run in executor, right after a successful ``fetch_audio``.

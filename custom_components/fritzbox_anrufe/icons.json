@@ -24,6 +24,14 @@
       "fritzbox_anrufe_anrufbeantworter_2": {
         "default": "mdi:voicemail"
       }
+    },
+    "switch": {
+      "fritzbox_anrufe_anrufbeantworter_schalter": {
+        "default": "mdi:answering-machine"
+      },
+      "fritzbox_anrufe_anrufbeantworter_2_schalter": {
+        "default": "mdi:answering-machine"
+      }
     }
   }
 }

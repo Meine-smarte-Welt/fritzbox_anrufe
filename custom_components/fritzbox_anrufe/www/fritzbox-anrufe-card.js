@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 5545bcb449a6b4b86bd81d7f0e99a64b0cf5c2122b30ef09c5198078801d52f4
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 955ea53f62bd61e0a893433f44dd5346c078ee99bdbbe2392d47dbf58379b1d1
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -208,6 +208,24 @@
  * Wahrheitswert-Prüfung auf die (dann falsy) rohe `id` bislang nie einen
  * Papierkorb-Button angezeigt.
  *
+ * v1.1.0: Anrufbeantworter Ein/Aus-Schalter, EXPERIMENTELL (neue
+ * `switch`-Plattform der Integration, siehe switch.py/tam.py:
+ * ACTION_SET_ENABLE - das zugrunde liegende TR-064-Argument ist NICHT
+ * unabhängig bestätigt). `show_tam_switch` (Standard AUS, editierbar unter
+ * "Darstellung") blendet vor der Nachrichten-Auflistung im
+ * Anrufbeantworter-Tab bis zu zwei Zeilen ein - eine je konfiguriertem
+ * `entity_tam_switch`/`entity_tam_switch_2` (eigene Entity-Picker unter
+ * "Sensoren", switch-Domäne; `entity_tam_switch_2` wirkt nur zusätzlich zu
+ * einem gesetzten `entity_voicemail_2`). Die Zeile zeigt den zuletzt von
+ * dieser Integration selbst gesetzten (optimistischen) Zustand, KEINE
+ * bestätigte Rücklesung vom FRITZ!Box-Gerät - siehe _renderTamSwitches().
+ * Ein Klick ruft den Standard-Home-Assistant-Dienst `switch.turn_on`/
+ * `switch.turn_off` auf; kein eigener, kartenseitig optimistischer Zustand
+ * nötig, da switch.py selbst bereits optimistisch mit Rückgängigmachen bei
+ * Fehler arbeitet (siehe dortiger Modul-Docstring) und der neue Zustand über
+ * die reguläre hass-Aktualisierung zurück in die Karte fließt (siehe
+ * _computeSignature()).
+ *
  * Example card configuration (YAML):
  *
  *   type: custom:fritzbox-anrufe-card
@@ -219,6 +237,9 @@
  *   entity_voicemail: sensor.fritz_box_7590_anrufbeantworter
  *   entity_voicemail_2: sensor.fritz_box_7590_anrufbeantworter_2  # optional, seit 1.0.6b2
  *   voicemail_2_mode: merged  # "merged" oder "separate", nur relevant mit entity_voicemail_2
+ *   entity_tam_switch: switch.fritz_box_7590_anrufbeantworter_ein_aus  # optional, seit 1.1.0, EXPERIMENTELL
+ *   entity_tam_switch_2: switch.fritz_box_7590_anrufbeantworter_2_ein_aus  # optional, seit 1.1.0
+ *   show_tam_switch: false
  *   max_rows: 10
  *   show_alle: true
  *   show_eingehend: true
@@ -537,6 +558,20 @@ const CONFIG_DEFAULTS = {
   // untereinander - siehe Moduldoku oben. Ohne entity_voicemail_2 ohne
   // jede Wirkung.
   voicemail_2_mode: "merged",
+  // Anrufbeantworter Ein/Aus-Schalter (seit v1.1.0, EXPERIMENTELL - siehe
+  // switch.py in der Integration). entity_tam_switch/entity_tam_switch_2
+  // sind eigene Entity-Picker (switch-Domäne) - bewusst NICHT aus
+  // entity_voicemail/entity_voicemail_2 abgeleitet, da Home Assistant für
+  // sprachabhängig benannte Entitäten keinen zuverlässigen Mechanismus
+  // bietet, den zugehörigen Schalter-entity_id algorithmisch zu bestimmen.
+  // entity_tam_switch_2 wirkt nur zusätzlich zu einem gesetzten
+  // entity_voicemail_2 (siehe _renderTamSwitches()). show_tam_switch ist der
+  // sichtbare Regler dafür (Standard AUS, exakt wie show_filter_bar/
+  // show_delete_button/hide_spam oben, damit bestehende Dashboards nach
+  // einem Update optisch unverändert bleiben).
+  entity_tam_switch: "",
+  entity_tam_switch_2: "",
+  show_tam_switch: false,
   // Farben (seit v1.0.4) - leer = bisheriger, fester Theme-Farbwert (siehe
   // COLOR_CONFIG_KEYS oben für die jeweiligen Standardwerte).
   color_tab_active: "",
@@ -784,6 +819,43 @@ const VOICEMAIL_ROWS_STYLES = `
      eigene width:100%-Regel und ist von diesem Effekt nicht betroffen. */
   .voicemail-player-slot { flex: 1 1 auto; min-width: 0; }
   .voicemail-player { width: 100%; height: 32px; }
+  /* Anrufbeantworter Ein/Aus-Schalter (seit v1.1.0, EXPERIMENTELL, nur bei
+     show_tam_switch) - steht vor der Nachrichten-Auflistung, siehe
+     _renderTamSwitches(). */
+  .tam-switch-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+  }
+  .tam-switch-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tam-switch-icon { color: var(--fba-color-row-icon); }
+  .tam-switch-label { flex: 1 1 auto; }
+  .tam-switch-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 10px;
+    background: var(--secondary-background-color, rgba(0, 0, 0, 0.08));
+    color: var(--primary-text-color, #212121);
+    font: inherit;
+    font-size: 0.85em;
+    cursor: pointer;
+  }
+  .tam-switch-toggle.on {
+    background: var(--fba-color-success);
+    color: var(--text-primary-color, #fff);
+  }
+  .tam-switch-toggle:disabled { opacity: 0.6; cursor: default; }
+  .tam-switch-toggle ha-icon { --mdc-icon-size: 18px; }
   .voicemail-play-btn {
     display: inline-flex;
     align-items: center;
@@ -1102,6 +1174,13 @@ class FritzboxAnrufeCard extends HTMLElement {
   static getStubConfig(hass, entities) {
     const guess = (suffix) =>
       (entities || []).find((e) => e.startsWith("sensor.") && e.includes(suffix)) || "";
+    // Eigene Guess-Funktion für die switch-Domäne (seit v1.1.0) - die
+    // Suffixe "anrufbeantworter_schalter"/"anrufbeantworter_2_schalter"
+    // matchen absichtlich nicht gegenseitig (siehe
+    // __init__.py:SWITCH_TRANSLATION_KEY_VOICEMAIL/_2 für die zugrunde
+    // liegende suggested_object_id).
+    const guessSwitch = (suffix) =>
+      (entities || []).find((e) => e.startsWith("switch.") && e.includes(suffix)) || "";
     return {
       ...CONFIG_DEFAULTS,
       entity_live: guess("call_monitor") || guess("live"),
@@ -1110,6 +1189,8 @@ class FritzboxAnrufeCard extends HTMLElement {
       entity_verpasst: guess("verpasst"),
       entity_voicemail: guess("anrufbeantworter") || guess("voicemail"),
       entity_voicemail_2: guess("anrufbeantworter_2") || guess("voicemail_2"),
+      entity_tam_switch: guessSwitch("anrufbeantworter_schalter"),
+      entity_tam_switch_2: guessSwitch("anrufbeantworter_2_schalter"),
     };
   }
 
@@ -1152,6 +1233,12 @@ class FritzboxAnrufeCard extends HTMLElement {
       this._config.entity_verpasst,
       this._config.entity_voicemail,
       this._config.entity_voicemail_2,
+      // Seit v1.1.0 - siehe _renderTamSwitches(): ohne dies würde ein
+      // Schalter-Klick zwar den Service-Call auslösen, aber der Karte erst
+      // beim nächsten ohnehin fälligen Re-Render (z. B. Tab-Wechsel)
+      // auffallen, statt sofort nach der hass-Aktualisierung.
+      this._config.entity_tam_switch,
+      this._config.entity_tam_switch_2,
     ].filter(Boolean);
     const statePart = ids
       .map((id) => {
@@ -1459,23 +1546,104 @@ class FritzboxAnrufeCard extends HTMLElement {
     return list;
   }
 
+  // Anrufbeantworter Ein/Aus-Schalter (seit v1.1.0, EXPERIMENTELL - siehe
+  // switch.py in der Integration) - rein optisch über show_tam_switch
+  // steuerbar (Standard AUS, siehe CONFIG_DEFAULTS). Erscheint, wenn
+  // aktiviert, VOR der Nachrichten-Auflistung im Anrufbeantworter-Tab
+  // (siehe _renderVoicemailRows() unten) - für beide voicemail_2_mode-
+  // Varianten identisch platziert, da die Aufgabenstellung "vor der
+  // Auflistung" nicht zwischen "gemischt"/"getrennt" unterscheidet.
+  _renderTamSwitches() {
+    if (!this._config.show_tam_switch) return "";
+    const rows = [];
+    if (this._config.entity_tam_switch) {
+      rows.push(this._renderTamSwitchRow(this._config.entity_tam_switch, "Anrufbeantworter"));
+    }
+    // Der Schalter für den zweiten Anrufbeantworter wirkt nur zusammen mit
+    // einem gesetzten entity_voicemail_2 - ohne zweiten Anrufbeantworter
+    // gibt es hier nichts zu schalten, exakt wie bei der übrigen
+    // zweiter-AB-Logik in dieser Karte.
+    if (this._config.entity_voicemail_2 && this._config.entity_tam_switch_2) {
+      rows.push(this._renderTamSwitchRow(this._config.entity_tam_switch_2, "Anrufbeantworter 2"));
+    }
+    if (!rows.length) return "";
+    return `<div class="tam-switch-block">${rows.join("")}</div>`;
+  }
+
+  // Eine einzelne Schalter-Zeile. `state` ist der rohe Home-Assistant-
+  // Zustand ("on"/"off"/"unavailable"/"unknown") - EXPERIMENTELL, siehe
+  // switch.py: assumed_state bedeutet, dieser Zustand ist die zuletzt von
+  // dieser Integration selbst gesetzte (optimistische) Annahme, keine
+  // bestätigte Rücklesung vom FRITZ!Box-Gerät.
+  _renderTamSwitchRow(entityId, label) {
+    const stateObj = this._entityState(entityId);
+    const state = stateObj ? stateObj.state : undefined;
+    const isOn = state === "on";
+    const unavailable = !stateObj || state === "unavailable";
+    const stateLabel = unavailable ? "Nicht verfügbar" : isOn ? "An" : "Aus";
+    return `
+      <div class="tam-switch-row">
+        <ha-icon class="tam-switch-icon" icon="mdi:answering-machine"></ha-icon>
+        <span class="tam-switch-label">${escapeHtml(label)}</span>
+        <button
+          class="tam-switch-toggle${isOn ? " on" : ""}"
+          data-entity="${escapeHtml(entityId)}"
+          data-state="${escapeHtml(state || "")}"
+          ${unavailable ? "disabled" : ""}
+        >
+          <ha-icon icon="${isOn ? "mdi:toggle-switch" : "mdi:toggle-switch-off-outline"}"></ha-icon>
+          <span>${stateLabel}</span>
+        </button>
+      </div>
+    `;
+  }
+
+  // Klick-Handler für .tam-switch-toggle (siehe _render() unten) - ruft den
+  // Standard-Home-Assistant-Service switch.turn_on/turn_off auf (kein
+  // eigener Dienst nötig, anders als beim Löschen von Nachrichten). Kein
+  // eigenes optimistisches UI-Update hier: switch.py selbst arbeitet bereits
+  // optimistisch (siehe dortiger Modul-Docstring) und der neue Zustand
+  // erreicht diese Karte über die reguläre hass-Aktualisierung (siehe
+  // _computeSignature() - entity_tam_switch/entity_tam_switch_2 sind dort
+  // seit v1.1.0 Teil der Signatur).
+  async _toggleTamSwitch(entityId, currentState) {
+    if (!entityId || !this._hass) return;
+    const turnOn = currentState !== "on";
+    try {
+      await this._hass.callService("switch", turnOn ? "turn_on" : "turn_off", {
+        entity_id: entityId,
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(
+        "fritzbox_anrufe: Anrufbeantworter-Schalter konnte nicht umgeschaltet werden",
+        err
+      );
+    }
+  }
+
   // Anrufbeantworter-Tab-Inhalt. Ohne konfigurierten zweiten Anrufbeantworter
   // (entity_voicemail_2, seit v1.0.6b2) exakt das bisherige Verhalten: eine
   // einzelne Liste. Mit zweitem Anrufbeantworter je nach voicemail_2_mode
   // entweder chronologisch gemischt mit "AB 1"/"AB 2"-Badge ("merged",
   // Standard - wie die "Alle"-Sammelansicht bei den Anrufen, siehe
   // _visibleCalls()) oder als zwei getrennte, überschriebene Abschnitte
-  // untereinander ("separate") - siehe Moduldoku oben.
+  // untereinander ("separate") - siehe Moduldoku oben. Seit v1.1.0 steht
+  // ggf. _renderTamSwitches() VOR jeder dieser Varianten (siehe dort).
   _renderVoicemailRows() {
     const maxRows = Number(this._config.max_rows) || 10;
+    const switches = this._renderTamSwitches();
 
     if (!this._config.entity_voicemail_2) {
       const messages = this._prepareVoicemails(this._voicemails());
-      return renderVoicemailRows(messages, {
-        maxRows,
-        showDeleteButton: !!this._config.show_delete_button,
-        confirmDeleteId: this._confirmDeleteMessageId,
-      });
+      return (
+        switches +
+        renderVoicemailRows(messages, {
+          maxRows,
+          showDeleteButton: !!this._config.show_delete_button,
+          confirmDeleteId: this._confirmDeleteMessageId,
+        })
+      );
     }
 
     if (this._config.voicemail_2_mode === "separate") {
@@ -1487,6 +1655,7 @@ class FritzboxAnrufeCard extends HTMLElement {
         confirmDeleteId: this._confirmDeleteMessageId,
       };
       return `
+        ${switches}
         <div class="voicemail-section">
           <div class="voicemail-section-title">Anrufbeantworter 1</div>
           ${renderVoicemailRows(primary, rowOpts)}
@@ -1511,12 +1680,15 @@ class FritzboxAnrufeCard extends HTMLElement {
     if (this._config.show_filter_bar) {
       merged = this._sortEntries(merged);
     }
-    return renderVoicemailRows(merged, {
-      maxRows,
-      showDeleteButton: !!this._config.show_delete_button,
-      confirmDeleteId: this._confirmDeleteMessageId,
-      showTamLabel: true,
-    });
+    return (
+      switches +
+      renderVoicemailRows(merged, {
+        maxRows,
+        showDeleteButton: !!this._config.show_delete_button,
+        confirmDeleteId: this._confirmDeleteMessageId,
+        showTamLabel: true,
+      })
+    );
   }
 
   // Filter-/Sortierleiste (seit v1.0.4b3) - siehe Moduldoku oben. Eigene
@@ -1648,6 +1820,14 @@ class FritzboxAnrufeCard extends HTMLElement {
         this._render();
       });
     }
+
+    // Anrufbeantworter Ein/Aus-Schalter (seit v1.1.0, nur bei aktivem
+    // show_tam_switch gerendert, siehe _renderTamSwitches()).
+    this.shadowRoot.querySelectorAll(".tam-switch-toggle").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._toggleTamSwitch(btn.dataset.entity, btn.dataset.state);
+      });
+    });
 
     this.shadowRoot.querySelectorAll(".voicemail-play-btn").forEach((btn) => {
       btn.addEventListener("click", () =>
@@ -1906,6 +2086,9 @@ const EDITOR_LABELS = {
   entity_voicemail: "Sensor: Anrufbeantworter (optional)",
   entity_voicemail_2: "Sensor: Zweiter Anrufbeantworter (optional)",
   voicemail_2_mode: "Darstellung mit zweitem Anrufbeantworter",
+  entity_tam_switch: "Schalter: Anrufbeantworter Ein/Aus (optional)",
+  entity_tam_switch_2: "Schalter: Zweiter Anrufbeantworter Ein/Aus (optional)",
+  show_tam_switch: "Anrufbeantworter-Ein/Aus-Schalter auf der Karte anzeigen",
   max_rows: "Max. Zeilen",
   show_alle: "Kategorie 'Gesamt' (Alle) anzeigen",
   show_eingehend: "Kategorie 'Angenommen' anzeigen",
@@ -1943,6 +2126,8 @@ const EDITOR_HELPERS = {
     "Spam wird über die Integrationseinstellungen definiert (FRITZ!Box-eigene Sperrliste und/oder eine von dir gepflegte Nummernliste) - siehe Einstellungen -> Geräte & Dienste -> FRITZ!Box Anrufe -> Konfigurieren.",
   voicemail_2_mode:
     "Nur mit gesetztem 'Sensor: Zweiter Anrufbeantworter'. 'Gemischt' zeigt beide Nachrichtenlisten chronologisch gemeinsam mit einem AB-1/AB-2-Badge, 'Getrennt' zeigt zwei eigene Abschnitte untereinander.",
+  show_tam_switch:
+    "EXPERIMENTELL: Zeigt vor der Nachrichten-Auflistung im Anrufbeantworter-Tab einen Ein/Aus-Schalter (benötigt einen unter 'Sensoren' gesetzten Schalter). Der angezeigte Zustand ist keine bestätigte Rücklesung vom FRITZ!Box-Gerät, siehe README.",
 };
 
 function computeEditorLabel(schemaItem) {
@@ -1976,6 +2161,11 @@ const EDITOR_SCHEMA = [
       { name: "entity_verpasst", selector: { entity: { domain: "sensor" } } },
       { name: "entity_voicemail", selector: { entity: { domain: "sensor" } } },
       { name: "entity_voicemail_2", selector: { entity: { domain: "sensor" } } },
+      // Seit v1.1.0, EXPERIMENTELL - eigene switch-Domäne, siehe
+      // CONFIG_DEFAULTS für den Grund, warum dies kein von entity_voicemail
+      // abgeleitetes Feld ist, sondern ein eigener Picker.
+      { name: "entity_tam_switch", selector: { entity: { domain: "switch" } } },
+      { name: "entity_tam_switch_2", selector: { entity: { domain: "switch" } } },
     ],
   },
   {
@@ -2018,6 +2208,12 @@ const EDITOR_SCHEMA = [
       { name: "show_filter_bar", selector: { boolean: {} } },
       { name: "show_delete_button", selector: { boolean: {} } },
       { name: "hide_spam", selector: { boolean: {} } },
+      // Seit v1.1.0, EXPERIMENTELL - siehe CONFIG_DEFAULTS/_renderTamSwitches().
+      // Bewusst hier in "Darstellung" (nicht "Sensoren"), da dies der rein
+      // optische Sichtbarkeits-Regler ist - die zugehörigen Entity-Picker
+      // (entity_tam_switch/entity_tam_switch_2) stehen wie gewohnt oben unter
+      // "Sensoren".
+      { name: "show_tam_switch", selector: { boolean: {} } },
       {
         name: "voicemail_2_mode",
         selector: {

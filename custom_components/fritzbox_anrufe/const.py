@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): a75f0afd54dead47a0b04776a215d8a805c754f87d84f6016d2c8204ae576aa0
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 971de1555ac94b528b119b6c64e18cb748e4cdba8a08d3d7b1028ecf8c9de077
 """Constants for the AVM Fritz!Box call monitor integration."""
 
 from enum import StrEnum
@@ -41,7 +41,7 @@ DEFAULT_NAME = "Phone"
 DOMAIN: Final = "fritzbox_anrufe"
 MANUFACTURER: Final = "FRITZ!"
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.SWITCH]
 
 # --- Anruflisten-Verlaufssensoren (fritzbox_anrufe_eingehend/ausgehend/verpasst) ---
 # sowie der Live-Callmonitor-Sensor (fritzbox_anrufe_live). Diese Suffixe
@@ -217,3 +217,19 @@ CALL_TYPE_VOICEMAIL_2 = "anrufbeantworter_2"
 # der bereits an echter Hardware bestätigte Wiedergabe-Pfad des ersten
 # Anrufbeantworters unangetastet bleibt.
 TAM2_MEDIA_URL_BASE = "/api/fritzbox_anrufe/tam2_media"
+
+# --- Anrufbeantworter Ein/Aus-Schalter (seit v1.1.0) - EXPERIMENTELL ------
+# Schalter zum Ein-/Ausschalten des jeweiligen Anrufbeantworters über TR-064
+# (SetEnable, siehe tam.py:ACTION_SET_ENABLE) - das NewEnable-Argument ist
+# NICHT unabhängig bestätigt (siehe dortiger Kommentar). Siehe switch.py für
+# die Einordnung als assumed_state-Schalter ohne Zustands-Rücklesung
+# (bewusst weiterhin kein GetInfo, siehe Projekthistorie).
+#
+# Diese Strings dienen zugleich als translation_key (strings.json/
+# translations/*.json, entity.switch-Namensraum - unabhängig vom
+# gleichnamigen entity.sensor-Namensraum, daher keine Kollision trotz
+# "anrufbeantworter" im Namen) UND als suggested_object_id für
+# _async_reserve_entity_ids in __init__.py - exakt dasselbe Muster wie
+# f"{DOMAIN}_{call_type}" bei den Sensoren oben.
+SWITCH_TRANSLATION_KEY_VOICEMAIL = f"{DOMAIN}_{CALL_TYPE_VOICEMAIL}_schalter"
+SWITCH_TRANSLATION_KEY_VOICEMAIL_2 = f"{DOMAIN}_{CALL_TYPE_VOICEMAIL_2}_schalter"

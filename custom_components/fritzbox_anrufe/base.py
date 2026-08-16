@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): a1a7b2c272431b63c5ce68264b3e0e34e0a9f7935fb9c6a73e1ce8dbbb633752
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986
 """Base class for fritzbox_anrufe entities."""
 
 from contextlib import suppress
@@ -9,9 +9,10 @@ import re
 
 from fritzconnection.lib.fritzphonebook import FritzPhonebook
 
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.util import Throttle
 
-from .const import REGEX_NUMBER, UNKNOWN_NAME
+from .const import DOMAIN, MANUFACTURER, REGEX_NUMBER, UNKNOWN_NAME
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -106,3 +107,21 @@ class FritzBoxPhonebook:
                 return self.number_dict[prefix + number.lstrip("0")]
 
         return unknown_contact
+
+
+def build_device_info(fritzbox_phonebook: FritzBoxPhonebook, unique_id: str) -> DeviceInfo:
+    """Build the shared device info for all entities of one FRITZ!Box account.
+
+    Moved here in v1.1.0 (previously a private helper in sensor.py) so the
+    new switch platform (see switch.py) can attach its entities to the
+    exact same Home Assistant device as the existing sensors, without one
+    platform module importing another.
+    """
+    return DeviceInfo(
+        configuration_url=fritzbox_phonebook.fph.fc.address,
+        identifiers={(DOMAIN, unique_id)},
+        manufacturer=MANUFACTURER,
+        model=fritzbox_phonebook.fph.modelname,
+        name=fritzbox_phonebook.fph.modelname,
+        sw_version=fritzbox_phonebook.fph.fc.system_version,
+    )

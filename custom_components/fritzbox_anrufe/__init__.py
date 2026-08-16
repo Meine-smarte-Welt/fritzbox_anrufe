@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 1f510c4c463e393e49aea56b9f116a48ca090e0ca9a73890128a1c9bd2c6f5fc
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 921483f0a2267e2007b7778b258d916df52bdbfa53de050bab6bd41b63cf9157
 """The fritzbox_anrufe integration."""
 
 from dataclasses import dataclass
@@ -34,6 +34,8 @@ from .const import (
     DOMAIN,
     PLATFORMS,
     SERIAL_NUMBER,
+    SWITCH_TRANSLATION_KEY_VOICEMAIL,
+    SWITCH_TRANSLATION_KEY_VOICEMAIL_2,
     TAM2_MEDIA_URL_BASE,
 )
 from .http import FritzBoxCallMediaView, FritzBoxTam2MediaView, FritzBoxTamMediaView
@@ -246,7 +248,10 @@ def _async_reserve_entity_ids(
 
     ``second_tam_enabled`` (seit v1.0.6b1) reserviert zusätzlich den
     entity_id des zweiten Anrufbeantworter-Sensors, nur wenn der zweite
-    Anrufbeantworter per Options-Flow aktiviert wurde.
+    Anrufbeantworter per Options-Flow aktiviert wurde. Seit v1.1.0 reserviert
+    dieselbe Option zusätzlich den entity_id des zweiten Anrufbeantworter-
+    Schalters (switch-Domäne, siehe switch.py) - identisches Muster, nur in
+    einer eigenen, separat verwalteten Registry-Domäne.
     """
     registry = er.async_get(hass)
     reservations = {
@@ -263,6 +268,26 @@ def _async_reserve_entity_ids(
             "sensor",
             DOMAIN,
             sensor_unique_id,
+            suggested_object_id=suggested_object_id,
+            config_entry=config_entry,
+        )
+
+    # Anrufbeantworter Ein/Aus-Schalter (seit v1.1.0, EXPERIMENTELL - siehe
+    # switch.py). Eigene Registry-Domäne ("switch" statt "sensor"), daher
+    # eine separate Reservierungsrunde - die unique_ids ("-switch"-Suffix)
+    # müssen exakt zu denen in switch.py:async_setup_entry passen.
+    switch_reservations = {
+        f"{unique_id}-{CALL_TYPE_VOICEMAIL}-switch": SWITCH_TRANSLATION_KEY_VOICEMAIL,
+    }
+    if second_tam_enabled:
+        switch_reservations[f"{unique_id}-{CALL_TYPE_VOICEMAIL_2}-switch"] = (
+            SWITCH_TRANSLATION_KEY_VOICEMAIL_2
+        )
+    for switch_unique_id, suggested_object_id in switch_reservations.items():
+        registry.async_get_or_create(
+            "switch",
+            DOMAIN,
+            switch_unique_id,
             suggested_object_id=suggested_object_id,
             config_entry=config_entry,
         )
