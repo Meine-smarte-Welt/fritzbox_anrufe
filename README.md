@@ -13,8 +13,9 @@ mitgelieferte Dashboard-Karte.
 - [Installation](#installation)
 - [Einrichtung](#einrichtung)
 - [Sensoren](#sensoren)
-- [Spam-Erkennung](#spam-erkennung-seit-version-106b1-optional)
-- [Zweiter Anrufbeantworter](#zweiter-anrufbeantworter-seit-version-106b1-optional)
+- [Spam-Erkennung](#spam-erkennung-seit-version-110-optional)
+- [Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111)
+- [Anrufbeantworter Ein/Aus-Schalter](#anrufbeantworter-einaus-schalter-seit-version-110-experimentell)
 - [Einstellungen (Optionen)](#einstellungen-optionen)
 - [Dashboard-Karte](#dashboard-karte)
 - [Icon](#icon)
@@ -51,25 +52,35 @@ mitgelieferte Dashboard-Karte.
   als 5. Symbol/Tab in der Kartenkopfzeile - nicht als Bereich unterhalb der
   Anrufliste.
 - Neues Event `fritzbox_anrufe_new_voicemail_message` (seit Version
-  1.0.6b0), gefeuert sobald eine bislang unbekannte
+  1.1.0), gefeuert sobald eine bislang unbekannte
   Anrufbeantworter-Nachricht eintrifft - direkt als Automations-Auslöser
   nutzbar, ohne die `messages`-Attributliste selbst per Vorlage auf neue
   Einträge vergleichen zu müssen, siehe
-  [Event bei neuer Anrufbeantworter-Nachricht](#event-bei-neuer-anrufbeantworter-nachricht-seit-version-106b0).
-- **Spam-Erkennung** (seit Version 1.0.6b1, optional): Anrufe und
+  [Event bei neuer Anrufbeantworter-Nachricht](#event-bei-neuer-anrufbeantworter-nachricht-seit-version-110).
+- **Spam-Erkennung** (seit Version 1.1.0, optional): Anrufe und
   Anrufbeantworter-Nachrichten werden als Spam markiert, wenn die FRITZ!Box
   sie bereits selbst blockiert hat UND/ODER die Nummer mit einer selbst
   gepflegten Liste übereinstimmt - die FRITZ!Box hat dafür keine eigene,
   automatische Erkennung, siehe
-  [Spam-Erkennung](#spam-erkennung-seit-version-106b1-optional). Spam-Einträge
+  [Spam-Erkennung](#spam-erkennung-seit-version-110-optional). Spam-Einträge
   lassen sich auf der Dashboard-Karte optional ausblenden (`hide_spam`).
-- **Zweiter Anrufbeantworter** (seit Version 1.0.6b1, optional): Ist auf der
-  FRITZ!Box ein zweiter Anrufbeantworter eingerichtet, kann dessen
-  Nachrichtenliste als eigener Sensor abgerufen werden, siehe
-  [Zweiter Anrufbeantworter](#zweiter-anrufbeantworter-seit-version-106b1-optional).
-  Seit Version 1.0.6b2 zeigt die Dashboard-Karte ihn optional direkt mit an
-  (`entity_voicemail_2`, gemischt oder in getrennten Abschnitten), statt nur
-  über eine zweite Karteninstanz.
+- **Mehrere Anrufbeantworter** (bis zu 5, seit Version 1.1.1, optional):
+  Sind auf der FRITZ!Box mehrere Anrufbeantworter eingerichtet, lässt sich
+  deren Anzahl per Schaltfläche in den Integrations-Einstellungen erhöhen -
+  jeder wird als eigener Sensor (plus Ein/Aus-Schalter) abgerufen, siehe
+  [Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111).
+  Die Dashboard-Karte zeigt den zweiten Anrufbeantworter optional direkt mit
+  an (`entity_voicemail_2`, gemischt oder in getrennten Abschnitten);
+  Anrufbeantworter 3 bis 5 lassen sich über zusätzliche Karteninstanzen
+  einbinden.
+- **Experimentell, neu seit Version 1.1.0: Anrufbeantworter Ein/Aus-Schalter**:
+  ein neuer Schalter (`switch`-Entität, TR-064-Aktion `SetEnable`) pro
+  konfiguriertem Anrufbeantworter (auch für den zweiten, falls aktiviert)
+  schaltet diesen ein bzw. aus, siehe
+  [Anrufbeantworter Ein/Aus-Schalter](#anrufbeantworter-einaus-schalter-seit-version-110-experimentell).
+  Auf der Dashboard-Karte optional anzeigbar (`show_tam_switch`, Editor-
+  Bereich "Darstellung"), direkt vor der Nachrichten-Auflistung im
+  Anrufbeantworter-Tab.
 - Alternative: einfache YAML-Tabellenkarte auf Basis von `flex-table-card`
   (siehe [`examples/dashboard_flex_table.yaml`](examples/dashboard_flex_table.yaml)).
 
@@ -175,6 +186,13 @@ Pro konfiguriertem Telefonbuch/FRITZ!Box-Konto werden fünf Sensoren angelegt:
 | `fritzbox_anrufe_ausgehend` | Ausgehende Anrufe | Anzahl gespeicherter Anrufe | `calls`: Liste ausgehender Anrufe |
 | `fritzbox_anrufe_verpasst` | Verpasste Anrufe | Anzahl gespeicherter Anrufe | `calls`: Liste verpasster Anrufe |
 | `fritzbox_anrufe_anrufbeantworter` **(experimentell)** | Anrufbeantworter-Nachrichten | Anzahl gespeicherter Nachrichten | `messages`: Liste der Sprachnachrichten |
+
+Zusätzlich legt die Integration seit Version 1.1.0 pro konfiguriertem
+Anrufbeantworter eine `switch`-Entität an (Übersetzungsschlüssel
+`fritzbox_anrufe_anrufbeantworter_schalter`, für Anrufbeantworter 2 bis 5
+entsprechend `fritzbox_anrufe_anrufbeantworter_2_schalter` bis `_5_schalter`,
+seit Version 1.1.1 bis zu fünf statt bisher höchstens zwei) - siehe
+[Anrufbeantworter Ein/Aus-Schalter](#anrufbeantworter-einaus-schalter-seit-version-110-experimentell).
 
 Die Verlaufs- und der Anrufbeantworter-Sensor werden **nicht** über den
 Callmonitor befüllt, sondern alle 5 Minuten per TR-064 von der FRITZ!Box
@@ -282,7 +300,7 @@ lassen - sie werden dann mit der festen entity_id neu angelegt. Bei mehr
 als einem FRITZ!Box-Konto bekommt das zweite/dritte Konto automatisch die
 Endungen `_2`/`_3` (normales Home-Assistant-Verhalten bei ID-Kollisionen).
 
-### Event bei neuer Anrufbeantworter-Nachricht (seit Version 1.0.6b0)
+### Event bei neuer Anrufbeantworter-Nachricht (seit Version 1.1.0)
 
 Sobald der Anrufbeantworter-Sensor beim regulären Abruf der
 Nachrichtenliste (alle 5 Minuten, oder mit kurzer Verzögerung direkt nach
@@ -326,7 +344,7 @@ action:
       message: "{{ trigger.event.data.name or trigger.event.data.number or 'Unbekannt' }}"
 ```
 
-### Spam-Erkennung (seit Version 1.0.6b1, optional)
+### Spam-Erkennung (seit Version 1.1.0, optional)
 
 **Wichtig:** Die FRITZ!Box selbst hat über die TR-064-Schnittstelle keine
 eigene, automatische Spam-/KI-Erkennung - anders als der Name "Spam-
@@ -353,30 +371,68 @@ ausschließen) und für die mitgelieferte Dashboard-Karte, die Spam-Einträge
 optional mit einem Badge markiert oder ganz ausblendet (`hide_spam`, siehe
 [Dashboard-Karte](#dashboard-karte)).
 
-### Zweiter Anrufbeantworter (seit Version 1.0.6b1, optional)
+### Mehrere Anrufbeantworter (bis zu 5, seit Version 1.1.1)
 
-Manche FRITZ!Box-Modelle/-Konfigurationen erlauben einen zweiten
-Anrufbeantworter zusätzlich zum ersten. Wird die Option **Zweiten
-Anrufbeantworter aktivieren** (`second_tam_enabled`, Options-Flow,
-standardmäßig aus) eingeschaltet, ruft die Integration zusätzlich dessen
-Nachrichtenliste ab und legt dafür einen eigenen, zweiten Sensor
-(`fritzbox_anrufe_anrufbeantworter_2`) mit denselben Fähigkeiten wie der
-erste an (Wiedergabe, Löschen, automatisch als gelesen markieren, Event bei
-neuer Nachricht mit zusätzlichem `tam: "2"`-Feld im Payload).
+Manche FRITZ!Box-Modelle/-Konfigurationen erlauben mehr als einen
+Anrufbeantworter. Seit Version 1.1.1 lässt sich die Anzahl der von dieser
+Integration abgefragten Anrufbeantworter über Einstellungen → Geräte &
+Dienste → FRITZ!Box Anrufe → "Konfigurieren" → **Anrufbeantworter
+verwalten** per Schaltfläche schrittweise von 1 auf bis zu 5 erhöhen (bzw.
+wieder verringern) - jeder Klick auf "Weiteren Anrufbeantworter
+hinzufügen"/"Anrufbeantworter entfernen" ändert die konfigurierte Anzahl um
+genau 1, "Fertig" übernimmt den zuletzt angezeigten Stand. Für jeden so
+konfigurierten Anrufbeantworter legt die Integration einen eigenen Sensor
+(`fritzbox_anrufe_anrufbeantworter_2` bis `_5`) mit denselben Fähigkeiten
+wie der erste an (Wiedergabe, Löschen, automatisch als gelesen markieren,
+Event bei neuer Nachricht mit zusätzlichem `tam`-Feld im Payload, z. B.
+`"tam": "3"`), sowie einen zugehörigen Ein/Aus-Schalter (siehe
+[Anrufbeantworter Ein/Aus-Schalter](#anrufbeantworter-einaus-schalter-seit-version-110-experimentell)).
 
-Hat die eigene FRITZ!Box gar keinen zweiten Anrufbeantworter, bleibt der
-zweite Sensor einfach dauerhaft "nicht verfügbar" - das blockiert die
-übrige Integration zu keinem Zeitpunkt, genau wie beim ersten
-Anrufbeantworter bei fehlender Berechtigung oder unbestätigter
-TR-064-API-Form (siehe [Bekannte Einschränkungen](#bekannte-einschränkungen)).
+**Bestehende Installationen (Migration von `second_tam_enabled`):** Wer
+bereits vor Version 1.1.1 die (jetzt entfallene) Option "Zweiten
+Anrufbeantworter aktivieren" eingeschaltet hatte, muss nichts weiter tun -
+die Integration übernimmt beim ersten Start nach dem Update automatisch
+"aktiviert" → Anzahl 2 bzw. "deaktiviert" → Anzahl 1 in die neue Einstellung
+und schreibt das genau einmal in die Konfiguration zurück. Die bisherige
+entity_id `sensor.fritzbox_anrufe_anrufbeantworter_2` bleibt dabei
+unverändert erhalten.
 
-**Auf der Dashboard-Karte anzeigen (seit Version 1.0.6b2):** Die
-mitgelieferte Karte kann den zweiten Anrufbeantworter direkt in derselben
-Karte mit anzeigen - weiterhin unter demselben Anrufbeantworter-Tab, kein
-zusätzliches, sechstes Symbol in der Icon-Leiste. Dafür im Editor (oder per
-YAML) `entity_voicemail_2` auf `sensor.fritzbox_anrufe_anrufbeantworter_2`
-setzen; `voicemail_2_mode` bestimmt dann, WIE beide Listen dargestellt
-werden:
+Hat die eigene FRITZ!Box gar nicht so viele Anrufbeantworter wie
+konfiguriert, bleiben die überzähligen Sensoren einfach dauerhaft "nicht
+verfügbar" - das blockiert die übrige Integration zu keinem Zeitpunkt,
+genau wie beim ersten Anrufbeantworter bei fehlender Berechtigung oder
+unbestätigter TR-064-API-Form (siehe
+[Bekannte Einschränkungen](#bekannte-einschränkungen)).
+
+**Wichtig - EXPERIMENTELL für Anrufbeantworter 2 bis 5:** Nur der erste
+Anrufbeantworter (Index 0) ist an echter Hardware bestätigt. Für die
+Anrufbeantworter 2 bis 5 nimmt die Integration lediglich an, dass die
+FRITZ!Box deren TR-064-Indizes fortlaufend (1, 2, 3, 4) vergibt - das ist
+NICHT unabhängig bestätigt (siehe den Modul-Docstring in `tam.py`). Bei
+Auffälligkeiten (z. B. eine falsche Nachrichtenliste hinter Anrufbeantworter
+3) bitte ein GitHub-Issue mit Angabe der tatsächlichen Anzahl und
+Reihenfolge der Anrufbeantworter am eigenen Gerät eröffnen.
+
+**Auf der Dashboard-Karte anzeigen:** Die mitgelieferte Karte unterstützt
+weiterhin ausschließlich einen zweiten Anrufbeantworter direkt in derselben
+Karte (Felder `entity_voicemail_2`/`voicemail_2_mode`, siehe unten) - die
+Karte selbst wurde in Version 1.1.1 nicht erweitert, es gibt also keine
+Felder `entity_voicemail_3`/`_4`/`_5`. Für Anrufbeantworter 3 bis 5 (und
+optional auch für 2) eine weitere, eigene Karteninstanz mit
+`entity_voicemail: sensor.fritzbox_anrufe_anrufbeantworter_3` (bzw. `_4`/
+`_5`) anlegen - genau dasselbe Muster, das seit Version 1.0.6b1 schon für
+den zweiten Anrufbeantworter als Alternative zur gemeinsamen Karte
+beschrieben ist (nicht benötigte Kategorien lassen sich dabei über die
+Kategorien-Einstellungen der jeweiligen Karteninstanz ausblenden). Eine
+echte Mehrfach-Tab-Ansicht innerhalb einer einzigen Karte bleibt eine
+mögliche künftige Erweiterung, aber (noch) nicht umgesetzt.
+
+Für den zweiten Anrufbeantworter kann die mitgelieferte Karte ihn
+weiterhin direkt in derselben Karte mit anzeigen - unter demselben
+Anrufbeantworter-Tab, kein zusätzliches Symbol in der Icon-Leiste. Dafür im
+Editor (oder per YAML) `entity_voicemail_2` auf
+`sensor.fritzbox_anrufe_anrufbeantworter_2` setzen; `voicemail_2_mode`
+bestimmt dann, WIE beide Listen dargestellt werden:
 
 - **`merged`** (Standard): eine gemeinsame, chronologisch gemischte Liste -
   jede Nachricht bekommt ein kleines "AB 1"/"AB 2"-Badge, damit erkennbar
@@ -389,21 +445,21 @@ Löschen (`show_delete_button`) und Spam-Ausblenden (`hide_spam`)
 funktionieren in beiden Modi unverändert für beide Anrufbeantworter, auch
 wenn deren Nachrichten-IDs sich überschneiden (die FRITZ!Box zählt bei
 jedem Anrufbeantworter unabhängig ab 0) - die Karte unterscheidet intern
-anhand des jeweiligen Sensors.
-
-Ohne gesetztes `entity_voicemail_2` verhält sich die Karte exakt wie vor
-Version 1.0.6b2 (eine einzelne Liste, kein Badge). Alternativ - z. B. für
-zwei optisch komplett unabhängige Kartenwidgets an unterschiedlichen
-Stellen im Dashboard - funktioniert weiterhin auch eine zweite, eigene
-Karteninstanz mit `entity_voicemail: sensor.fritzbox_anrufe_anrufbeantworter_2`
-(die andere Kategorien über die Kategorien-Einstellungen ausblendet, falls
-gewünscht). Eine echte zweite Tab-Ansicht (sechstes Icon in der Leiste)
-bleibt eine mögliche künftige Erweiterung, aber (noch) nicht umgesetzt.
+anhand des jeweiligen Sensors. Ohne gesetztes `entity_voicemail_2` verhält
+sich die Karte wie vor Version 1.1.0 (eine einzelne Liste, kein Badge).
 
 ## Einstellungen (Optionen)
 
 Über Einstellungen → Geräte & Dienste → FRITZ!Box Anrufe → "Konfigurieren"
-lassen sich jederzeit ändern:
+öffnet sich seit Version 1.1.1 zunächst ein Auswahlmenü mit zwei Zielen:
+
+- **Grundeinstellungen**: alle bisherigen Optionen (Präfixe, Verlaufstiefe,
+  automatisch als gelesen markieren, Spam-Nummern) - siehe Liste unten.
+- **Anrufbeantworter verwalten**: die neue, schaltflächenbasierte Auswahl
+  der Anzahl abgefragter Anrufbeantworter (1 bis 5) - siehe
+  [Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111).
+
+Unter "Grundeinstellungen" lassen sich jederzeit ändern:
 
 - **Präfixe** (kommagetrennte Liste), zur Rufnummernauflösung z. B. bei
   abweichenden Landes-/Ortsvorwahlen im Telefonbuch.
@@ -424,12 +480,15 @@ lassen sich jederzeit ändern:
   Zustand auf der FRITZ!Box geändert wird (u. a. auch die Anzahl ungelesener
   Nachrichten in FRITZ!App Fon) - nicht nur die Darstellung dieser einen
   Karte.
-- **Spam-Nummern/-Vorwahlen** (seit Version 1.0.6b1, `spam_numbers`,
+- **Spam-Nummern/-Vorwahlen** (seit Version 1.1.0, `spam_numbers`,
   kommagetrennte Liste, standardmäßig leer): siehe
-  [Spam-Erkennung](#spam-erkennung-seit-version-106b1-optional).
-- **Zweiten Anrufbeantworter aktivieren** (seit Version 1.0.6b1,
-  `second_tam_enabled`, standardmäßig aus): siehe
-  [Zweiter Anrufbeantworter](#zweiter-anrufbeantworter-seit-version-106b1-optional).
+  [Spam-Erkennung](#spam-erkennung-seit-version-110-optional).
+
+Die frühere Option "Zweiten Anrufbeantworter aktivieren"
+(`second_tam_enabled`) ist mit Version 1.1.1 entfallen und wurde durch die
+Anzahl-Auswahl unter "Anrufbeantworter verwalten" ersetzt (bestehende
+Installationen werden automatisch migriert, siehe
+[Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111)).
 
 ## Dashboard-Karte
 
@@ -488,7 +547,9 @@ entity_eingehend: sensor.fritz_box_7590_eingehende_anrufe
 entity_ausgehend: sensor.fritz_box_7590_ausgehende_anrufe
 entity_verpasst: sensor.fritz_box_7590_verpasste_anrufe
 entity_voicemail: sensor.fritz_box_7590_anrufbeantworter  # optional, experimentell
-entity_voicemail_2: sensor.fritz_box_7590_anrufbeantworter_2  # optional, seit Version 1.0.6b2
+entity_voicemail_2: sensor.fritz_box_7590_anrufbeantworter_2  # optional, seit Version 1.1.0
+entity_tam_switch: switch.fritz_box_7590_anrufbeantworter_ein_aus  # optional, seit Version 1.1.0, experimentell
+entity_tam_switch_2: switch.fritz_box_7590_anrufbeantworter_2_ein_aus  # optional, seit Version 1.1.0
 max_rows: 10
 show_alle: true
 show_eingehend: true
@@ -513,17 +574,21 @@ show_filter_bar: false
 # Papierkorb-Button für Anrufbeantworter-Nachrichten (seit Version 1.0.5,
 # optional) - standardmäßig aus: Löschen ist unwiderruflich.
 show_delete_button: false
-# Als Spam erkannte Anrufe/Nachrichten ausblenden (seit Version 1.0.6b1,
+# Als Spam erkannte Anrufe/Nachrichten ausblenden (seit Version 1.1.0,
 # optional) - standardmäßig aus. Was als Spam gilt, wird über die
 # Integrations-Optionen definiert, siehe
-# https://github.com/Meine-smarte-Welt/fritzbox_anrufe#spam-erkennung-seit-version-106b1-optional
+# https://github.com/Meine-smarte-Welt/fritzbox_anrufe#spam-erkennung-seit-version-110-optional
 hide_spam: false
-# Darstellung mit zweitem Anrufbeantworter (seit Version 1.0.6b2, optional,
+# Darstellung mit zweitem Anrufbeantworter (seit Version 1.1.0, optional,
 # nur mit gesetztem entity_voicemail_2) - "merged" mischt beide
 # Nachrichtenlisten chronologisch mit einem "AB 1"/"AB 2"-Badge pro
 # Nachricht, "separate" zeigt stattdessen zwei eigene, überschriebene
 # Abschnitte untereinander.
 voicemail_2_mode: merged
+# Anrufbeantworter Ein/Aus-Schalter (seit Version 1.1.0, optional,
+# experimentell) - standardmäßig aus, benötigt zusätzlich einen gesetzten
+# entity_tam_switch (bzw. entity_tam_switch_2).
+show_tam_switch: false
 # Farben (seit Version 1.0.4, optional) - CSS-Farbwert (Hex, rgb()/rgba(),
 # hsl(), oder eine Theme-Variable wie var(--accent-color)); leer/weggelassen
 # = bisherige Standardfarbe.
@@ -544,11 +609,12 @@ color_icon_anrufbeantworter: ""
 **Grafischer Editor:** Statt die Karte per YAML zu konfigurieren, kann sie
 über die normale Lovelace-Karten-Auswahl bearbeitet werden ("Karte
 bearbeiten" → es öffnet sich automatisch ein Home-Assistant-Standardformular
-statt des YAML-Editors). Dort lassen sich Titel, alle sechs Sensoren
-(inkl. des seit Version 1.0.6b2 optionalen zweiten Anrufbeantworters) sowie
-die Zeilenanzahl per Eingabefeld/Entity-Picker setzen. Die tatsächlichen
-Entity-IDs findest du unter Einstellungen → Geräte & Dienste → Entitäten
-(Suche nach "Anrufe"/"Call monitor"/"Anrufbeantworter"). Seit Version 1.0.4
+statt des YAML-Editors). Dort lassen sich Titel, alle Sensoren (inkl. des
+optionalen zweiten Anrufbeantworters) sowie - seit Version 1.1.0 - der/die
+optionale(n) Anrufbeantworter-Ein/Aus-Schalter per Entity-Picker setzen,
+zusätzlich die Zeilenanzahl per Eingabefeld. Die tatsächlichen Entity-IDs
+findest du unter Einstellungen → Geräte & Dienste → Entitäten (Suche nach
+"Anrufe"/"Call monitor"/"Anrufbeantworter"). Seit Version 1.0.4
 ist der Editor in aufklappbare Abschnitte gruppiert (Sensoren, Kategorien,
 Darstellung, Weiterverarbeitung, Farben) - bei einer inzwischen recht langen
 Feldliste auf Wunsch von Thorsten eingeführt, um den Überblick zu behalten.
@@ -773,10 +839,10 @@ endet - unabhängig davon, ob `auto_mark_read` aktiviert ist oder nicht.
 `MarkMessage` funktioniert wie erwartet, das "Neu"-Kennzeichen verschwindet
 nach der Wiedergabe.
 
-### Spam ausblenden (seit Version 1.0.6b1, optional)
+### Spam ausblenden (seit Version 1.1.0, optional)
 
 Anrufe und Anrufbeantworter-Nachrichten, die als Spam erkannt wurden (siehe
-[Spam-Erkennung](#spam-erkennung-seit-version-106b1-optional)), bekommen auf
+[Spam-Erkennung](#spam-erkennung-seit-version-110-optional)), bekommen auf
 der Karte standardmäßig ein kleines rotes "Spam"-Badge neben dem
 Namen/der Nummer - genau wie das bestehende "neu"-Badge bei
 Anrufbeantworter-Nachrichten, nur in der Fehlerfarbe statt der
@@ -785,16 +851,67 @@ solche Einträge stattdessen komplett aus der Anrufliste bzw. der
 Nachrichtenliste aus, sowohl auf dem "Alle"/"Gesamt"-Tab als auch auf den
 Einzelkategorien.
 
-### Zweiten Anrufbeantworter anzeigen (seit Version 1.0.6b2, optional)
+### Zweiten Anrufbeantworter anzeigen (seit Version 1.1.0, optional)
 
 Mit gesetztem `entity_voicemail_2` (siehe
-[Zweiter Anrufbeantworter](#zweiter-anrufbeantworter-seit-version-106b1-optional))
+[Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111))
 zeigt der Anrufbeantworter-Tab beide Nachrichtenlisten. `voicemail_2_mode`
 wählt zwischen `merged` (Standard, eine gemeinsame chronologische Liste mit
 "AB 1"/"AB 2"-Badge je Nachricht) und `separate` (zwei eigene, überschriebene
 Abschnitte untereinander, unvermischt). Papierkorb-Button und
 Spam-Ausblenden funktionieren dabei für beide Anrufbeantworter wie gewohnt.
 Ohne `entity_voicemail_2` ändert sich am bisherigen Verhalten nichts.
+
+### Anrufbeantworter Ein/Aus-Schalter (seit Version 1.1.0, experimentell)
+
+**Wichtig, experimentell:** Die verwendete TR-064-Aktion `SetEnable` (Dienst
+`X_AVM-DE_TAM1`, derselbe Dienst wie `GetMessageList`/`DeleteMessage`/
+`MarkMessage`) konnte NICHT unabhängig gegen AVMs offizielle Dokumentation
+oder eine Community-Referenz bestätigt werden - sie wurde ausschließlich
+durch die starke, innerhalb desselben Diensts bereits mehrfach bestätigte
+Namenskonvention hergeleitet (`NewIndex` plus ein einzelnes
+`New<Konzept>`-Argument, hier `NewEnable`). Aus demselben Grund ruft diese
+Integration bewusst weiterhin **nicht** die Aktion `GetInfo` auf (siehe
+[Bekannte Einschränkungen](#bekannte-einschränkungen)), mit der sich der
+tatsächliche Ein/Aus-Zustand zuverlässig auslesen ließe. Der Schalter zeigt
+deshalb keinen bestätigten, von der FRITZ!Box zurückgelesenen Zustand,
+sondern ausschließlich den zuletzt über Home Assistant selbst gesetzten
+(`assumed_state`) - übersteht einen Neustart von Home Assistant (der letzte
+bekannte Zustand wird wiederhergestellt), aber nicht zwingend eine
+Änderung, die direkt an der FRITZ!Box oder in FRITZ!App Fon vorgenommen
+wurde. Bitte mit dem Ergebnis eines eigenen Tests (schaltet der
+Anrufbeantworter an der FRITZ!Box tatsächlich um?) als GitHub-Issue melden.
+
+Pro konfiguriertem Anrufbeantworter legt die Integration automatisch eine
+eigene `switch`-Entität an (siehe [Sensoren](#sensoren)) - ein Klick
+schaltet den jeweiligen Anrufbeantworter über TR-064 ein bzw. aus, mit
+sofortiger optischer Rückmeldung und automatischem Zurücksetzen, falls der
+TR-064-Aufruf fehlschlägt (derselbe optimistische Ansatz wie beim Löschen
+von Nachrichten, siehe
+[Anrufbeantworter-Nachrichten löschen](#anrufbeantworter-nachrichten-löschen-seit-version-105-optional)).
+Sind weitere Anrufbeantworter konfiguriert (bis zu 5, siehe
+[Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111)),
+legt die Integration für jeden davon eine eigene, unabhängige
+Schalter-Entität an.
+
+**Auf der Dashboard-Karte anzeigen:** Standardmäßig blendet die Karte
+keinen Schalter ein (`show_tam_switch: false`, wie jeder rein optische
+Regler dieser Karte, damit bestehende Dashboards nach einem Update optisch
+unverändert bleiben). Zum Aktivieren im grafischen Editor unter
+"Sensoren" die Felder **Schalter: Anrufbeantworter Ein/Aus** und (bei
+konfiguriertem zweitem Anrufbeantworter) **Schalter: Zweiter
+Anrufbeantworter Ein/Aus** auf die jeweilige `switch.…`-Entität setzen und
+zusätzlich unter "Darstellung" den Regler **Anrufbeantworter-Ein/Aus-
+Schalter auf der Karte anzeigen** (`show_tam_switch`) einschalten. Der
+Schalter erscheint dann im Anrufbeantworter-Tab direkt **vor** der
+Nachrichten-Auflistung, unabhängig davon, ob ein zweiter Anrufbeantworter
+konfiguriert ist und ob `voicemail_2_mode` auf `merged` oder `separate`
+steht. Diese beiden Entity-Felder sind bewusst eigenständige Picker (nicht
+aus `entity_voicemail`/`entity_voicemail_2` abgeleitet) - Home Assistant
+bietet für sprachabhängig benannte Entitäten keinen zuverlässigen
+Mechanismus, um die zugehörige `switch`-entity_id automatisch zu
+bestimmen; die tatsächlichen Entity-IDs finden sich wie gewohnt unter
+Einstellungen → Geräte & Dienste → Entitäten (Suche nach "Anrufbeantworter").
 
 ### Variante 2: flex-table-card (YAML, spaltenweise ein-/ausblendbar)
 
@@ -967,7 +1084,7 @@ die dortigen Maintainer den Fehler beheben.
   ist deshalb standardmäßig ausgeblendet (`show_delete_button: false`) und
   zeigt vor dem eigentlichen Löschen eine Bestätigung.
 - **Event bei neuer Anrufbeantworter-Nachricht - noch nicht an eigener
-  Hardware bestätigt** (seit Version 1.0.6b0): Die Erkennung vergleicht bei
+  Hardware bestätigt** (seit Version 1.1.0): Die Erkennung vergleicht bei
   jedem Abruf der Nachrichtenliste die aktuellen Nachrichten-IDs mit denen
   des vorherigen Abrufs - technisch unabhängig von den bereits an echter
   Hardware bestätigten TR-064-Aktionen (`GetMessageList` selbst wird
@@ -976,77 +1093,118 @@ die dortigen Maintainer den Fehler beheben.
   direkt von der FRITZ!Box, ohne Abgleich mit dem Home-Assistant-Telefonbuch
   dieser Integration - bei einem unbekannten Anrufer bleiben beide Felder
   ggf. leer.
-- **Spam-Erkennung - kein natives FRITZ!Box-Signal** (seit Version 1.0.6b1):
-  Wie unter [Spam-Erkennung](#spam-erkennung-seit-version-106b1-optional)
+- **Spam-Erkennung - kein natives FRITZ!Box-Signal** (seit Version 1.1.0):
+  Wie unter [Spam-Erkennung](#spam-erkennung-seit-version-110-optional)
   beschrieben, gibt es keine automatische, KI-/datenbankbasierte
   Spam-Erkennung der FRITZ!Box selbst. Ohne konfigurierte `spam_numbers`
   erkennt diese Integration nur Anrufe, die die FRITZ!Box bereits selbst
   blockiert hat - alles andere erfordert eine selbst gepflegte Liste.
-- **Zweiter Anrufbeantworter - TAM-Index 1 unbestätigt, kein eigener
-  Karten-Tab** (seit Version 1.0.6b1): Die Existenz eines zweiten,
-  über den TAM-Index "1" ansprechbaren Anrufbeantworters stützt sich auf
-  Hinweise in der TR-064-Dokumentation sowie den bereits bestehenden Code-
-  Kommentar in `tam.py`, ist aber (mangels passender Testhardware in dieser
-  Entwicklungsumgebung) noch nicht an echter Hardware mit tatsächlich
-  konfiguriertem zweiten Anrufbeantworter verifiziert - bei fehlender
-  Hardware-Unterstützung bleibt der zweite Sensor einfach dauerhaft "nicht
-  verfügbar", ohne die übrige Integration zu beeinträchtigen. Es gibt
-  weiterhin keinen eigenen sechsten Tab/Icon in der Kartenkopfzeile dafür -
-  seit Version 1.0.6b2 lässt sich der zweite Anrufbeantworter aber direkt
-  im bestehenden Anrufbeantworter-Tab mit anzeigen (`entity_voicemail_2`),
-  siehe [Zweiten Anrufbeantworter anzeigen](#zweiten-anrufbeantworter-anzeigen-seit-version-106b2-optional).
+- **Anrufbeantworter 2 bis 5 - TAM-Indizes unbestätigt, kein eigener
+  Karten-Tab** (seit Version 1.1.0, erweitert auf bis zu 5 in Version
+  1.1.1): Die Existenz eines zweiten, über den TAM-Index "1" ansprechbaren
+  Anrufbeantworters stützt sich auf Hinweise in der TR-064-Dokumentation
+  sowie den bereits bestehenden Code-Kommentar in `tam.py`. Für
+  Anrufbeantworter 3 bis 5 (TAM-Indizes "2"/"3"/"4") nimmt die Integration
+  seit Version 1.1.1 zusätzlich eine rein fortlaufende Nummerierung an -
+  das ist eine reine Vermutung, noch weniger abgesichert als bei Index "1".
+  Keine dieser Annahmen wurde (mangels passender Testhardware in dieser
+  Entwicklungsumgebung) an echter Hardware mit tatsächlich konfigurierten
+  weiteren Anrufbeantwortern verifiziert - bei fehlender
+  Hardware-Unterstützung bleibt der jeweilige Sensor einfach dauerhaft
+  "nicht verfügbar", ohne die übrige Integration zu beeinträchtigen. Es
+  gibt weiterhin keinen eigenen Tab/Icon in der Kartenkopfzeile dafür - seit
+  Version 1.1.0 lässt sich der zweite Anrufbeantworter direkt im
+  bestehenden Anrufbeantworter-Tab mit anzeigen (`entity_voicemail_2`),
+  siehe [Zweiten Anrufbeantworter anzeigen](#zweiten-anrufbeantworter-anzeigen-seit-version-110-optional);
+  Anrufbeantworter 3 bis 5 benötigen dafür je eine eigene, zusätzliche
+  Karteninstanz, siehe
+  [Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111).
+- **Migration von `second_tam_enabled`** (seit Version 1.1.1): Die
+  automatische Übernahme des alten Boolean-Werts in die neue Anzahl (siehe
+  [Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111))
+  wurde nur gegen synthetische Testdaten geprüft, nicht an einem
+  tatsächlichen Bestandssystem mit echter FRITZ!Box. Sollte nach einem
+  Update auf 1.1.1 die Anzahl der Anrufbeantworter in den
+  Integrations-Einstellungen nicht dem erwarteten Wert entsprechen, bitte
+  als GitHub-Issue melden - die vorherige entity_id
+  `sensor.fritzbox_anrufe_anrufbeantworter_2` bleibt in jedem Fall
+  unverändert erhalten.
+- **Anrufbeantworter Ein/Aus-Schalter - `SetEnable` unbestätigt, kein
+  Zustands-Rücklesen** (seit Version 1.1.0): Die TR-064-Aktion `SetEnable`
+  wurde ausschließlich durch Namenskonvention innerhalb des bereits
+  bestätigten Diensts `X_AVM-DE_TAM1` hergeleitet, nicht durch AVMs
+  offizielle Dokumentation oder eine Community-Referenz. Aus demselben
+  Grund, aus dem `GetInfo` in dieser Integration grundsätzlich nicht
+  verwendet wird (dessen genaue Rückgabewerte konnten trotz mehrerer
+  Versuche nicht bestätigt werden), liest der Schalter den tatsächlichen
+  Zustand nicht von der FRITZ!Box zurück, sondern zeigt ausschließlich den
+  zuletzt über Home Assistant selbst gesetzten (`assumed_state`) - siehe
+  [Anrufbeantworter Ein/Aus-Schalter](#anrufbeantworter-einaus-schalter-seit-version-110-experimentell).
+  Bitte mit dem Ergebnis eines eigenen Tests als GitHub-Issue melden.
 
 ## Versionshistorie
 
-- **1.0.6b2** (Vorabversion): Der zweite Anrufbeantworter (siehe 1.0.6b1
-  unten) lässt sich jetzt direkt in derselben Dashboard-Karte mit anzeigen,
-  statt nur über eine zweite Karteninstanz - neues, optionales Karten-Feld
-  `entity_voicemail_2`. `voicemail_2_mode` bestimmt die Darstellung:
-  `merged` (Standard, eine gemeinsame chronologische Liste mit "AB 1"/"AB
-  2"-Badge je Nachricht) oder `separate` (zwei eigene, überschriebene
-  Abschnitte untereinander). Weiterhin nur EIN Anrufbeantworter-Tab, kein
-  zusätzliches, sechstes Icon in der Kopfzeile - siehe
-  [Zweiten Anrufbeantworter anzeigen](#zweiten-anrufbeantworter-anzeigen-seit-version-106b2-optional).
-  Rein clientseitige Änderung an der Karte (`www/fritzbox-anrufe-card.js`) -
-  keine Änderung an der Integration selbst nötig, da beide zugrunde
-  liegenden Sensoren bereits seit 1.0.6b1 existieren. Nebeneffekt: eine
-  Anrufbeantworter-Nachricht mit Index 0 (die jeweils erste Nachricht)
-  bekommt jetzt korrekt einen Papierkorb-Button angezeigt - vorher verhinderte
-  eine Wahrheitswert-Prüfung auf die (bei Index 0 falsy) rohe Nachrichten-ID
-  das unbeabsichtigt.
+- **1.1.1**: **Mehrere Anrufbeantworter** (bis zu 5, statt bisher fest 1
+  oder 2): die Options-Flow-Einstellung `second_tam_enabled` entfällt
+  zugunsten einer neuen, schaltflächenbasierten Auswahl unter
+  "Anrufbeantworter verwalten" (Einstellungen → Geräte & Dienste →
+  FRITZ!Box Anrufe → "Konfigurieren"), mit der sich die Anzahl abgefragter
+  Anrufbeantworter schrittweise zwischen 1 und 5 einstellen lässt - siehe
+  [Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111).
+  Bestehende Installationen mit aktiviertem `second_tam_enabled` werden
+  beim ersten Start nach dem Update automatisch und ohne weiteres Zutun auf
+  die neue Einstellung migriert (aktiviert → 2, deaktiviert → 1). Für jeden
+  konfigurierten Anrufbeantworter ab dem dritten (Anrufbeantworter 3 bis 5)
+  gilt dieselbe experimentelle Einschränkung wie bereits seit Version 1.1.0
+  für den zweiten: der verwendete TR-064-Index ist nicht unabhängig
+  bestätigt, sondern aus einer fortlaufenden Nummerierung abgeleitet. Die
+  mitgelieferte Dashboard-Karte selbst wurde nicht erweitert - sie
+  unterstützt weiterhin nur einen zweiten Anrufbeantworter direkt in
+  derselben Karte (`entity_voicemail_2`); Anrufbeantworter 3 bis 5 lassen
+  sich über zusätzliche Karteninstanzen einbinden.
 
-- **1.0.6b1** (Vorabversion): Zwei neue, unabhängig voneinander nutzbare
-  Fähigkeiten. **Spam-Erkennung** (siehe
-  [Spam-Erkennung](#spam-erkennung-seit-version-106b1-optional)): Anrufe und
-  Anrufbeantworter-Nachrichten werden als Spam markiert (neues `spam`-Feld
-  in `calls`/`messages` sowie im Event-Payload), wenn die FRITZ!Box den
-  Anruf bereits selbst blockiert hat und/oder die Nummer mit einer neuen,
-  selbst gepflegten Options-Flow-Liste (`spam_numbers`) übereinstimmt - die
-  FRITZ!Box hat dafür keine eigene, automatische Erkennung. Die
-  Dashboard-Karte kann Spam-Einträge markieren (Badge) oder komplett
-  ausblenden (`hide_spam`, standardmäßig aus, siehe
-  [Spam ausblenden](#spam-ausblenden-seit-version-106b1-optional)).
-  **Zweiter Anrufbeantworter** (siehe
-  [Zweiter Anrufbeantworter](#zweiter-anrufbeantworter-seit-version-106b1-optional)):
-  neue Options-Flow-Einstellung `second_tam_enabled` (standardmäßig aus)
-  richtet bei Bedarf einen zweiten Anrufbeantworter-Sensor
-  (`fritzbox_anrufe_anrufbeantworter_2`) mit denselben Fähigkeiten wie der
-  erste ein (Wiedergabe, Löschen, automatisch als gelesen markieren, eigenes
-  Event) - noch ohne eigenen zweiten Tab in der Karte, stattdessen per
-  zweiter Karteninstanz nutzbar. Beide Fähigkeiten wurden auf Wunsch
-  gebündelt in dieser einen Version umgesetzt.
+  **Bugfix (Grundeinstellungen):** Ein leer gelassenes Textfeld bei
+  **Präfixe** oder **Spam-Nummern/-Vorwahlen** führte zuvor zu einer
+  Fehlermeldung ("expected str") beim Speichern, obwohl beide Felder
+  optional sind - Home Assistant übermittelt ein leeres Textfeld intern als
+  `null`, was die bisherige Validierung nicht zuließ. Behoben, beide Felder
+  lassen sich jetzt problemlos leer lassen.
+- **1.1.0**: **Anrufbeantworter Ein/Aus-Schalter** (neu, experimentell):
+  ein neuer Schalter pro konfiguriertem Anrufbeantworter schaltet diesen
+  über TR-064 (`SetEnable`) ein bzw. aus - siehe
+  [Anrufbeantworter Ein/Aus-Schalter](#anrufbeantworter-einaus-schalter-seit-version-110-experimentell).
+  Ist ein zweiter Anrufbeantworter konfiguriert, steht derselbe Schalter
+  auch für ihn zur Verfügung. Auf der Dashboard-Karte erscheint der
+  Schalter, sofern aktiviert (`show_tam_switch`, standardmäßig aus, im
+  Editor unter "Darstellung"), direkt unter der Kategorie Anrufbeantworter
+  vor der Nachrichten-Auflistung.
 
-- **1.0.6b0** (Vorabversion): Neues Event `fritzbox_anrufe_new_voicemail_message`,
-  gefeuert sobald beim Abruf der Anrufbeantworter-Nachrichtenliste eine
-  gegenüber dem vorherigen Abruf neue Nachrichten-ID entdeckt wird - direkt
-  als Automations-Auslöser nutzbar (z. B. für eine Push-Benachrichtigung
-  mit Anrufername/-nummer), ohne die `messages`-Attributliste selbst per
-  Vorlage auf neu hinzugekommene Einträge vergleichen zu müssen, siehe
-  [Event bei neuer Anrufbeantworter-Nachricht](#event-bei-neuer-anrufbeantworter-nachricht-seit-version-106b0).
-  Beim allerersten Abruf nach einem Neustart wird bewusst kein Event
+  Außerdem in dieser Version zusammengeführt: **Event bei neuer
+  Anrufbeantworter-Nachricht** (`fritzbox_anrufe_new_voicemail_message`,
+  gefeuert sobald beim Abruf der Nachrichtenliste eine gegenüber dem
+  vorherigen Abruf neue Nachrichten-ID entdeckt wird - direkt als
+  Automations-Auslöser nutzbar, ohne die `messages`-Attributliste selbst
+  per Vorlage auf neu hinzugekommene Einträge vergleichen zu müssen, siehe
+  [Event bei neuer Anrufbeantworter-Nachricht](#event-bei-neuer-anrufbeantworter-nachricht-seit-version-110));
+  **Spam-Erkennung** (Anrufe und Anrufbeantworter-Nachrichten werden als
+  Spam markiert - `spam`-Feld in `calls`/`messages` sowie im Event-Payload -
+  wenn die FRITZ!Box den Anruf bereits selbst blockiert hat und/oder die
+  Nummer mit einer selbst gepflegten Options-Flow-Liste (`spam_numbers`)
+  übereinstimmt, siehe
+  [Spam-Erkennung](#spam-erkennung-seit-version-110-optional); Karte kann
+  Spam-Einträge markieren oder ausblenden, `hide_spam`, siehe
+  [Spam ausblenden](#spam-ausblenden-seit-version-110-optional));
+  **Zweiter Anrufbeantworter** (Options-Flow-Einstellung
+  `second_tam_enabled`, standardmäßig aus, richtet bei Bedarf einen
+  zweiten Anrufbeantworter-Sensor `fritzbox_anrufe_anrufbeantworter_2` mit
+  denselben Fähigkeiten wie der erste ein, siehe
+  [Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111))
+  samt direkter Anzeige in derselben Dashboard-Karte (`entity_voicemail_2`,
+  `voicemail_2_mode`: `merged` oder `separate`, siehe
+  [Zweiten Anrufbeantworter anzeigen](#zweiten-anrufbeantworter-anzeigen-seit-version-110-optional)).
+  Beim allerersten Event-Abruf nach einem Neustart wird bewusst kein Event
   gefeuert, um keine Benachrichtigungen für längst bekannte, nur noch nicht
-  abgehörte Nachrichten auszulösen. Die Erkennung selbst ist noch nicht an
-  Thorstens eigener Hardware bestätigt.
+  abgehörte Nachrichten auszulösen.
 - **1.0.5**: Anrufbeantworter-Nachrichten lassen sich jetzt direkt über die
   Dashboard-Karte löschen (neuer Papierkorb-Button, `show_delete_button`,
   standardmäßig aus - siehe
@@ -1223,25 +1381,26 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.0.6b2) |
+| Datei | SHA256 (Version 1.1.1) |
 | --- | --- |
-| `__init__.py` | `1f510c4c463e393e49aea56b9f116a48ca090e0ca9a73890128a1c9bd2c6f5fc` |
-| `base.py` | `a1a7b2c272431b63c5ce68264b3e0e34e0a9f7935fb9c6a73e1ce8dbbb633752` |
+| `__init__.py` | `85eaddff90e92ebc314aa5e7474f97707e9e2fdfa02525cc7ff0f359cd962f6c` |
+| `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
 | `call_log.py` | `c7115af494200e8a19dae9efaed855680b4ac8186b81788aeacb6c5aae8721f9` |
-| `config_flow.py` | `f2b8a0695882ae21c781bb4ea9cd1bbe09468b095705d787238c511c3c42d152` |
-| `const.py` | `a75f0afd54dead47a0b04776a215d8a805c754f87d84f6016d2c8204ae576aa0` |
-| `http.py` | `36c5b0ea06ebc7da649150bfed7d5cc195f6ff2751c5c5cf31e12dad8f933b52` |
-| `sensor.py` | `723f4125f20b06452dc7d142d250ddb1f5a7e4bb96659564713fc47c47b8b695` |
+| `config_flow.py` | `35737922b8f7d03479393539a9b61dedd6bfbae758d5f8a11f132d2b704d5bce` |
+| `const.py` | `69cadf3c875e12376cc945e1b072393f2459c6dc5763d484261b2afe031be0a6` |
+| `http.py` | `a5823e4d0838b8783484179dbdbe17290bd484017ccc38001a29e57463d999cf` |
+| `sensor.py` | `4116f337557a8eea43d8a85f47293928e20651c04d7b6516e5bf8b1e6a5a1b90` |
 | `spam.py` | `2e300431c40ce61953fc92a4e92e661caa7c825b26683a3ce6d70c6ebc04872b` |
-| `tam.py` | `c0e9d34e6cd4702ad550b29a88e633ffdedf304b6d854978674daa2ca6839009` |
-| `voicemail.py` | `e0dcc988b2670810740cfe007eb0ddf1c91dec82bcf6b63c7aba07f58dcd700e` |
+| `switch.py` | `7cdbb0e5d3c5d1c8fa3cc5cad1cba6fa1f666b6c7eb1e034fbed40861b0e73c2` |
+| `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
+| `voicemail.py` | `b03e665eba0cb346c8877988da845a957a6737f9a8a6de8811fe2199a0e4e9b7` |
 | `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
-| `www/fritzbox-anrufe-card.js` | `5545bcb449a6b4b86bd81d7f0e99a64b0cf5c2122b30ef09c5198078801d52f4` |
-| `manifest.json` | `46ce37b65d7809acbbc94dfc3450ed01c6eb84d21e08d8b82240b2e99e00fe33` |
-| `strings.json` | `eaedc2f668460566db8d23e303fbf03e72af80cdfcedafbee4e940bfc9bd3449` |
-| `translations/de.json` | `643a3eff2e1452f37dcabb859569cf4f711c2b8eb480d68f1c33f93466eea9eb` |
-| `translations/en.json` | `eaedc2f668460566db8d23e303fbf03e72af80cdfcedafbee4e940bfc9bd3449` |
-| `icons.json` | `8db2810bdf50239b9834f66089d7b292affc261168b0ff81d0872c25c8259e07` |
+| `www/fritzbox-anrufe-card.js` | `955ea53f62bd61e0a893433f44dd5346c078ee99bdbbe2392d47dbf58379b1d1` |
+| `manifest.json` | `d0d3579019ac2c9505dbf626899c029d044cdc9152fc910e4083abab2ea39183` |
+| `strings.json` | `7141f53bb34bf7ee725238b0406ce0e1f9875c3e7cf4076032e43008f752a93b` |
+| `translations/de.json` | `b50b22d3cd943bea2b835fc5e73039ccdb3704bd95655fff86e0430cec0bd4fd` |
+| `translations/en.json` | `7141f53bb34bf7ee725238b0406ce0e1f9875c3e7cf4076032e43008f752a93b` |
+| `icons.json` | `b1ebf716e78af310f50d29096270ab340a0d82d8f6183347c79d08ee7fdd495c` |
 
 ## Fehlerbehebung
 
@@ -1371,3 +1530,13 @@ die komplette Datei, z. B. `sha256sum manifest.json`).
   Bitte den HTTP-Statuscode aus dem Home-Assistant-Log
   (`custom_components.fritzbox_anrufe.http`, Meldung "Fehler beim Abrufen
   der Anruf-Aufnahme ...") als GitHub-Issue melden.
+- **Anrufbeantworter Ein/Aus-Schalter erscheint nicht auf der Karte**:
+  prüfen, ob sowohl `show_tam_switch: true` (Editor-Bereich "Darstellung")
+  als auch die passende `entity_tam_switch`/`entity_tam_switch_2`-Entität
+  (Editor-Bereich "Sensoren") gesetzt sind - beides zusammen ist nötig,
+  siehe [Anrufbeantworter Ein/Aus-Schalter](#anrufbeantworter-einaus-schalter-seit-version-110-experimentell).
+- **Anrufbeantworter Ein/Aus-Schalter schaltet den Anrufbeantworter an der
+  FRITZ!Box nicht tatsächlich um**: Die zugrunde liegende TR-064-Aktion
+  `SetEnable` ist experimentell und nicht unabhängig bestätigt (siehe
+  [Bekannte Einschränkungen](#bekannte-einschränkungen)). Bitte mit der
+  FRITZ!OS-Version und dem Modell als GitHub-Issue melden.
