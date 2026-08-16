@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 35737922b8f7d03479393539a9b61dedd6bfbae758d5f8a11f132d2b704d5bce
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 05dd6054182e5ea860767fdcb17f9271ca6d84588baec7f2bd6936a38e2154d6
 """Config flow for fritzbox_anrufe."""
 
 from __future__ import annotations
@@ -431,7 +431,7 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
             vol.Optional(
                 CONF_PREFIXES,
                 description={"suggested_value": options.get(CONF_PREFIXES)},
-            ): vol.Any(str, None),
+            ): vol.Any(None, str),
         }
         schema.update(_history_schema_dict(options))
         # Anrufbeantworter: nach Wiedergabe automatisch als gelesen markieren
@@ -458,17 +458,32 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
         # der Schlüssel fehlt auch nicht einfach im user_input-Dict) -
         # dagegen schlug die Validierung mit "expected str" fehl, obwohl
         # das Feld laut ``vol.Optional`` gar nicht ausgefüllt werden muss.
-        # ``vol.Any(str, None)`` lässt beide Fälle zu; die nachgelagerte
+        # ``vol.Any(None, str)`` lässt beide Fälle zu; die nachgelagerte
         # Verarbeitung (``_get_list_of_prefixes``) behandelt ``None``
         # bereits korrekt. Betraf denselben Schema-Aufbau auch bei
         # CONF_PREFIXES oben, dort nur nicht aufgefallen, weil dieses Feld
         # bei den meisten Installationen bereits befüllt ist.
+        #
+        # Nachtrag: die ARGUMENT-REIHENFOLGE ist hier entscheidend, nicht
+        # nur Kosmetik. Home Assistants ``voluptuous_serialize.convert()``
+        # (wandelt das Schema serverseitig in die vom Frontend darstellbare
+        # Formularbeschreibung um) erkennt ausschließlich das Muster
+        # ``vol.Any(None, <typ>)`` als "optionales Feld dieses Typs"
+        # (identisch zu Home Assistants eigenem ``vol.Maybe()``-Helper) -
+        # ``vol.Any(<typ>, None)`` (Reihenfolge vertauscht) fällt durch
+        # jeden bekannten Fall und lässt ``convert()`` mit
+        # ``ValueError: Unable to convert schema`` abbrechen. Das führte in
+        # einem ersten Fix-Versuch dazu, dass der "Grundeinstellungen"-
+        # Schritt selbst nicht mehr aufrufbar war (leerer "Fehler"-Dialog
+        # ohne Text) - obwohl die reine Eingabevalidierung (nur relevant
+        # BEIM SPEICHERN, nicht beim erstmaligen Anzeigen des Formulars)
+        # mit dieser Reihenfolge durchaus funktioniert hätte.
         schema[
             vol.Optional(
                 CONF_SPAM_NUMBERS,
                 description={"suggested_value": options.get(CONF_SPAM_NUMBERS)},
             )
-        ] = vol.Any(str, None)
+        ] = vol.Any(None, str)
         return vol.Schema(schema)
 
     async def async_step_init(
