@@ -1168,11 +1168,13 @@ die dortigen Maintainer den Fehler beheben.
   Fehlermeldung ("expected str") beim Speichern, obwohl beide Felder
   optional sind - Home Assistant übermittelt ein leeres Textfeld intern als
   `null`, was die bisherige Validierung nicht zuließ. Behoben, beide Felder
-  lassen sich jetzt problemlos leer lassen. (Ein erster Korrekturversuch
-  brachte kurzzeitig einen neuen, eigenen Fehler mit sich - ein leerer,
-  betitelter "Fehler"-Dialog beim Öffnen der "Grundeinstellungen", da die
-  interne Validierungs-Regel in der falschen Reihenfolge notiert war; auch
-  das ist mit der finalen Fassung behoben.)
+  lassen sich jetzt problemlos leer lassen. (Zwei Korrekturversuche
+  brachten dabei jeweils kurzzeitig einen neuen, eigenen Fehler mit sich -
+  zunächst ein leerer, nur mit "Fehler" betitelter Dialog beim Öffnen der
+  "Grundeinstellungen", danach eine Meldung "not a valid value" beim
+  Speichern; beide sind mit der jetzt ausgelieferten, auf einem
+  vollwertigen Text-Selector statt einem einfachen Typ basierenden Fassung
+  behoben.)
 - **1.1.0**: **Anrufbeantworter Ein/Aus-Schalter** (neu, experimentell):
   ein neuer Schalter pro konfiguriertem Anrufbeantworter schaltet diesen
   über TR-064 (`SetEnable`) ein bzw. aus - siehe
@@ -1390,7 +1392,7 @@ die komplette Datei, z. B. `sha256sum manifest.json`).
 | `__init__.py` | `85eaddff90e92ebc314aa5e7474f97707e9e2fdfa02525cc7ff0f359cd962f6c` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
 | `call_log.py` | `c7115af494200e8a19dae9efaed855680b4ac8186b81788aeacb6c5aae8721f9` |
-| `config_flow.py` | `05dd6054182e5ea860767fdcb17f9271ca6d84588baec7f2bd6936a38e2154d6` |
+| `config_flow.py` | `0bfc65be75b44090a11bc8521e32dd815ae19e556d429620f39b5d9be31aa9f2` |
 | `const.py` | `69cadf3c875e12376cc945e1b072393f2459c6dc5763d484261b2afe031be0a6` |
 | `http.py` | `a5823e4d0838b8783484179dbdbe17290bd484017ccc38001a29e57463d999cf` |
 | `sensor.py` | `4116f337557a8eea43d8a85f47293928e20651c04d7b6516e5bf8b1e6a5a1b90` |
