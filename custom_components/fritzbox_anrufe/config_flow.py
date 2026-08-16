@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 0bfc65be75b44090a11bc8521e32dd815ae19e556d429620f39b5d9be31aa9f2
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 10ad669abc160bc54dd79087757cff21306105c72f9864820e574f01f790cf99
 """Config flow for fritzbox_anrufe."""
 
 from __future__ import annotations
@@ -77,6 +77,67 @@ class ConnectResult(StrEnum):
     NO_DEVIES_FOUND = "no_devices_found"
     UNKNOWN = "unknown"
     SUCCESS = "success"
+
+
+class _TolerantOptionalTextSelector(selector.TextSelector):
+    """``TextSelector`` variant tolerant of every raw value observed so far
+    for CONF_PREFIXES/CONF_SPAM_NUMBERS when the field is left empty.
+
+    Bugfix-Historie (v1.1.1/v1.1.2) - VIER Anläufe für dieselben zwei
+    Felder, siehe der ausführliche Kommentar bei CONF_SPAM_NUMBERS in
+    ``_get_option_schema()`` unten für Details zu Versuch 1-3. Versuch 3
+    (``vol.Any(None, selector.TextSelector())``) wurde gegen die echten
+    ``homeassistant``-/``voluptuous_serialize``-Pakete (Version 2024.3.3)
+    verifiziert und schien vollständig korrekt - trotzdem meldete Thorsten
+    denselben "not a valid value"-Fehler beim Speichern mit leerem
+    Spam-Nummern-Feld erneut (v1.1.2-Auslöser). Der eigene Regressionstest
+    aus Nachtrag 3 hatte einen entscheidenden Fall - eine LEERE LISTE als
+    übermittelter Wert - fälschlich als "absichtlich böswillige Eingabe,
+    muss abgelehnt werden" verifiziert, statt zu erkennen, dass genau DAS
+    offenbar der reale Wert ist, den Home Assistants Formular für ein nie
+    befülltes, optionales Selector-Textfeld tatsächlich übermittelt (statt
+    des angenommenen ``null``).
+    """
+
+    def __call__(self, data: Any) -> str | None:
+        """Coerce every "kein Wert eingegeben"-Variante zu ``None``.
+
+        Ein echtes ``None`` erreicht diese Methode nie (das übergeordnete
+        ``vol.Any(None, ...)`` fängt es bereits per Gleichheitsvergleich
+        ab, bevor dieser Selector überhaupt aufgerufen wird) - hier geht es
+        ausschließlich um die ANDEREN Formen, in denen Home Assistants
+        Frontend "leer" ausdrücken kann (leere Liste, leerer String,
+        ``False``, ``0``, ...). Absichtlich wird ``None`` zurückgegeben statt
+        eines leeren Strings ``""``: die nachgelagerte Verarbeitung
+        (``_are_prefixes_valid``/``_get_list_of_prefixes``) behandelt ``None``
+        bereits korrekt als "kein Wert", während ein leerer String stattdessen
+        als "malformed_prefixes" abgelehnt würde bzw. zu einer unschönen
+        Ein-Element-Liste mit einem leeren String führen würde.
+
+        Eine (nicht-leere) Liste wird als bereits geparster, erneut
+        übermittelter Vorwert interpretiert (z. B. wenn Home Assistant beim
+        erneuten Öffnen des Formulars den zuvor gespeicherten, bereits in
+        eine Liste umgewandelten Optionswert unverändert zurückschickt) und
+        wieder zu einem kommagetrennten String zusammengefügt, bevor die
+        eigentliche (strengere) ``TextSelector``-Validierung greift. Die
+        Selector-Serialisierung (``serialize()``, geerbt von
+        ``TextSelector``) bleibt dabei unverändert - Home Assistant zeigt
+        also weiterhin exakt dasselbe, bereits bewährte Formularfeld an.
+        """
+        if isinstance(data, (list, tuple)):
+            joined = ",".join(str(item) for item in data if item not in (None, ""))
+            return super().__call__(joined) if joined else None
+        if isinstance(data, str):
+            # Ein leerer String ist ebenfalls "kein Wert" (siehe Docstring
+            # oben, warum None statt "" zurückgegeben wird) - ein NICHT
+            # leerer String (auch reines Leerzeichen, siehe
+            # _are_prefixes_valid) bleibt unverändert.
+            return super().__call__(data) if data else None
+        if not data:
+            # None (siehe oben eigentlich unerreichbar, aber defensiv
+            # abgesichert), 0, 0.0, False - alles "kein Wert".
+            return None
+        return super().__call__(str(data))
 
 
 def _history_schema_dict(current_options: Mapping[str, Any]) -> dict[Any, Any]:
@@ -428,13 +489,14 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
         """
         options = self.config_entry.options
         schema: dict[Any, Any] = {
-            # Bugfix-Historie (seit v1.1.1) siehe ausführlicher Kommentar bei
-            # CONF_SPAM_NUMBERS weiter unten - derselbe Validator-Aufbau,
-            # hier nur kurz gehalten, um Dopplung zu vermeiden.
+            # Bugfix-Historie (seit v1.1.1, zuletzt v1.1.2) siehe
+            # ausführlicher Kommentar bei CONF_SPAM_NUMBERS weiter unten -
+            # derselbe Validator-Aufbau, hier nur kurz gehalten, um
+            # Dopplung zu vermeiden.
             vol.Optional(
                 CONF_PREFIXES,
                 description={"suggested_value": options.get(CONF_PREFIXES)},
-            ): vol.Any(None, selector.TextSelector()),
+            ): vol.Any(None, _TolerantOptionalTextSelector()),
         }
         schema.update(_history_schema_dict(options))
         # Anrufbeantworter: nach Wiedergabe automatisch als gelesen markieren
@@ -503,12 +565,28 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
         # erreicht dessen eigene (strengere) Validierung also nie. Die
         # nachgelagerte Verarbeitung (``_get_list_of_prefixes()``)
         # behandelt ``None`` unverändert korrekt.
+        #
+        # NACHTRAG (v1.1.2): Trotz vorstehendem "finalem" Fix meldete
+        # Thorsten denselben "not a valid value"-Fehler beim Speichern mit
+        # LEEREM Spam-Nummern-Feld erneut. Grund: der eigene Regressionstest
+        # aus v1.1.1 hatte einen zentralen Fall - eine LEERE LISTE als
+        # übermittelter Wert - fälschlich als "absichtlich böswillige
+        # Eingabe, muss abgelehnt werden" eingestuft, statt zu erkennen,
+        # dass genau das offenbar der reale Wert ist, den Home Assistants
+        # Formular für ein nie befülltes, optionales Selector-Textfeld
+        # tatsächlich übermittelt (statt des angenommenen ``null``). Der
+        # bloße Selector-Typ (Versuch 3) war also tatsächlich der richtige
+        # RENDERING-Weg - nur die VALIDIERUNG war noch zu eng gefasst.
+        # ECHTER FIX: ``_TolerantOptionalTextSelector`` (siehe Klasse oben)
+        # statt eines nackten ``selector.TextSelector()`` - identische
+        # Serialisierung/Formulardarstellung, aber toleriert zusätzlich
+        # Listen/Tupel und weitere "leer"-Varianten bei der Validierung.
         schema[
             vol.Optional(
                 CONF_SPAM_NUMBERS,
                 description={"suggested_value": options.get(CONF_SPAM_NUMBERS)},
             )
-        ] = vol.Any(None, selector.TextSelector())
+        ] = vol.Any(None, _TolerantOptionalTextSelector())
         return vol.Schema(schema)
 
     async def async_step_init(
