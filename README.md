@@ -1144,6 +1144,17 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
+- **1.1.2**: **Bugfix (Grundeinstellungen):** Der in 1.1.1 als behoben
+  gemeldete Fehler "not a valid value" beim Speichern eines leer
+  gelassenen Felds **Präfixe** oder **Spam-Nummern/-Vorwahlen** trat in
+  einem konkreten Fall weiterhin auf: wurde das Feld nie befüllt und
+  direkt gespeichert, übermittelte Home Assistant dafür offenbar eine
+  leere Liste statt des erwarteten `null` - ein Fall, den der bisherige
+  automatisierte Test fälschlich als "muss abgelehnt werden" eingestuft
+  hatte. Die interne Validierung akzeptiert diesen (und weitere
+  gleichwertige "kein Wert"-Formen) jetzt zusätzlich, ohne die Darstellung
+  des Formularfelds zu verändern. Beide Felder lassen sich damit jetzt
+  tatsächlich in jedem Fall leer lassen.
 - **1.1.1**: **Mehrere Anrufbeantworter** (bis zu 5, statt bisher fest 1
   oder 2): die Options-Flow-Einstellung `second_tam_enabled` entfällt
   zugunsten einer neuen, schaltflächenbasierten Auswahl unter
@@ -1387,12 +1398,12 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.1.1) |
+| Datei | SHA256 (Version 1.1.2) |
 | --- | --- |
 | `__init__.py` | `85eaddff90e92ebc314aa5e7474f97707e9e2fdfa02525cc7ff0f359cd962f6c` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
 | `call_log.py` | `c7115af494200e8a19dae9efaed855680b4ac8186b81788aeacb6c5aae8721f9` |
-| `config_flow.py` | `0bfc65be75b44090a11bc8521e32dd815ae19e556d429620f39b5d9be31aa9f2` |
+| `config_flow.py` | `10ad669abc160bc54dd79087757cff21306105c72f9864820e574f01f790cf99` |
 | `const.py` | `69cadf3c875e12376cc945e1b072393f2459c6dc5763d484261b2afe031be0a6` |
 | `http.py` | `a5823e4d0838b8783484179dbdbe17290bd484017ccc38001a29e57463d999cf` |
 | `sensor.py` | `4116f337557a8eea43d8a85f47293928e20651c04d7b6516e5bf8b1e6a5a1b90` |
@@ -1402,7 +1413,7 @@ die komplette Datei, z. B. `sha256sum manifest.json`).
 | `voicemail.py` | `b03e665eba0cb346c8877988da845a957a6737f9a8a6de8811fe2199a0e4e9b7` |
 | `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
 | `www/fritzbox-anrufe-card.js` | `955ea53f62bd61e0a893433f44dd5346c078ee99bdbbe2392d47dbf58379b1d1` |
-| `manifest.json` | `d0d3579019ac2c9505dbf626899c029d044cdc9152fc910e4083abab2ea39183` |
+| `manifest.json` | `90ac338de87fa9a987b32d9ff875376191f99874b11f59a454fd28a270976ceb` |
 | `strings.json` | `7141f53bb34bf7ee725238b0406ce0e1f9875c3e7cf4076032e43008f752a93b` |
 | `translations/de.json` | `b50b22d3cd943bea2b835fc5e73039ccdb3704bd95655fff86e0430cec0bd4fd` |
 | `translations/en.json` | `7141f53bb34bf7ee725238b0406ce0e1f9875c3e7cf4076032e43008f752a93b` |
