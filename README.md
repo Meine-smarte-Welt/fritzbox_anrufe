@@ -413,40 +413,64 @@ Auffälligkeiten (z. B. eine falsche Nachrichtenliste hinter Anrufbeantworter
 3) bitte ein GitHub-Issue mit Angabe der tatsächlichen Anzahl und
 Reihenfolge der Anrufbeantworter am eigenen Gerät eröffnen.
 
-**Auf der Dashboard-Karte anzeigen:** Die mitgelieferte Karte unterstützt
-weiterhin ausschließlich einen zweiten Anrufbeantworter direkt in derselben
-Karte (Felder `entity_voicemail_2`/`voicemail_2_mode`, siehe unten) - die
-Karte selbst wurde in Version 1.1.1 nicht erweitert, es gibt also keine
-Felder `entity_voicemail_3`/`_4`/`_5`. Für Anrufbeantworter 3 bis 5 (und
-optional auch für 2) eine weitere, eigene Karteninstanz mit
-`entity_voicemail: sensor.fritzbox_anrufe_anrufbeantworter_3` (bzw. `_4`/
-`_5`) anlegen - genau dasselbe Muster, das seit Version 1.0.6b1 schon für
-den zweiten Anrufbeantworter als Alternative zur gemeinsamen Karte
-beschrieben ist (nicht benötigte Kategorien lassen sich dabei über die
-Kategorien-Einstellungen der jeweiligen Karteninstanz ausblenden). Eine
-echte Mehrfach-Tab-Ansicht innerhalb einer einzigen Karte bleibt eine
-mögliche künftige Erweiterung, aber (noch) nicht umgesetzt.
+**Auf der Dashboard-Karte anzeigen:** Seit Version 1.2.0 unterstützt die
+mitgelieferte Karte alle bis zu fünf Anrufbeantworter DIREKT in derselben
+Karte - dafür im Editor (oder per YAML) unter "Sensoren" zusätzlich zu
+`entity_voicemail_2` auch `entity_voicemail_3`/`_4`/`_5` auf die
+entsprechenden Sensoren setzen (`sensor.fritzbox_anrufe_anrufbeantworter_3`
+bis `_5`). `voicemail_2_mode` bestimmt dann, WIE die konfigurierten Listen
+dargestellt werden:
 
-Für den zweiten Anrufbeantworter kann die mitgelieferte Karte ihn
-weiterhin direkt in derselben Karte mit anzeigen - unter demselben
-Anrufbeantworter-Tab, kein zusätzliches Symbol in der Icon-Leiste. Dafür im
-Editor (oder per YAML) `entity_voicemail_2` auf
-`sensor.fritzbox_anrufe_anrufbeantworter_2` setzen; `voicemail_2_mode`
-bestimmt dann, WIE beide Listen dargestellt werden:
+- **`merged`** (Standard, nur bei GENAU zwei konfigurierten
+  Anrufbeantwortern wählbar): eine gemeinsame, chronologisch gemischte
+  Liste - jede Nachricht bekommt ein kleines "AB 1"/"AB 2"-Badge, damit
+  erkennbar bleibt, von welchem Anrufbeantworter sie stammt.
+- **`separate`** (ebenfalls nur bei genau zwei): eigene, überschriebene
+  Abschnitte ("Anrufbeantworter 1"/"Anrufbeantworter 2") untereinander,
+  jeweils unvermischt - ohne Badge, da die Überschriften bereits eindeutig
+  trennen.
+- **`accordion`** (neu in Version 1.2.0): je Anrufbeantworter ein
+  unabhängig auf-/zuklappbarer Abschnitt. Ein Abschnitt mit mindestens
+  einer neuen ("Neu"-Status) Nachricht öffnet sich beim ersten Anzeigen der
+  Karte automatisch, alle anderen starten eingeklappt; danach entscheidet
+  ausschließlich ein Klick auf den jeweiligen Abschnitt, ob er offen ist
+  (auch mehrere gleichzeitig möglich). Sobald mehr als zwei
+  Anrufbeantworter konfiguriert sind, verwendet die Karte automatisch
+  "accordion", unabhängig vom hier eingestellten Wert - "merged"/"separate"
+  sind nur für genau zwei Listen sinnvoll definiert.
 
-- **`merged`** (Standard): eine gemeinsame, chronologisch gemischte Liste -
-  jede Nachricht bekommt ein kleines "AB 1"/"AB 2"-Badge, damit erkennbar
-  bleibt, von welchem Anrufbeantworter sie stammt.
-- **`separate`**: zwei eigene, überschriebene Abschnitte ("Anrufbeantworter
-  1"/"Anrufbeantworter 2") untereinander, jeweils unvermischt - ohne Badge,
-  da die Überschriften bereits eindeutig trennen.
+**Welcher Anrufbeantworter angezeigt wird, ist zweistufig wählbar (seit
+Version 1.2.0):** Die Editor-Schalter `show_voicemail_1` bis `_5`
+("Kategorien", Standard AN für alle) legen den dauerhaft gespeicherten
+Grundzustand fest, welche konfigurierten Anrufbeantworter grundsätzlich
+einbezogen werden. Sobald zwei oder mehr Anrufbeantworter konfiguriert
+sind, erscheint zusätzlich direkt auf der Karte selbst eine Reihe kleiner
+Kontrollkästchen ("AB 1", "AB 2", …) - damit lässt sich beim Betrachten des
+Dashboards schnell ein einzelner Anrufbeantworter isolieren oder wieder
+einblenden, ohne die Karte zu bearbeiten. Diese Auswahl ist reiner
+Anzeige-Laufzeitstatus (geht beim Neuladen der Karte wieder auf den
+Editor-Grundzustand zurück, genau wie die bestehende Filter-/Sortierleiste)
+und wirkt auf alle drei obigen Darstellungen gleichermaßen. Werden alle
+Anrufbeantworter abgewählt, erscheint statt der Nachrichten-Auflistung ein
+Hinweistext - die Kontrollkästchen selbst bleiben sichtbar, um mindestens
+einen wieder einzublenden.
+
+Hat man nur zwei Anrufbeantworter konfiguriert, funktioniert weiterhin auch
+das bisherige Muster (seit Version 1.0.6b1) einer zusätzlichen, eigenen
+Karteninstanz pro Anrufbeantworter als Alternative zur gemeinsamen Karte
+(`entity_voicemail: sensor.fritzbox_anrufe_anrufbeantworter_3` in einer
+zweiten Karte, nicht benötigte Kategorien über deren eigene
+Kategorien-Einstellungen ausgeblendet) - seit Version 1.2.0 aber nicht mehr
+nötig, sofern alle Anrufbeantworter in einer einzigen Karte erscheinen
+sollen.
 
 Löschen (`show_delete_button`) und Spam-Ausblenden (`hide_spam`)
-funktionieren in beiden Modi unverändert für beide Anrufbeantworter, auch
-wenn deren Nachrichten-IDs sich überschneiden (die FRITZ!Box zählt bei
-jedem Anrufbeantworter unabhängig ab 0) - die Karte unterscheidet intern
-anhand des jeweiligen Sensors. Ohne gesetztes `entity_voicemail_2` verhält
-sich die Karte wie vor Version 1.1.0 (eine einzelne Liste, kein Badge).
+funktionieren in allen drei Darstellungen unverändert für jeden
+Anrufbeantworter, auch wenn deren Nachrichten-IDs sich überschneiden (die
+FRITZ!Box zählt bei jedem Anrufbeantworter unabhängig ab 0) - die Karte
+unterscheidet intern anhand des jeweiligen Sensors. Ohne gesetztes
+`entity_voicemail_2` (und `_3`/`_4`/`_5`) verhält sich die Karte wie vor
+Version 1.1.0 (eine einzelne Liste, kein Badge).
 
 ## Einstellungen (Optionen)
 
@@ -548,14 +572,30 @@ entity_ausgehend: sensor.fritz_box_7590_ausgehende_anrufe
 entity_verpasst: sensor.fritz_box_7590_verpasste_anrufe
 entity_voicemail: sensor.fritz_box_7590_anrufbeantworter  # optional, experimentell
 entity_voicemail_2: sensor.fritz_box_7590_anrufbeantworter_2  # optional, seit Version 1.1.0
+entity_voicemail_3: sensor.fritz_box_7590_anrufbeantworter_3  # optional, seit Version 1.2.0
+entity_voicemail_4: sensor.fritz_box_7590_anrufbeantworter_4  # optional, seit Version 1.2.0
+entity_voicemail_5: sensor.fritz_box_7590_anrufbeantworter_5  # optional, seit Version 1.2.0
 entity_tam_switch: switch.fritz_box_7590_anrufbeantworter_ein_aus  # optional, seit Version 1.1.0, experimentell
 entity_tam_switch_2: switch.fritz_box_7590_anrufbeantworter_2_ein_aus  # optional, seit Version 1.1.0
+entity_tam_switch_3: switch.fritz_box_7590_anrufbeantworter_3_ein_aus  # optional, seit Version 1.2.0
+entity_tam_switch_4: switch.fritz_box_7590_anrufbeantworter_4_ein_aus  # optional, seit Version 1.2.0
+entity_tam_switch_5: switch.fritz_box_7590_anrufbeantworter_5_ein_aus  # optional, seit Version 1.2.0
 max_rows: 10
 show_alle: true
 show_eingehend: true
 show_ausgehend: true
 show_verpasst: true
 show_anrufbeantworter: true
+# Grundzustand je Anrufbeantworter-Slot (seit Version 1.2.0, Standard AN für
+# alle) - nur mit dem jeweils zugehörigen entity_voicemail_N gesetzt von
+# Bedeutung. Ab zwei konfigurierten Anrufbeantwortern lässt sich das
+# zusätzlich direkt auf der Karte per Kontrollkästchen temporär anpassen,
+# ohne die Karte zu bearbeiten.
+show_voicemail_1: true
+show_voicemail_2: true
+show_voicemail_3: true
+show_voicemail_4: true
+show_voicemail_5: true
 show_name: true
 show_number: true
 show_own_number: false
@@ -579,11 +619,15 @@ show_delete_button: false
 # Integrations-Optionen definiert, siehe
 # https://github.com/Meine-smarte-Welt/fritzbox_anrufe#spam-erkennung-seit-version-110-optional
 hide_spam: false
-# Darstellung mit zweitem Anrufbeantworter (seit Version 1.1.0, optional,
-# nur mit gesetztem entity_voicemail_2) - "merged" mischt beide
+# Darstellung bei mehreren Anrufbeantwortern (seit Version 1.1.0, optional,
+# nur mit mindestens entity_voicemail_2 gesetzt) - "merged" mischt die
 # Nachrichtenlisten chronologisch mit einem "AB 1"/"AB 2"-Badge pro
-# Nachricht, "separate" zeigt stattdessen zwei eigene, überschriebene
-# Abschnitte untereinander.
+# Nachricht, "separate" zeigt stattdessen eigene, überschriebene Abschnitte
+# untereinander (beide nur bei GENAU zwei konfigurierten
+# Anrufbeantwortern wählbar), "accordion" (seit Version 1.2.0) zeigt
+# unabhängig auf-/zuklappbare Abschnitte je Anrufbeantworter und ist ab drei
+# konfigurierten Anrufbeantwortern die einzige, automatisch erzwungene
+# Darstellung.
 voicemail_2_mode: merged
 # Anrufbeantworter Ein/Aus-Schalter (seit Version 1.1.0, optional,
 # experimentell) - standardmäßig aus, benötigt zusätzlich einen gesetzten
@@ -851,15 +895,25 @@ solche Einträge stattdessen komplett aus der Anrufliste bzw. der
 Nachrichtenliste aus, sowohl auf dem "Alle"/"Gesamt"-Tab als auch auf den
 Einzelkategorien.
 
-### Zweiten Anrufbeantworter anzeigen (seit Version 1.1.0, optional)
+### Mehrere Anrufbeantworter anzeigen (seit Version 1.1.0, erweitert in Version 1.2.0, optional)
 
-Mit gesetztem `entity_voicemail_2` (siehe
+Mit gesetztem `entity_voicemail_2` (und optional `_3`/`_4`/`_5`, seit
+Version 1.2.0 - siehe
 [Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111))
-zeigt der Anrufbeantworter-Tab beide Nachrichtenlisten. `voicemail_2_mode`
-wählt zwischen `merged` (Standard, eine gemeinsame chronologische Liste mit
-"AB 1"/"AB 2"-Badge je Nachricht) und `separate` (zwei eigene, überschriebene
-Abschnitte untereinander, unvermischt). Papierkorb-Button und
-Spam-Ausblenden funktionieren dabei für beide Anrufbeantworter wie gewohnt.
+zeigt der Anrufbeantworter-Tab alle konfigurierten Nachrichtenlisten
+zusammen. `voicemail_2_mode` wählt zwischen `merged` (Standard, nur bei
+genau zwei konfigurierten Anrufbeantwortern: eine gemeinsame chronologische
+Liste mit "AB 1"/"AB 2"-Badge je Nachricht), `separate` (ebenfalls nur bei
+genau zwei: eigene, überschriebene Abschnitte untereinander, unvermischt)
+und `accordion` (seit Version 1.2.0: unabhängig auf-/zuklappbare Abschnitte
+je Anrufbeantworter, ab drei konfigurierten automatisch erzwungen - siehe
+[Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111)
+für die genaue Beschreibung des Auf-/Zuklapp-Verhaltens). Zusätzlich lässt
+sich seit Version 1.2.0 über die Editor-Schalter `show_voicemail_1` bis `_5`
+(dauerhaft) sowie über Kontrollkästchen direkt auf der Karte (temporär,
+sobald zwei oder mehr Anrufbeantworter konfiguriert sind) auswählen, welche
+Anrufbeantworter überhaupt einbezogen werden. Papierkorb-Button und
+Spam-Ausblenden funktionieren dabei für jeden Anrufbeantworter wie gewohnt.
 Ohne `entity_voicemail_2` ändert sich am bisherigen Verhalten nichts.
 
 ### Anrufbeantworter Ein/Aus-Schalter (seit Version 1.1.0, experimentell)
@@ -1113,12 +1167,10 @@ die dortigen Maintainer den Fehler beheben.
   Hardware-Unterstützung bleibt der jeweilige Sensor einfach dauerhaft
   "nicht verfügbar", ohne die übrige Integration zu beeinträchtigen. Es
   gibt weiterhin keinen eigenen Tab/Icon in der Kartenkopfzeile dafür - seit
-  Version 1.1.0 lässt sich der zweite Anrufbeantworter direkt im
-  bestehenden Anrufbeantworter-Tab mit anzeigen (`entity_voicemail_2`),
-  siehe [Zweiten Anrufbeantworter anzeigen](#zweiten-anrufbeantworter-anzeigen-seit-version-110-optional);
-  Anrufbeantworter 3 bis 5 benötigen dafür je eine eigene, zusätzliche
-  Karteninstanz, siehe
-  [Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111).
+  Version 1.1.0 lässt sich der zweite Anrufbeantworter, seit Version 1.2.0
+  auch der dritte bis fünfte, direkt im bestehenden Anrufbeantworter-Tab mit
+  anzeigen (`entity_voicemail_2`/`_3`/`_4`/`_5`), siehe
+  [Mehrere Anrufbeantworter anzeigen](#mehrere-anrufbeantworter-anzeigen-seit-version-110-erweitert-in-version-120-optional).
 - **Migration von `second_tam_enabled`** (seit Version 1.1.1): Die
   automatische Übernahme des alten Boolean-Werts in die neue Anzahl (siehe
   [Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111))
@@ -1144,6 +1196,26 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
+- **1.2.0**: **Bis zu fünf Anrufbeantworter direkt in einer Karte:** die
+  mitgelieferte Dashboard-Karte unterstützt jetzt alle bis zu fünf
+  Anrufbeantworter direkt in derselben Karte (neue Felder
+  `entity_voicemail_3`/`_4`/`_5`, analog zu `entity_voicemail_2`) - bislang
+  war dafür ab dem dritten stets eine eigene, zusätzliche Karteninstanz
+  nötig. Neuer Darstellungsmodus **`accordion`** (`voicemail_2_mode`): je
+  Anrufbeantworter ein unabhängig auf-/zuklappbarer Abschnitt, ab drei
+  konfigurierten Anrufbeantwortern automatisch verwendet, da "merged"/
+  "separate" nur für genau zwei Listen sinnvoll definiert sind - ein
+  Abschnitt mit ungehörten Nachrichten öffnet sich beim ersten Anzeigen
+  automatisch. Zusätzlich neu: eine Auswahl, WELCHE Anrufbeantworter
+  überhaupt angezeigt werden - dauerhaft über neue Editor-Schalter
+  `show_voicemail_1` bis `_5`, und (sobald zwei oder mehr Anrufbeantworter
+  konfiguriert sind) zusätzlich direkt auf der Karte über Kontrollkästchen,
+  ohne die Karte bearbeiten zu müssen. Siehe
+  [Mehrere Anrufbeantworter anzeigen](#mehrere-anrufbeantworter-anzeigen-seit-version-110-erweitert-in-version-120-optional)
+  für Details. Keine Änderungen an der Integration selbst (reine
+  Karten-/Dashboard-Erweiterung) - bestehende Konfigurationen mit nur einem
+  oder zwei Anrufbeantwortern bleiben optisch unverändert (Standard
+  weiterhin `merged`, alle `show_voicemail_N` standardmäßig an).
 - **1.1.2**: **Bugfix (Grundeinstellungen):** Der in 1.1.1 als behoben
   gemeldete Fehler "not a valid value" beim Speichern eines leer
   gelassenen Felds **Präfixe** oder **Spam-Nummern/-Vorwahlen** trat in
@@ -1218,7 +1290,7 @@ die dortigen Maintainer den Fehler beheben.
   [Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111))
   samt direkter Anzeige in derselben Dashboard-Karte (`entity_voicemail_2`,
   `voicemail_2_mode`: `merged` oder `separate`, siehe
-  [Zweiten Anrufbeantworter anzeigen](#zweiten-anrufbeantworter-anzeigen-seit-version-110-optional)).
+  [Mehrere Anrufbeantworter anzeigen](#mehrere-anrufbeantworter-anzeigen-seit-version-110-erweitert-in-version-120-optional)).
   Beim allerersten Event-Abruf nach einem Neustart wird bewusst kein Event
   gefeuert, um keine Benachrichtigungen für längst bekannte, nur noch nicht
   abgehörte Nachrichten auszulösen.
@@ -1398,7 +1470,7 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.1.2) |
+| Datei | SHA256 (Version 1.2.0) |
 | --- | --- |
 | `__init__.py` | `85eaddff90e92ebc314aa5e7474f97707e9e2fdfa02525cc7ff0f359cd962f6c` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
@@ -1412,8 +1484,8 @@ die komplette Datei, z. B. `sha256sum manifest.json`).
 | `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
 | `voicemail.py` | `b03e665eba0cb346c8877988da845a957a6737f9a8a6de8811fe2199a0e4e9b7` |
 | `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
-| `www/fritzbox-anrufe-card.js` | `955ea53f62bd61e0a893433f44dd5346c078ee99bdbbe2392d47dbf58379b1d1` |
-| `manifest.json` | `90ac338de87fa9a987b32d9ff875376191f99874b11f59a454fd28a270976ceb` |
+| `www/fritzbox-anrufe-card.js` | `341fc1a75747fad57a140258f25f69f3f985931a3947269f91aa54369a056dce` |
+| `manifest.json` | `bed4ea016b419a405bc4fa759fc6291cf2d62e9d804b22b512c840a1cece4510` |
 | `strings.json` | `7141f53bb34bf7ee725238b0406ce0e1f9875c3e7cf4076032e43008f752a93b` |
 | `translations/de.json` | `b50b22d3cd943bea2b835fc5e73039ccdb3704bd95655fff86e0430cec0bd4fd` |
 | `translations/en.json` | `7141f53bb34bf7ee725238b0406ce0e1f9875c3e7cf4076032e43008f752a93b` |
