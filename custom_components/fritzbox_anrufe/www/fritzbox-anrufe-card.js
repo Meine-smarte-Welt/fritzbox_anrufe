@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 955ea53f62bd61e0a893433f44dd5346c078ee99bdbbe2392d47dbf58379b1d1
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 341fc1a75747fad57a140258f25f69f3f985931a3947269f91aa54369a056dce
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -226,6 +226,52 @@
  * die reguläre hass-Aktualisierung zurück in die Karte fließt (siehe
  * _computeSignature()).
  *
+ * v1.2.0: bis zu fünf Anrufbeantworter DIREKT in derselben Karte (statt wie
+ * bislang nur zwei, siehe v1.0.6b2 oben) - neue, optionale Felder
+ * `entity_voicemail_3`/`_4`/`_5` (analog zu `entity_voicemail_2`, dieselbe
+ * Verallgemeinerung wie bereits backendseitig seit v1.1.1 bei den
+ * Integrations-Sensoren selbst, siehe const.py:CALL_TYPES_VOICEMAIL). Bisher
+ * war für Anrufbeantworter 3-5 stets eine eigene, zusätzliche Karteninstanz
+ * nötig (siehe README "Bekannte Einschränkungen" vor 1.2.0). Neuer
+ * `voicemail_2_mode`-Wert `"accordion"`: zeigt je Anrufbeantworter einen
+ * unabhängig auf-/zuklappbaren Abschnitt (natives `<details>`, siehe
+ * FritzboxAnrufeCard._renderVoicemailAccordion()) - ein Abschnitt mit
+ * mindestens einer neuen ("Neu"-Status) Nachricht startet aufgeklappt, alle
+ * anderen eingeklappt; danach bestimmt ausschließlich der Nutzer per Klick,
+ * welche Abschnitte offen sind (mehrere gleichzeitig möglich), auch über
+ * spätere Re-Renders hinweg (siehe FritzboxAnrufeCard._tamAccordionOpen).
+ * "merged"/"separate" bleiben für GENAU zwei konfigurierte Anrufbeantworter
+ * unverändert wählbar (Standard weiterhin "merged", exakt das bisherige
+ * Verhalten bestehender Dashboards) - sobald mehr als zwei Anrufbeantworter
+ * konfiguriert sind, erzwingt die Karte "accordion" unabhängig vom
+ * gespeicherten `voicemail_2_mode`-Wert, da "merged"/"separate" nur für
+ * genau zwei Listen sinnvoll definiert sind (siehe
+ * FritzboxAnrufeCard._voicemailDisplayMode()). `entity_tam_switch_3`/`_4`/
+ * `_5` (EXPERIMENTELL, wie `entity_tam_switch_2` seit v1.1.0) ergänzen die
+ * Ein/Aus-Schalter-Zeilen entsprechend, siehe _renderTamSwitches().
+ *
+ * Ebenfalls neu in v1.2.0: ein Live-Regler direkt auf der Karte (Checkboxen
+ * "AB 1".."AB 5", siehe FritzboxAnrufeCard._renderTamPicker()), sobald zwei
+ * oder mehr Anrufbeantworter konfiguriert sind - erlaubt, einzelne
+ * Anrufbeantworter beim Betrachten des Dashboards temporär aus der Ansicht
+ * zu nehmen (z. B. nur einen bestimmten AB sehen wollen), OHNE die
+ * Kartenkonfiguration zu bearbeiten. Der dabei gewählte Zustand ist reiner
+ * UI-Laufzeitstatus (this._tamPickerVisible) und geht bei jedem Neuladen der
+ * Karte bzw. jeder Konfigurationsänderung wieder auf den DAUERHAFT
+ * gespeicherten Grundzustand zurück - dafür neue, optionale Editor-Schalter
+ * `show_voicemail_1` bis `_5` (Standard AN für alle, Abschnitt
+ * "Kategorien"), analog zu den bestehenden show_alle/show_eingehend-
+ * Schaltern. Wirkt auf alle drei Mehrfach-Darstellungen (merged/separate/
+ * accordion) gleichermaßen: die jeweils SICHTBARE Teilmenge der
+ * konfigurierten Anrufbeantworter bestimmt sowohl, ob überhaupt noch
+ * "merged"/"separate" (nur bei genau zwei sichtbaren) oder "accordion" (drei
+ * oder mehr sichtbare) gilt, als auch, WELCHE zwei Slots im "merged"-/
+ * "separate"-Fall gezeigt werden - nicht mehr zwingend Slot 1+2, siehe
+ * _renderVoicemailRows(). Werden alle Anrufbeantworter abgewählt, erscheint
+ * statt der (dann leeren) Nachrichten-Auflistung ein eigener Hinweistext;
+ * der Regler selbst bleibt weiterhin sichtbar, um mindestens einen wieder
+ * einzublenden.
+ *
  * Example card configuration (YAML):
  *
  *   type: custom:fritzbox-anrufe-card
@@ -236,9 +282,15 @@
  *   entity_verpasst: sensor.fritz_box_7590_verpasste_anrufe
  *   entity_voicemail: sensor.fritz_box_7590_anrufbeantworter
  *   entity_voicemail_2: sensor.fritz_box_7590_anrufbeantworter_2  # optional, seit 1.0.6b2
- *   voicemail_2_mode: merged  # "merged" oder "separate", nur relevant mit entity_voicemail_2
+ *   entity_voicemail_3: sensor.fritz_box_7590_anrufbeantworter_3  # optional, seit 1.2.0
+ *   entity_voicemail_4: sensor.fritz_box_7590_anrufbeantworter_4  # optional, seit 1.2.0
+ *   entity_voicemail_5: sensor.fritz_box_7590_anrufbeantworter_5  # optional, seit 1.2.0
+ *   voicemail_2_mode: merged  # "merged"/"separate" (nur bei genau 2 ABs) oder "accordion" (seit 1.2.0, ab 3 ABs erzwungen)
  *   entity_tam_switch: switch.fritz_box_7590_anrufbeantworter_ein_aus  # optional, seit 1.1.0, EXPERIMENTELL
  *   entity_tam_switch_2: switch.fritz_box_7590_anrufbeantworter_2_ein_aus  # optional, seit 1.1.0
+ *   entity_tam_switch_3: switch.fritz_box_7590_anrufbeantworter_3_ein_aus  # optional, seit 1.2.0
+ *   entity_tam_switch_4: switch.fritz_box_7590_anrufbeantworter_4_ein_aus  # optional, seit 1.2.0
+ *   entity_tam_switch_5: switch.fritz_box_7590_anrufbeantworter_5_ein_aus  # optional, seit 1.2.0
  *   show_tam_switch: false
  *   max_rows: 10
  *   show_alle: true
@@ -246,6 +298,11 @@
  *   show_ausgehend: true
  *   show_verpasst: true
  *   show_anrufbeantworter: true
+ *   show_voicemail_1: true  # seit 1.2.0, Grundzustand für den Live-Regler auf der Karte
+ *   show_voicemail_2: true
+ *   show_voicemail_3: true
+ *   show_voicemail_4: true
+ *   show_voicemail_5: true
  *   show_name: true
  *   show_number: true
  *   show_own_number: false
@@ -287,6 +344,12 @@ const FILTER_META = {
   verpasst: { icon: "mdi:phone-missed", label: "Verpasst" },
   anrufbeantworter: { icon: "mdi:voicemail", label: "Anrufbeantworter" },
 };
+
+// Maximale Anzahl direkt in dieser Karte anzeigbarer Anrufbeantworter (seit
+// v1.2.0) - identisch zu const.py:MAX_TAM_COUNT in der Integration (die dort
+// je konfiguriertem Slot ohnehin nie mehr als 5 Sensoren anlegt). Siehe
+// FritzboxAnrufeCard._activeTamSlots()/_tamEntityKey()/_tamSwitchKey().
+const MAX_TAM_SLOTS = 5;
 
 // --- Filter-/Sortierleiste (seit v1.0.4b3, optional über show_filter_bar) --
 //
@@ -553,25 +616,62 @@ const CONFIG_DEFAULTS = {
   // Moduldoku oben. Leer = kein zweiter Anrufbeantworter, exakt das
   // bisherige Verhalten.
   entity_voicemail_2: "",
-  // "merged" (Standard) mischt beide Nachrichtenlisten chronologisch mit
-  // "AB 1"/"AB 2"-Badge, "separate" zeigt zwei getrennte Abschnitte
-  // untereinander - siehe Moduldoku oben. Ohne entity_voicemail_2 ohne
-  // jede Wirkung.
+  // Dritter bis fünfter Anrufbeantworter (seit v1.2.0) - analog zu
+  // entity_voicemail_2 oben, dieselbe TAM_SLOTS-Behandlung (siehe
+  // FritzboxAnrufeCard._activeTamSlots()). Die Integration selbst legt seit
+  // v1.1.1 für jeden konfigurierten Anrufbeantworter (bis zu 5, siehe
+  // const.py:MAX_TAM_COUNT) einen eigenen Sensor an - diese Karte konnte
+  // davon bislang aber nur die ersten beiden direkt anzeigen, für Slot 3-5
+  // war bis v1.1.1 stets eine eigene, zusätzliche Karteninstanz nötig (siehe
+  // README "Bekannte Einschränkungen"). Leer = dieser Slot bleibt
+  // unberücksichtigt, exakt wie bei entity_voicemail_2.
+  entity_voicemail_3: "",
+  entity_voicemail_4: "",
+  entity_voicemail_5: "",
+  // "merged" (Standard, nur bei GENAU zwei konfigurierten Anrufbeantwortern
+  // wählbar) mischt beide Nachrichtenlisten chronologisch mit "AB 1"/"AB
+  // 2"-Badge, "separate" zeigt getrennte Abschnitte untereinander,
+  // "accordion" (seit v1.2.0) zeigt stattdessen je Anrufbeantworter einen
+  // auf-/zuklappbaren Abschnitt - siehe Moduldoku oben und
+  // FritzboxAnrufeCard._voicemailDisplayMode(). Sobald mehr als zwei
+  // Anrufbeantworter konfiguriert sind, erzwingt die Karte "accordion"
+  // unabhängig vom hier gespeicherten Wert, da "merged"/"separate" nur für
+  // exakt zwei Listen definiert sind. Ohne mindestens entity_voicemail_2
+  // ohne jede Wirkung.
   voicemail_2_mode: "merged",
   // Anrufbeantworter Ein/Aus-Schalter (seit v1.1.0, EXPERIMENTELL - siehe
-  // switch.py in der Integration). entity_tam_switch/entity_tam_switch_2
-  // sind eigene Entity-Picker (switch-Domäne) - bewusst NICHT aus
-  // entity_voicemail/entity_voicemail_2 abgeleitet, da Home Assistant für
-  // sprachabhängig benannte Entitäten keinen zuverlässigen Mechanismus
-  // bietet, den zugehörigen Schalter-entity_id algorithmisch zu bestimmen.
-  // entity_tam_switch_2 wirkt nur zusätzlich zu einem gesetzten
-  // entity_voicemail_2 (siehe _renderTamSwitches()). show_tam_switch ist der
-  // sichtbare Regler dafür (Standard AUS, exakt wie show_filter_bar/
-  // show_delete_button/hide_spam oben, damit bestehende Dashboards nach
-  // einem Update optisch unverändert bleiben).
+  // switch.py in der Integration). entity_tam_switch/entity_tam_switch_2/
+  // _3/_4/_5 sind eigene Entity-Picker (switch-Domäne) - bewusst NICHT aus
+  // entity_voicemail/entity_voicemail_2/_3/_4/_5 abgeleitet, da Home
+  // Assistant für sprachabhängig benannte Entitäten keinen zuverlässigen
+  // Mechanismus bietet, den zugehörigen Schalter-entity_id algorithmisch zu
+  // bestimmen. entity_tam_switch_N (N>1) wirkt jeweils nur zusätzlich zu
+  // einem gesetzten entity_voicemail_N (siehe _renderTamSwitches()).
+  // show_tam_switch ist der sichtbare Regler dafür (Standard AUS, exakt wie
+  // show_filter_bar/show_delete_button/hide_spam oben, damit bestehende
+  // Dashboards nach einem Update optisch unverändert bleiben).
   entity_tam_switch: "",
   entity_tam_switch_2: "",
+  entity_tam_switch_3: "",
+  entity_tam_switch_4: "",
+  entity_tam_switch_5: "",
   show_tam_switch: false,
+  // Welche konfigurierten Anrufbeantworter standardmäßig einbezogen werden
+  // (seit v1.2.0) - Standard AN für alle 5, damit bestehende Dashboards nach
+  // einem Update unverändert bleiben (jeder konfigurierte entity_voicemail_N
+  // erscheint weiterhin wie bisher). Wirkt nur zusätzlich zu einem
+  // tatsächlich gesetzten entity_voicemail_N - Slots ohne konfigurierten
+  // Sensor bleiben ohnehin unberücksichtigt (siehe _activeTamSlots()). Ab
+  // zwei konfigurierten Anrufbeantwortern kann diese Auswahl zusätzlich
+  // direkt auf der Karte über Checkboxen temporär angepasst werden (reiner
+  // UI-Laufzeitstatus, siehe FritzboxAnrufeCard._tamPickerVisible/
+  // _renderTamPicker()) - dieser Wert hier ist nur der beim Laden der Karte
+  // wiederhergestellte, dauerhaft gespeicherte Grundzustand dafür.
+  show_voicemail_1: true,
+  show_voicemail_2: true,
+  show_voicemail_3: true,
+  show_voicemail_4: true,
+  show_voicemail_5: true,
   // Farben (seit v1.0.4) - leer = bisheriger, fester Theme-Farbwert (siehe
   // COLOR_CONFIG_KEYS oben für die jeweiligen Standardwerte).
   color_tab_active: "",
@@ -791,6 +891,46 @@ const VOICEMAIL_ROWS_STYLES = `
     color: var(--secondary-text-color, #727272);
     margin-bottom: 8px;
   }
+  /* Akkordeon-Darstellung mehrerer Anrufbeantworter (seit v1.2.0, "accordion"-
+     Modus, ab drei Anrufbeantwortern erzwungen) - siehe Moduldoku oben und
+     FritzboxAnrufeCard._renderVoicemailAccordion(). Bewusst derselbe
+     natives-<details>-plus-eigener-Chevron-Aufbau wie die Farben-Abschnitte
+     im Karten-EDITOR (.fba-color-editor, siehe dort für die ausführliche
+     Begründung je Detail) - hier als eigener Klassensatz, da diese Regeln in
+     der eigentlichen KARTE (nicht im Editor) gelten und unabhängig von
+     dessen Aufbau bestehen bleiben sollen. */
+  .voicemail-accordion-section:not(:last-child) { margin-bottom: 8px; }
+  .voicemail-accordion-section {
+    border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+    border-radius: 8px;
+    padding: 0 12px;
+  }
+  .voicemail-accordion-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--primary-text-color, #212121);
+    list-style: none;
+  }
+  .voicemail-accordion-summary::-webkit-details-marker { display: none; }
+  .voicemail-accordion-summary::marker { display: none; }
+  .voicemail-accordion-title { flex: 1 1 auto; }
+  .voicemail-accordion-count {
+    font-size: 0.8em;
+    color: var(--secondary-text-color, #727272);
+  }
+  .voicemail-accordion-chevron {
+    --mdc-icon-size: 20px;
+    color: var(--secondary-text-color, #727272);
+    transition: transform 0.2s ease;
+  }
+  .voicemail-accordion-section[open] > .voicemail-accordion-summary .voicemail-accordion-chevron {
+    transform: rotate(180deg);
+  }
+  .voicemail-accordion-body { padding: 0 0 12px; }
   .row-badge {
     font-size: 0.7em;
     text-transform: uppercase;
@@ -819,6 +959,35 @@ const VOICEMAIL_ROWS_STYLES = `
      eigene width:100%-Regel und ist von diesem Effekt nicht betroffen. */
   .voicemail-player-slot { flex: 1 1 auto; min-width: 0; }
   .voicemail-player { width: 100%; height: 32px; }
+  /* Live-AB-Regler (seit v1.2.0, ab 2 konfigurierten Anrufbeantwortern) -
+     steht nach den Ein/Aus-Schaltern (falls aktiv) und vor der eigentlichen
+     Nachrichten-Auflistung, siehe _renderTamPicker(). */
+  .voicemail-tam-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .voicemail-tam-picker-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+    border-radius: 999px;
+    padding: 3px 10px 3px 8px;
+    font-size: 0.85em;
+    color: var(--secondary-text-color, #727272);
+    cursor: pointer;
+    user-select: none;
+  }
+  .voicemail-tam-picker-chip.checked {
+    border-color: var(--fba-color-playback);
+    color: var(--primary-text-color, #212121);
+  }
+  .voicemail-tam-picker-chip input[type="checkbox"] {
+    margin: 0;
+    accent-color: var(--fba-color-playback);
+  }
   /* Anrufbeantworter Ein/Aus-Schalter (seit v1.1.0, EXPERIMENTELL, nur bei
      show_tam_switch) - steht vor der Nachrichten-Auflistung, siehe
      _renderTamSwitches(). */
@@ -1050,6 +1219,17 @@ class FritzboxAnrufeCard extends HTMLElement {
     // bereits ausgeblendet sind - siehe _deleteVoicemailMessage().
     this._confirmDeleteMessageId = null;
     this._pendingDeletedMessageIds = new Set();
+    // Akkordeon-Auf-/Zuklapp-Status je Anrufbeantworter-Slot (seit v1.2.0,
+    // siehe _renderVoicemailAccordion()) - reiner UI-Laufzeitstatus, genau
+    // wie die übrigen Felder hier: geht bei jedem Neuladen bzw. jeder
+    // Config-Änderung verloren (siehe setConfig()). Objekt bleibt leer, bis
+    // ein Slot zum ersten Mal gerendert wird - erst dann wird der
+    // Startzustand einmalig festgelegt (siehe dortiger Kommentar).
+    this._tamAccordionOpen = {};
+    // Live-AB-Regler (seit v1.2.0, siehe _renderTamPicker()) - ebenfalls
+    // reiner UI-Laufzeitstatus, wird in setConfig() aus dem dauerhaft
+    // gespeicherten Grundzustand (show_voicemail_1-5) neu befüllt.
+    this._tamPickerVisible = {};
     this._hass = null;
     this._config = null;
     this._objectUrls = [];
@@ -1071,6 +1251,17 @@ class FritzboxAnrufeCard extends HTMLElement {
     this._sortBy = DEFAULT_SORT;
     this._confirmDeleteMessageId = null;
     this._pendingDeletedMessageIds = new Set();
+    this._tamAccordionOpen = {};
+    // Grundzustand für den Live-Regler aus der dauerhaft gespeicherten
+    // Konfiguration übernehmen (siehe CONFIG_DEFAULTS/_renderTamPicker()) -
+    // JEDE Config-Änderung (auch nur ein einzelnes anderes Feld) setzt einen
+    // zuvor per Klick temporär geänderten Regler-Zustand wieder auf diesen
+    // Grundzustand zurück, exakt wie bei den übrigen UI-Laufzeitstatus-
+    // Feldern hier.
+    this._tamPickerVisible = {};
+    for (let n = 1; n <= MAX_TAM_SLOTS; n += 1) {
+      this._tamPickerVisible[n] = this._config[`show_voicemail_${n}`] !== false;
+    }
     this._lastSignature = null;
     this._render();
   }
@@ -1189,8 +1380,16 @@ class FritzboxAnrufeCard extends HTMLElement {
       entity_verpasst: guess("verpasst"),
       entity_voicemail: guess("anrufbeantworter") || guess("voicemail"),
       entity_voicemail_2: guess("anrufbeantworter_2") || guess("voicemail_2"),
+      // Slot 3-5 (seit v1.2.0) - dieselben Suffixe wie die Integration seit
+      // v1.1.1 selbst für diese Sensoren vergibt (const.py:CALL_TYPES_VOICEMAIL).
+      entity_voicemail_3: guess("anrufbeantworter_3") || guess("voicemail_3"),
+      entity_voicemail_4: guess("anrufbeantworter_4") || guess("voicemail_4"),
+      entity_voicemail_5: guess("anrufbeantworter_5") || guess("voicemail_5"),
       entity_tam_switch: guessSwitch("anrufbeantworter_schalter"),
       entity_tam_switch_2: guessSwitch("anrufbeantworter_2_schalter"),
+      entity_tam_switch_3: guessSwitch("anrufbeantworter_3_schalter"),
+      entity_tam_switch_4: guessSwitch("anrufbeantworter_4_schalter"),
+      entity_tam_switch_5: guessSwitch("anrufbeantworter_5_schalter"),
     };
   }
 
@@ -1233,12 +1432,19 @@ class FritzboxAnrufeCard extends HTMLElement {
       this._config.entity_verpasst,
       this._config.entity_voicemail,
       this._config.entity_voicemail_2,
+      // Slot 3-5 (seit v1.2.0) - siehe _activeTamSlots().
+      this._config.entity_voicemail_3,
+      this._config.entity_voicemail_4,
+      this._config.entity_voicemail_5,
       // Seit v1.1.0 - siehe _renderTamSwitches(): ohne dies würde ein
       // Schalter-Klick zwar den Service-Call auslösen, aber der Karte erst
       // beim nächsten ohnehin fälligen Re-Render (z. B. Tab-Wechsel)
       // auffallen, statt sofort nach der hass-Aktualisierung.
       this._config.entity_tam_switch,
       this._config.entity_tam_switch_2,
+      this._config.entity_tam_switch_3,
+      this._config.entity_tam_switch_4,
+      this._config.entity_tam_switch_5,
     ].filter(Boolean);
     const statePart = ids
       .map((id) => {
@@ -1337,6 +1543,62 @@ class FritzboxAnrufeCard extends HTMLElement {
   _voicemails2() {
     if (!this._config.entity_voicemail_2) return [];
     return this._voicemailsFor(this._config.entity_voicemail_2, "2");
+  }
+
+  // Konfigurationsschlüssel für Anrufbeantworter-Slot `n` (1-5, seit
+  // v1.2.0) - Slot 1 nutzt bewusst die schon immer unsuffixierten
+  // Feldnamen (entity_voicemail/entity_tam_switch), damit bestehende
+  // Konfigurationen unverändert gültig bleiben; Slot 2-5 folgen dem seit
+  // v1.0.6b2 etablierten "_N"-Muster.
+  _tamEntityKey(n) {
+    return n === 1 ? "entity_voicemail" : `entity_voicemail_${n}`;
+  }
+
+  _tamSwitchKey(n) {
+    return n === 1 ? "entity_tam_switch" : `entity_tam_switch_${n}`;
+  }
+
+  // Nachrichten für einen beliebigen Slot 1-5 (seit v1.2.0) - Verallgemeinerung
+  // von _voicemails()/_voicemails2() oben (die beide unverändert bestehen
+  // bleiben, um an ihren bestehenden Aufrufstellen keine unnötige Diff-Last
+  // zu erzeugen) für Slot 3-5 sowie für den neuen Akkordeon-Renderpfad.
+  _voicemailsForSlot(n) {
+    const entityId = this._config[this._tamEntityKey(n)];
+    if (!entityId) return [];
+    return this._voicemailsFor(entityId, String(n));
+  }
+
+  // Alle tatsächlich konfigurierten Anrufbeantworter-Slots (1-5, seit
+  // v1.2.0), in Reihenfolge. Ein Slot gilt als "aktiv", sobald sein
+  // entity_voicemail_N gesetzt ist - unabhängig davon, ob die vorherigen
+  // Slots ebenfalls gesetzt sind (auch wenn dieser Fall in der Praxis kaum
+  // vorkommen dürfte, siehe MAX_TAM_COUNT/migrated_tam_count in der
+  // Integration selbst, die Slots stets lückenlos von 1 an vergibt).
+  _activeTamSlots() {
+    const slots = [];
+    for (let n = 1; n <= MAX_TAM_SLOTS; n += 1) {
+      const entityId = this._config[this._tamEntityKey(n)];
+      if (!entityId) continue;
+      slots.push({ n, entityId, switchEntityId: this._config[this._tamSwitchKey(n)] });
+    }
+    return slots;
+  }
+
+  // Bestimmt, WIE mehrere Anrufbeantworter dargestellt werden (seit v1.2.0)
+  // - siehe Moduldoku oben und CONFIG_DEFAULTS:voicemail_2_mode. "merged"/
+  // "separate" sind nur für GENAU zwei Listen definiert (siehe deren
+  // Renderlogik unten) - ab drei Slots gibt es dafür keine sinnvolle
+  // Fortsetzung (ein "AB 1"/"AB 2"/"AB 3"/...-Badge-Gemisch wäre kaum noch
+  // lesbar), daher erzwingt diese Methode "accordion" ab dem dritten Slot,
+  // unabhängig vom gespeicherten Konfigurationswert.
+  _voicemailDisplayMode(slotCount) {
+    if (slotCount <= 2) {
+      return this._config.voicemail_2_mode === "accordion" ||
+        this._config.voicemail_2_mode === "separate"
+        ? this._config.voicemail_2_mode
+        : "merged";
+    }
+    return "accordion";
   }
 
   _liveStateObj() {
@@ -1559,12 +1821,16 @@ class FritzboxAnrufeCard extends HTMLElement {
     if (this._config.entity_tam_switch) {
       rows.push(this._renderTamSwitchRow(this._config.entity_tam_switch, "Anrufbeantworter"));
     }
-    // Der Schalter für den zweiten Anrufbeantworter wirkt nur zusammen mit
-    // einem gesetzten entity_voicemail_2 - ohne zweiten Anrufbeantworter
-    // gibt es hier nichts zu schalten, exakt wie bei der übrigen
-    // zweiter-AB-Logik in dieser Karte.
-    if (this._config.entity_voicemail_2 && this._config.entity_tam_switch_2) {
-      rows.push(this._renderTamSwitchRow(this._config.entity_tam_switch_2, "Anrufbeantworter 2"));
+    // Slot 2-5 (seit v1.2.0 verallgemeinert von zuvor nur Slot 2): der
+    // Schalter eines Slots wirkt nur zusammen mit einem gesetzten
+    // entity_voicemail_N - ohne diesen Anrufbeantworter gibt es hier nichts
+    // zu schalten, exakt wie bei der übrigen Slot-Logik dieser Karte.
+    for (let n = 2; n <= MAX_TAM_SLOTS; n += 1) {
+      const entityId = this._config[this._tamEntityKey(n)];
+      const switchEntityId = this._config[this._tamSwitchKey(n)];
+      if (entityId && switchEntityId) {
+        rows.push(this._renderTamSwitchRow(switchEntityId, `Anrufbeantworter ${n}`));
+      }
     }
     if (!rows.length) return "";
     return `<div class="tam-switch-block">${rows.join("")}</div>`;
@@ -1622,19 +1888,54 @@ class FritzboxAnrufeCard extends HTMLElement {
     }
   }
 
-  // Anrufbeantworter-Tab-Inhalt. Ohne konfigurierten zweiten Anrufbeantworter
-  // (entity_voicemail_2, seit v1.0.6b2) exakt das bisherige Verhalten: eine
-  // einzelne Liste. Mit zweitem Anrufbeantworter je nach voicemail_2_mode
-  // entweder chronologisch gemischt mit "AB 1"/"AB 2"-Badge ("merged",
-  // Standard - wie die "Alle"-Sammelansicht bei den Anrufen, siehe
-  // _visibleCalls()) oder als zwei getrennte, überschriebene Abschnitte
-  // untereinander ("separate") - siehe Moduldoku oben. Seit v1.1.0 steht
-  // ggf. _renderTamSwitches() VOR jeder dieser Varianten (siehe dort).
+  // Live-AB-Regler (seit v1.2.0) - Checkboxen zum temporären Ein-/Ausblenden
+  // einzelner konfigurierter Anrufbeantworter direkt auf der Karte, ohne
+  // deren Konfiguration zu bearbeiten (analog zur bestehenden Filter-/
+  // Sortierleiste, show_filter_bar). Zeigt IMMER alle konfigurierten Slots
+  // an (auch gerade ausgeblendete, damit sie wieder einblendbar bleiben) -
+  // der Startzustand kommt aus show_voicemail_1-5 (siehe CONFIG_DEFAULTS/
+  // setConfig()), jede weitere Änderung hier ist reiner UI-Laufzeitstatus
+  // (this._tamPickerVisible). Nur sichtbar ab zwei konfigurierten
+  // Anrufbeantwortern - mit nur einem gibt es nichts auszuwählen.
+  _renderTamPicker(configuredSlots) {
+    if (configuredSlots.length < 2) return "";
+    const chips = configuredSlots
+      .map(({ n }) => {
+        const checked = this._tamPickerVisible[n] !== false;
+        return `
+          <label class="voicemail-tam-picker-chip${checked ? " checked" : ""}">
+            <input
+              type="checkbox"
+              class="voicemail-tam-picker-checkbox"
+              data-tam="${n}"
+              ${checked ? "checked" : ""}
+            />
+            <span>AB ${n}</span>
+          </label>
+        `;
+      })
+      .join("");
+    return `<div class="voicemail-tam-picker">${chips}</div>`;
+  }
+
+  // Anrufbeantworter-Tab-Inhalt. Mit höchstens einem konfigurierten
+  // Anrufbeantworter exakt das bisherige (Vor-1.0.6b2-)Verhalten: eine
+  // einzelne Liste. Mit zwei (aktuell sichtbaren, siehe Live-AB-Regler oben)
+  // Anrufbeantwortern je nach voicemail_2_mode entweder chronologisch
+  // gemischt mit "AB X"/"AB Y"-Badge ("merged", Standard - wie die
+  // "Alle"-Sammelansicht bei den Anrufen, siehe _visibleCalls()), als
+  // getrennte, überschriebene Abschnitte untereinander ("separate"), oder
+  // als auf-/zuklappbare Abschnitte ("accordion", seit v1.2.0). Ab drei
+  // sichtbaren Anrufbeantwortern ist "accordion" die einzige Darstellung -
+  // siehe Moduldoku oben und _voicemailDisplayMode(). Seit v1.1.0 steht ggf.
+  // _renderTamSwitches() VOR jeder dieser Varianten (siehe dort), seit
+  // v1.2.0 direkt danach ggf. _renderTamPicker().
   _renderVoicemailRows() {
     const maxRows = Number(this._config.max_rows) || 10;
     const switches = this._renderTamSwitches();
+    const configuredSlots = this._activeTamSlots();
 
-    if (!this._config.entity_voicemail_2) {
+    if (configuredSlots.length <= 1) {
       const messages = this._prepareVoicemails(this._voicemails());
       return (
         switches +
@@ -1646,35 +1947,54 @@ class FritzboxAnrufeCard extends HTMLElement {
       );
     }
 
-    if (this._config.voicemail_2_mode === "separate") {
-      const primary = this._prepareVoicemails(this._voicemails());
-      const secondary = this._prepareVoicemails(this._voicemails2());
-      const rowOpts = {
-        maxRows,
-        showDeleteButton: !!this._config.show_delete_button,
-        confirmDeleteId: this._confirmDeleteMessageId,
-      };
-      return `
-        ${switches}
-        <div class="voicemail-section">
-          <div class="voicemail-section-title">Anrufbeantworter 1</div>
-          ${renderVoicemailRows(primary, rowOpts)}
-        </div>
-        <div class="voicemail-section">
-          <div class="voicemail-section-title">Anrufbeantworter 2</div>
-          ${renderVoicemailRows(secondary, rowOpts)}
-        </div>
-      `;
+    const picker = this._renderTamPicker(configuredSlots);
+    const visibleSlots = configuredSlots.filter((slot) => this._tamPickerVisible[slot.n] !== false);
+    const rowOpts = {
+      maxRows,
+      showDeleteButton: !!this._config.show_delete_button,
+      confirmDeleteId: this._confirmDeleteMessageId,
+    };
+
+    if (!visibleSlots.length) {
+      return `${switches}${picker}<div class="empty">Kein Anrufbeantworter ausgewählt.</div>`;
     }
 
-    // "merged" (Standard): Sortierung erst NACH dem Zusammenführen, sonst
-    // wären beide Quellen nur hintereinandergehängt statt tatsächlich
-    // chronologisch gemischt - dieselbe Reihenfolge wie bei der
-    // "Alle"-Sammelansicht der Anrufe (_visibleCalls()): immer nach Datum
-    // sortiert als Grundordnung, bei aktiver Filter-/Sortierleiste
-    // stattdessen die dort gewählte Sortierung.
-    const primary = this._prepareVoicemails(this._voicemails(), { sort: false });
-    const secondary = this._prepareVoicemails(this._voicemails2(), { sort: false });
+    if (visibleSlots.length === 1) {
+      const messages = this._prepareVoicemails(this._voicemailsForSlot(visibleSlots[0].n));
+      return switches + picker + renderVoicemailRows(messages, rowOpts);
+    }
+
+    const mode = this._voicemailDisplayMode(visibleSlots.length);
+
+    if (mode === "accordion") {
+      return switches + picker + this._renderVoicemailAccordion(visibleSlots, maxRows);
+    }
+
+    if (mode === "separate") {
+      const sections = visibleSlots.map(({ n }) => {
+        const messages = this._prepareVoicemails(this._voicemailsForSlot(n));
+        return `
+          <div class="voicemail-section">
+            <div class="voicemail-section-title">Anrufbeantworter ${n}</div>
+            ${renderVoicemailRows(messages, rowOpts)}
+          </div>
+        `;
+      });
+      return switches + picker + sections.join("");
+    }
+
+    // "merged" (Standard, nur mit genau 2 sichtbaren Slots erreichbar -
+    // siehe _voicemailDisplayMode()): Sortierung erst NACH dem
+    // Zusammenführen, sonst wären beide Quellen nur hintereinandergehängt
+    // statt tatsächlich chronologisch gemischt - dieselbe Reihenfolge wie
+    // bei der "Alle"-Sammelansicht der Anrufe (_visibleCalls()): immer nach
+    // Datum sortiert als Grundordnung, bei aktiver Filter-/Sortierleiste
+    // stattdessen die dort gewählte Sortierung. Verallgemeinert seit v1.2.0
+    // auf ein BELIEBIGES Slot-Paar (nicht mehr zwingend Slot 1+2), da der
+    // Live-AB-Regler z. B. auch nur Slot 1+3 sichtbar lassen kann.
+    const [slotA, slotB] = visibleSlots;
+    const primary = this._prepareVoicemails(this._voicemailsForSlot(slotA.n), { sort: false });
+    const secondary = this._prepareVoicemails(this._voicemailsForSlot(slotB.n), { sort: false });
     let merged = [...primary, ...secondary];
     merged.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
     if (this._config.show_filter_bar) {
@@ -1682,13 +2002,58 @@ class FritzboxAnrufeCard extends HTMLElement {
     }
     return (
       switches +
+      picker +
       renderVoicemailRows(merged, {
-        maxRows,
-        showDeleteButton: !!this._config.show_delete_button,
-        confirmDeleteId: this._confirmDeleteMessageId,
+        ...rowOpts,
         showTamLabel: true,
       })
     );
+  }
+
+  // Akkordeon-Darstellung mehrerer Anrufbeantworter (seit v1.2.0, siehe
+  // Moduldoku oben) - je Slot ein unabhängig auf-/zuklappbarer <details>-
+  // Abschnitt (nativ, kein eigener JS-Zustandsautomat für das Auf-/Zuklappen
+  // selbst nötig - siehe _render() weiter unten für das "toggle"-Event, das
+  // lediglich den geöffneten Zustand in this._tamAccordionOpen spiegelt,
+  // damit er einen nachfolgenden Re-Render übersteht). Mehrere Abschnitte
+  // können gleichzeitig offen sein, unabhängig voneinander - kein
+  // "nur-einer-offen"-Verhalten.
+  //
+  // Startzustand (einmalig, siehe Kommentar unten bei this._tamAccordionOpen):
+  // ein Slot mit mindestens einer neuen ("Neu"-Status) Nachricht startet
+  // aufgeklappt, alle anderen eingeklappt. Danach bestimmt ausschließlich der
+  // Nutzer per Klick auf den jeweiligen Abschnitt, ob dieser offen ist - ein
+  // späterer Re-Render (z. B. weil eine ANDERE Nachricht eintrifft) ändert
+  // eine bereits getroffene Nutzerentscheidung nicht mehr, selbst wenn sich
+  // der "hat neue Nachrichten"-Status dieses Slots inzwischen geändert hat.
+  _renderVoicemailAccordion(slots, maxRows) {
+    const rowOpts = {
+      maxRows,
+      showDeleteButton: !!this._config.show_delete_button,
+      confirmDeleteId: this._confirmDeleteMessageId,
+    };
+    const sections = slots.map(({ n }) => {
+      const messages = this._prepareVoicemails(this._voicemailsForSlot(n));
+      const hasNew = messages.some((msg) => msg.new);
+      if (!(n in this._tamAccordionOpen)) {
+        this._tamAccordionOpen[n] = hasNew;
+      }
+      const open = !!this._tamAccordionOpen[n];
+      return `
+        <details class="voicemail-accordion-section" data-tam="${n}" ${open ? "open" : ""}>
+          <summary class="voicemail-accordion-summary">
+            <ha-icon class="voicemail-accordion-chevron" icon="mdi:chevron-down"></ha-icon>
+            <span class="voicemail-accordion-title">Anrufbeantworter ${n}</span>
+            ${hasNew ? '<span class="voicemail-badge">neu</span>' : ""}
+            <span class="voicemail-accordion-count">${messages.length}</span>
+          </summary>
+          <div class="voicemail-accordion-body">
+            ${renderVoicemailRows(messages, rowOpts)}
+          </div>
+        </details>
+      `;
+    });
+    return `<div class="voicemail-accordion">${sections.join("")}</div>`;
   }
 
   // Filter-/Sortierleiste (seit v1.0.4b3) - siehe Moduldoku oben. Eigene
@@ -1826,6 +2191,40 @@ class FritzboxAnrufeCard extends HTMLElement {
     this.shadowRoot.querySelectorAll(".tam-switch-toggle").forEach((btn) => {
       btn.addEventListener("click", () => {
         this._toggleTamSwitch(btn.dataset.entity, btn.dataset.state);
+      });
+    });
+
+    // Akkordeon-Abschnitte (seit v1.2.0, siehe _renderVoicemailAccordion()) -
+    // bewusst KEIN _render() hier: das native <details>-Element klappt sich
+    // bereits selbst auf/zu, ein voller Re-Render würde nur unnötig das DOM
+    // austauschen (und, falls in einem ANDEREN Abschnitt gerade eine
+    // Anrufbeantworter-Nachricht abgespielt wird, dessen <audio>-Element
+    // zerstören - siehe _hasActiveMediaPlayback()/Moduldoku oben). Der
+    // "toggle"-Event-Listener spiegelt den neuen Zustand nur in
+    // this._tamAccordionOpen, damit er einen späteren, aus anderem Grund
+    // ausgelösten Re-Render übersteht.
+    this.shadowRoot.querySelectorAll(".voicemail-accordion-section").forEach((details) => {
+      details.addEventListener("toggle", () => {
+        const n = Number(details.dataset.tam);
+        if (Number.isInteger(n)) {
+          this._tamAccordionOpen[n] = details.open;
+        }
+      });
+    });
+
+    // Live-AB-Regler (seit v1.2.0, siehe _renderTamPicker()) - anders als
+    // der Akkordeon-Toggle oben MUSS dies einen echten Re-Render auslösen,
+    // da sich dadurch ändert, WELCHE Anrufbeantworter überhaupt angezeigt
+    // werden (nicht nur ein Auf-/Zuklapp-Zustand innerhalb der bestehenden
+    // Darstellung) - ein reiner CSS-/DOM-Attributwechsel würde hier nicht
+    // ausreichen.
+    this.shadowRoot.querySelectorAll(".voicemail-tam-picker-checkbox").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        const n = Number(cb.dataset.tam);
+        if (Number.isInteger(n)) {
+          this._tamPickerVisible[n] = cb.checked;
+          this._render();
+        }
       });
     });
 
@@ -2085,9 +2484,15 @@ const EDITOR_LABELS = {
   entity_verpasst: "Sensor: Verpasste Anrufe",
   entity_voicemail: "Sensor: Anrufbeantworter (optional)",
   entity_voicemail_2: "Sensor: Zweiter Anrufbeantworter (optional)",
-  voicemail_2_mode: "Darstellung mit zweitem Anrufbeantworter",
+  entity_voicemail_3: "Sensor: Dritter Anrufbeantworter (optional)",
+  entity_voicemail_4: "Sensor: Vierter Anrufbeantworter (optional)",
+  entity_voicemail_5: "Sensor: Fünfter Anrufbeantworter (optional)",
+  voicemail_2_mode: "Darstellung bei mehreren Anrufbeantwortern",
   entity_tam_switch: "Schalter: Anrufbeantworter Ein/Aus (optional)",
   entity_tam_switch_2: "Schalter: Zweiter Anrufbeantworter Ein/Aus (optional)",
+  entity_tam_switch_3: "Schalter: Dritter Anrufbeantworter Ein/Aus (optional)",
+  entity_tam_switch_4: "Schalter: Vierter Anrufbeantworter Ein/Aus (optional)",
+  entity_tam_switch_5: "Schalter: Fünfter Anrufbeantworter Ein/Aus (optional)",
   show_tam_switch: "Anrufbeantworter-Ein/Aus-Schalter auf der Karte anzeigen",
   max_rows: "Max. Zeilen",
   show_alle: "Kategorie 'Gesamt' (Alle) anzeigen",
@@ -2095,6 +2500,11 @@ const EDITOR_LABELS = {
   show_ausgehend: "Kategorie 'Ausgehend' anzeigen",
   show_verpasst: "Kategorie 'Verpasst' anzeigen",
   show_anrufbeantworter: "Kategorie 'Anrufbeantworter' anzeigen",
+  show_voicemail_1: "Anrufbeantworter 1 einbeziehen",
+  show_voicemail_2: "Anrufbeantworter 2 einbeziehen",
+  show_voicemail_3: "Anrufbeantworter 3 einbeziehen",
+  show_voicemail_4: "Anrufbeantworter 4 einbeziehen",
+  show_voicemail_5: "Anrufbeantworter 5 einbeziehen",
   show_name: "Name anzeigen",
   show_number: "Nummer anzeigen",
   show_own_number: "Eigene Rufnummer anzeigen",
@@ -2125,7 +2535,17 @@ const EDITOR_HELPERS = {
   hide_spam:
     "Spam wird über die Integrationseinstellungen definiert (FRITZ!Box-eigene Sperrliste und/oder eine von dir gepflegte Nummernliste) - siehe Einstellungen -> Geräte & Dienste -> FRITZ!Box Anrufe -> Konfigurieren.",
   voicemail_2_mode:
-    "Nur mit gesetztem 'Sensor: Zweiter Anrufbeantworter'. 'Gemischt' zeigt beide Nachrichtenlisten chronologisch gemeinsam mit einem AB-1/AB-2-Badge, 'Getrennt' zeigt zwei eigene Abschnitte untereinander.",
+    "Nur mit mindestens 'Sensor: Zweiter Anrufbeantworter' gesetzt. 'Gemischt' und 'Getrennt' funktionieren ausschließlich mit GENAU zwei Anrufbeantwortern. 'Akkordeon' zeigt je Anrufbeantworter einen einzeln auf-/zuklappbaren Abschnitt (ein Abschnitt mit ungehörten Nachrichten öffnet sich beim ersten Anzeigen automatisch) und ist die einzige Darstellung, sobald drei oder mehr Anrufbeantworter konfiguriert sind - die Einstellung wird dann unabhängig vom hier gewählten Wert erzwungen.",
+  show_voicemail_1:
+    "Legt den Grundzustand fest, ob dieser Anrufbeantworter standardmäßig einbezogen wird. Ab zwei konfigurierten Anrufbeantwortern lässt sich das zusätzlich direkt auf der Karte per Checkbox temporär ändern, ohne die Karte zu bearbeiten.",
+  show_voicemail_2:
+    "Legt den Grundzustand fest, ob dieser Anrufbeantworter standardmäßig einbezogen wird. Ab zwei konfigurierten Anrufbeantwortern lässt sich das zusätzlich direkt auf der Karte per Checkbox temporär ändern, ohne die Karte zu bearbeiten.",
+  show_voicemail_3:
+    "Legt den Grundzustand fest, ob dieser Anrufbeantworter standardmäßig einbezogen wird. Ab zwei konfigurierten Anrufbeantwortern lässt sich das zusätzlich direkt auf der Karte per Checkbox temporär ändern, ohne die Karte zu bearbeiten.",
+  show_voicemail_4:
+    "Legt den Grundzustand fest, ob dieser Anrufbeantworter standardmäßig einbezogen wird. Ab zwei konfigurierten Anrufbeantwortern lässt sich das zusätzlich direkt auf der Karte per Checkbox temporär ändern, ohne die Karte zu bearbeiten.",
+  show_voicemail_5:
+    "Legt den Grundzustand fest, ob dieser Anrufbeantworter standardmäßig einbezogen wird. Ab zwei konfigurierten Anrufbeantwortern lässt sich das zusätzlich direkt auf der Karte per Checkbox temporär ändern, ohne die Karte zu bearbeiten.",
   show_tam_switch:
     "EXPERIMENTELL: Zeigt vor der Nachrichten-Auflistung im Anrufbeantworter-Tab einen Ein/Aus-Schalter (benötigt einen unter 'Sensoren' gesetzten Schalter). Der angezeigte Zustand ist keine bestätigte Rücklesung vom FRITZ!Box-Gerät, siehe README.",
 };
@@ -2161,11 +2581,18 @@ const EDITOR_SCHEMA = [
       { name: "entity_verpasst", selector: { entity: { domain: "sensor" } } },
       { name: "entity_voicemail", selector: { entity: { domain: "sensor" } } },
       { name: "entity_voicemail_2", selector: { entity: { domain: "sensor" } } },
+      // Slot 3-5 (seit v1.2.0) - siehe CONFIG_DEFAULTS/_activeTamSlots().
+      { name: "entity_voicemail_3", selector: { entity: { domain: "sensor" } } },
+      { name: "entity_voicemail_4", selector: { entity: { domain: "sensor" } } },
+      { name: "entity_voicemail_5", selector: { entity: { domain: "sensor" } } },
       // Seit v1.1.0, EXPERIMENTELL - eigene switch-Domäne, siehe
       // CONFIG_DEFAULTS für den Grund, warum dies kein von entity_voicemail
       // abgeleitetes Feld ist, sondern ein eigener Picker.
       { name: "entity_tam_switch", selector: { entity: { domain: "switch" } } },
       { name: "entity_tam_switch_2", selector: { entity: { domain: "switch" } } },
+      { name: "entity_tam_switch_3", selector: { entity: { domain: "switch" } } },
+      { name: "entity_tam_switch_4", selector: { entity: { domain: "switch" } } },
+      { name: "entity_tam_switch_5", selector: { entity: { domain: "switch" } } },
     ],
   },
   {
@@ -2181,6 +2608,14 @@ const EDITOR_SCHEMA = [
       { name: "show_ausgehend", selector: { boolean: {} } },
       { name: "show_verpasst", selector: { boolean: {} } },
       { name: "show_anrufbeantworter", selector: { boolean: {} } },
+      // Grundzustand je Anrufbeantworter-Slot (seit v1.2.0) - siehe
+      // CONFIG_DEFAULTS/_renderTamPicker(). Nur mit dem jeweils
+      // zugehörigen entity_voicemail_N gesetzt von Bedeutung.
+      { name: "show_voicemail_1", selector: { boolean: {} } },
+      { name: "show_voicemail_2", selector: { boolean: {} } },
+      { name: "show_voicemail_3", selector: { boolean: {} } },
+      { name: "show_voicemail_4", selector: { boolean: {} } },
+      { name: "show_voicemail_5", selector: { boolean: {} } },
     ],
   },
   {
@@ -2220,8 +2655,9 @@ const EDITOR_SCHEMA = [
           select: {
             mode: "dropdown",
             options: [
-              { value: "merged", label: "Gemischt (eine Liste, mit AB-1/AB-2-Badge)" },
-              { value: "separate", label: "Getrennt (zwei Abschnitte untereinander)" },
+              { value: "merged", label: "Gemischt (eine Liste, mit AB-1/AB-2-Badge, nur bei genau 2 ABs)" },
+              { value: "separate", label: "Getrennt (Abschnitte untereinander, nur bei genau 2 ABs)" },
+              { value: "accordion", label: "Akkordeon (auf-/zuklappbare Abschnitte, ab 3 ABs erzwungen)" },
             ],
           },
         },
