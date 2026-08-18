@@ -1196,6 +1196,17 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
+- **1.2.1**: **Bugfix (Wiedergabe von Anrufbeantworter-Nachrichten):** Auf
+  neueren Home-Assistant-Kernen (mit `aiohttp` 3.x, z. B. unter Python 3.14)
+  schlug das Abhören einer Anrufbeantworter-Nachricht mit einer
+  `ValueError: charset must not be in content_type argument` im Log fehl. Die
+  FRITZ!Box liefert im `Content-Type`-Header ihrer Audio-Downloads gelegentlich
+  einen `charset`-Parameter mit (z. B. `audio/x-wav; charset=...`), den neuere
+  `aiohttp`-Versionen bei der Antwortkonstruktion nicht mehr akzeptieren.
+  `http.py` entfernt diesen (für Binär-Audio ohnehin bedeutungslosen) Parameter
+  jetzt, bevor die Antwort gebaut wird. Betrifft die Wiedergabe aller
+  Anrufbeantworter sowie verknüpfter Anruf-Aufnahmen. Reiner Integrations-Fix
+  (kein Karten-/Dashboard-Bezug), keine Konfigurationsänderung nötig.
 - **1.2.0**: **Bis zu fünf Anrufbeantworter direkt in einer Karte:** die
   mitgelieferte Dashboard-Karte unterstützt jetzt alle bis zu fünf
   Anrufbeantworter direkt in derselben Karte (neue Felder
@@ -1470,14 +1481,14 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.2.0) |
+| Datei | SHA256 (Version 1.2.1) |
 | --- | --- |
 | `__init__.py` | `85eaddff90e92ebc314aa5e7474f97707e9e2fdfa02525cc7ff0f359cd962f6c` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
 | `call_log.py` | `c7115af494200e8a19dae9efaed855680b4ac8186b81788aeacb6c5aae8721f9` |
 | `config_flow.py` | `10ad669abc160bc54dd79087757cff21306105c72f9864820e574f01f790cf99` |
 | `const.py` | `69cadf3c875e12376cc945e1b072393f2459c6dc5763d484261b2afe031be0a6` |
-| `http.py` | `a5823e4d0838b8783484179dbdbe17290bd484017ccc38001a29e57463d999cf` |
+| `http.py` | `4d98f8fb1236eb7960d0d3470f0eef1a0e3a45e48e713fe121faa1481a6b70df` |
 | `sensor.py` | `4116f337557a8eea43d8a85f47293928e20651c04d7b6516e5bf8b1e6a5a1b90` |
 | `spam.py` | `2e300431c40ce61953fc92a4e92e661caa7c825b26683a3ce6d70c6ebc04872b` |
 | `switch.py` | `7cdbb0e5d3c5d1c8fa3cc5cad1cba6fa1f666b6c7eb1e034fbed40861b0e73c2` |
@@ -1485,7 +1496,7 @@ die komplette Datei, z. B. `sha256sum manifest.json`).
 | `voicemail.py` | `b03e665eba0cb346c8877988da845a957a6737f9a8a6de8811fe2199a0e4e9b7` |
 | `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
 | `www/fritzbox-anrufe-card.js` | `341fc1a75747fad57a140258f25f69f3f985931a3947269f91aa54369a056dce` |
-| `manifest.json` | `bed4ea016b419a405bc4fa759fc6291cf2d62e9d804b22b512c840a1cece4510` |
+| `manifest.json` | `4a9f5786d86b1e0246c7f864510e6fdd897e367494f849c228264c16b424c7b9` |
 | `strings.json` | `7141f53bb34bf7ee725238b0406ce0e1f9875c3e7cf4076032e43008f752a93b` |
 | `translations/de.json` | `b50b22d3cd943bea2b835fc5e73039ccdb3704bd95655fff86e0430cec0bd4fd` |
 | `translations/en.json` | `7141f53bb34bf7ee725238b0406ce0e1f9875c3e7cf4076032e43008f752a93b` |
