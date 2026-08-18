@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): a5823e4d0838b8783484179dbdbe17290bd484017ccc38001a29e57463d999cf
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 4d98f8fb1236eb7960d0d3470f0eef1a0e3a45e48e713fe121faa1481a6b70df
 """Authenticated proxy view for FRITZ!Box answering-machine (TAM) audio.
 
 EXPERIMENTAL - see :mod:`.tam`. The FRITZ!Box audio recording itself
@@ -24,6 +24,48 @@ from homeassistant.core import HomeAssistant
 from .const import CALL_MEDIA_URL_BASE, DOMAIN, TAM_MEDIA_URL_BASE, TAM_MEDIA_URL_BASES
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _strip_charset(content_type: str | None) -> str | None:
+    """Entferne einen etwaigen ``charset``-Parameter aus dem Content-Type.
+
+    Realer Bug (gemeldet von einem Nutzer mit neuerem Home-Assistant-Kern /
+    Python 3.14, seit v1.2.1): neuere ``aiohttp``-Versionen (u. a. 3.14.x)
+    werfen ``ValueError("charset must not be in content_type argument")``,
+    sobald der an :class:`aiohttp.web.Response` übergebene ``content_type``
+    einen ``charset``-Parameter enthält. Die FRITZ!Box liefert im
+    ``Content-Type``-Header ihrer Audio-Downloads gelegentlich genau so einen
+    (für Binär-Audio ohnehin bedeutungslosen) Parameter mit, z. B.
+    ``audio/x-wav; charset=...``. Ältere aiohttp-Versionen akzeptierten das
+    stillschweigend, weshalb der Fehler erst auf neueren Kernen auftrat und in
+    den bisherigen Tests (gegen ältere aiohttp-Stände) nie sichtbar wurde. Wir
+    senden den Medientyp daher ohne charset; andere, unkritische Parameter
+    (z. B. ``codecs=``) bleiben erhalten.
+    """
+    if not content_type:
+        return content_type
+    parts = content_type.split(";")
+    media_type = parts[0].strip()
+    if not media_type:
+        return None
+    kept = [
+        part.strip()
+        for part in parts[1:]
+        if part.strip() and part.split("=", 1)[0].strip().lower() != "charset"
+    ]
+    return "; ".join([media_type, *kept]) if kept else media_type
+
+
+def _audio_response(audio_bytes: bytes, content_type: str | None) -> web.Response:
+    """Baue die Audio-Antwort, robust gegen ein ``charset`` im Content-Type.
+
+    Gemeinsame Response-Konstruktion für alle Audio-Views dieser Datei -
+    siehe :func:`_strip_charset` für den Hintergrund.
+    """
+    safe = _strip_charset(content_type)
+    if safe:
+        return web.Response(body=audio_bytes, content_type=safe)
+    return web.Response(body=audio_bytes)
 
 
 async def _serve_tam_message(hass, tam_coordinator, message_id: str) -> web.Response:
@@ -61,7 +103,7 @@ async def _serve_tam_message(hass, tam_coordinator, message_id: str) -> web.Resp
     # hier nötig.
     await hass.async_add_executor_job(tam_coordinator.maybe_auto_mark_read, message)
 
-    return web.Response(body=audio_bytes, content_type=content_type)
+    return _audio_response(audio_bytes, content_type)
 
 
 class FritzBoxTamMediaView(HomeAssistantView):
@@ -215,4 +257,4 @@ class FritzBoxCallMediaView(HomeAssistantView):
                 tam_coordinator.maybe_auto_mark_read, tam_message
             )
 
-        return web.Response(body=audio_bytes, content_type=content_type)
+        return _audio_response(audio_bytes, content_type)
