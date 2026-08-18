@@ -1196,6 +1196,15 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
+- **1.2.2**: **Editor: eigenes Klappmenü für die Anrufbeantworter-Sensoren.**
+  Im grafischen Karten-Editor sind die Anrufbeantworter-Entitäten (die
+  Sensoren `entity_voicemail` bis `entity_voicemail_5` sowie die Ein/Aus-
+  Schalter `entity_tam_switch` bis `entity_tam_switch_5`) jetzt in einem
+  eigenen, zuklappbaren Untermenü **„Anrufbeantworter"** innerhalb der
+  Sektion **„Sensoren"** zusammengefasst (standardmäßig eingeklappt), damit
+  die vier Anruf-Sensoren darüber übersichtlich bleiben. Rein optische
+  Gruppierung im Editor - an der gespeicherten Konfiguration (den YAML-
+  Schlüsseln) ändert sich nichts, bestehende Karten bleiben unverändert.
 - **1.2.1**: **Bugfix (Wiedergabe von Anrufbeantworter-Nachrichten):** Auf
   neueren Home-Assistant-Kernen (mit `aiohttp` 3.x, z. B. unter Python 3.14)
   schlug das Abhören einer Anrufbeantworter-Nachricht mit einer
@@ -1481,7 +1490,7 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.2.1) |
+| Datei | SHA256 (Version 1.2.2) |
 | --- | --- |
 | `__init__.py` | `85eaddff90e92ebc314aa5e7474f97707e9e2fdfa02525cc7ff0f359cd962f6c` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
@@ -1495,8 +1504,8 @@ die komplette Datei, z. B. `sha256sum manifest.json`).
 | `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
 | `voicemail.py` | `b03e665eba0cb346c8877988da845a957a6737f9a8a6de8811fe2199a0e4e9b7` |
 | `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
-| `www/fritzbox-anrufe-card.js` | `341fc1a75747fad57a140258f25f69f3f985931a3947269f91aa54369a056dce` |
-| `manifest.json` | `4a9f5786d86b1e0246c7f864510e6fdd897e367494f849c228264c16b424c7b9` |
+| `www/fritzbox-anrufe-card.js` | `f923f9263fb3fa0891baf94c16c012e8079be74a9812a3ab870b6d26c07ab151` |
+| `manifest.json` | `32c209a011f9d094790649d90492cbfbfb4264243b13d9a6b257b5ca338a53f2` |
 | `strings.json` | `7141f53bb34bf7ee725238b0406ce0e1f9875c3e7cf4076032e43008f752a93b` |
 | `translations/de.json` | `b50b22d3cd943bea2b835fc5e73039ccdb3704bd95655fff86e0430cec0bd4fd` |
 | `translations/en.json` | `7141f53bb34bf7ee725238b0406ce0e1f9875c3e7cf4076032e43008f752a93b` |
