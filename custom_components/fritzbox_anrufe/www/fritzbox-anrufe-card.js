@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 341fc1a75747fad57a140258f25f69f3f985931a3947269f91aa54369a056dce
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): f923f9263fb3fa0891baf94c16c012e8079be74a9812a3ab870b6d26c07ab151
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -35,7 +35,13 @@
  * settings into collapsible sections (Sensoren/Kategorien/Darstellung/
  * Weiterverarbeitung/Farben) via <ha-form>'s "expandable" schema type with
  * `flatten: true` - the resulting config stays a flat object (identical
- * YAML keys as before), the grouping is purely visual. This relies on a
+ * YAML keys as before), the grouping is purely visual. Since v1.2.2 the
+ * "Sensoren" section additionally nests the answering-machine entity pickers
+ * (entity_voicemail/entity_voicemail_2..5 plus the entity_tam_switch/
+ * entity_tam_switch_2..5 on/off switches) inside their own collapsible
+ * "Anrufbeantworter" sub-expandable (again `flatten: true`, so the stored
+ * config is unchanged - purely an editor grouping), collapsed by default to
+ * keep the four call sensors readable above it. This relies on a
  * reasonably recent Home Assistant frontend; NOT confirmed against real
  * hardware/every HA version - please open a GitHub issue if the editor
  * renders oddly (e.g. ungrouped, or with a stray top-level key) on your
@@ -2579,20 +2585,43 @@ const EDITOR_SCHEMA = [
       { name: "entity_eingehend", selector: { entity: { domain: "sensor" } } },
       { name: "entity_ausgehend", selector: { entity: { domain: "sensor" } } },
       { name: "entity_verpasst", selector: { entity: { domain: "sensor" } } },
-      { name: "entity_voicemail", selector: { entity: { domain: "sensor" } } },
-      { name: "entity_voicemail_2", selector: { entity: { domain: "sensor" } } },
-      // Slot 3-5 (seit v1.2.0) - siehe CONFIG_DEFAULTS/_activeTamSlots().
-      { name: "entity_voicemail_3", selector: { entity: { domain: "sensor" } } },
-      { name: "entity_voicemail_4", selector: { entity: { domain: "sensor" } } },
-      { name: "entity_voicemail_5", selector: { entity: { domain: "sensor" } } },
-      // Seit v1.1.0, EXPERIMENTELL - eigene switch-Domäne, siehe
-      // CONFIG_DEFAULTS für den Grund, warum dies kein von entity_voicemail
-      // abgeleitetes Feld ist, sondern ein eigener Picker.
-      { name: "entity_tam_switch", selector: { entity: { domain: "switch" } } },
-      { name: "entity_tam_switch_2", selector: { entity: { domain: "switch" } } },
-      { name: "entity_tam_switch_3", selector: { entity: { domain: "switch" } } },
-      { name: "entity_tam_switch_4", selector: { entity: { domain: "switch" } } },
-      { name: "entity_tam_switch_5", selector: { entity: { domain: "switch" } } },
+      // Anrufbeantworter-Sensoren + -Schalter als eigenes, zuklappbares
+      // Unter-Akkordeon innerhalb von "Sensoren" (seit v1.2.2). Umgesetzt als
+      // verschachteltes ha-form-"expandable" mit flatten:true, sodass die
+      // Feldnamen weiterhin direkt auf die Top-Level-Config-Schlüssel
+      // abbilden (entity_voicemail, entity_voicemail_2..5,
+      // entity_tam_switch, entity_tam_switch_2..5) - es ändert sich rein die
+      // Editor-Gruppierung, nicht die gespeicherte Konfiguration. Bewusst
+      // standardmäßig eingeklappt (expanded:false), um die "Sensoren"-Sektion
+      // aufzuräumen: bis zu 10 AB-bezogene Picker liegen sonst lang zwischen
+      // den vier Anruf-Sensoren. Die reinen Sichtbarkeits-/Anzeige-Regler der
+      // Anrufbeantworter (show_voicemail_1..5, show_tam_switch,
+      // voicemail_2_mode) bleiben bewusst in "Kategorien"/"Darstellung" -
+      // hier stehen nur die Entity-Picker selbst.
+      {
+        name: "",
+        type: "expandable",
+        title: "Anrufbeantworter",
+        icon: "mdi:voicemail",
+        flatten: true,
+        expanded: false,
+        schema: [
+          { name: "entity_voicemail", selector: { entity: { domain: "sensor" } } },
+          { name: "entity_voicemail_2", selector: { entity: { domain: "sensor" } } },
+          // Slot 3-5 (seit v1.2.0) - siehe CONFIG_DEFAULTS/_activeTamSlots().
+          { name: "entity_voicemail_3", selector: { entity: { domain: "sensor" } } },
+          { name: "entity_voicemail_4", selector: { entity: { domain: "sensor" } } },
+          { name: "entity_voicemail_5", selector: { entity: { domain: "sensor" } } },
+          // Seit v1.1.0, EXPERIMENTELL - eigene switch-Domäne, siehe
+          // CONFIG_DEFAULTS für den Grund, warum dies kein von
+          // entity_voicemail abgeleitetes Feld ist, sondern ein eigener Picker.
+          { name: "entity_tam_switch", selector: { entity: { domain: "switch" } } },
+          { name: "entity_tam_switch_2", selector: { entity: { domain: "switch" } } },
+          { name: "entity_tam_switch_3", selector: { entity: { domain: "switch" } } },
+          { name: "entity_tam_switch_4", selector: { entity: { domain: "switch" } } },
+          { name: "entity_tam_switch_5", selector: { entity: { domain: "switch" } } },
+        ],
+      },
     ],
   },
   {
