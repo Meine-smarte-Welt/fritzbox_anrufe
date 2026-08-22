@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): c7115af494200e8a19dae9efaed855680b4ac8186b81788aeacb6c5aae8721f9
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 935c8c856ec3e116ad222e197f7827e1f171f22c5ff3aec9a0881ef4bb3c32cb
 """Coordinator to poll the FRITZ!Box call list (incoming/outgoing/missed).
 
 Unlike the call monitor (TCP port 1012), which only streams live call
@@ -90,6 +90,7 @@ from .const import (
     CALL_TYPE_MISSED,
     CALL_TYPE_OUTGOING,
     CALL_TYPES,
+    CONF_SPAM_NAME_PREFIXES,
     CONF_SPAM_NUMBERS,
     DEFAULT_CALL_LOG_COUNT,
     DEFAULT_CALL_LOG_DAYS,
@@ -100,7 +101,7 @@ from .const import (
     conf_call_log_days,
     conf_call_log_limit_type,
 )
-from .spam import is_spam_number, parse_spam_patterns
+from .spam import is_spam_name, is_spam_number, parse_name_markers, parse_spam_patterns
 from .tam import TamMessage
 from .voicemail import FritzTamCoordinator
 
@@ -350,6 +351,9 @@ class FritzCallLogCoordinator(DataUpdateCoordinator[CallLogData]):
             (self._tam_coordinator.data if self._tam_coordinator is not None else None) or []
         )
         spam_patterns = parse_spam_patterns(self.config_entry.options.get(CONF_SPAM_NUMBERS))
+        spam_name_markers = parse_name_markers(
+            self.config_entry.options.get(CONF_SPAM_NAME_PREFIXES)
+        )
 
         unsorted_by_type: dict[str, list[Call]] = {call_type: [] for call_type in CALL_TYPES}
         for call in raw_calls:
@@ -361,9 +365,15 @@ class FritzCallLogCoordinator(DataUpdateCoordinator[CallLogData]):
                 continue
             call.outcome = outcome
             call.tam_message = matched_message
-            call.spam = call.type == REJECTED_CALL_TYPE or is_spam_number(
-                call.Caller, spam_patterns
-            ) or is_spam_number(call.Called, spam_patterns)
+            call.spam = (
+                call.type == REJECTED_CALL_TYPE
+                or is_spam_number(call.Caller, spam_patterns)
+                or is_spam_number(call.Called, spam_patterns)
+                # Seit v1.2.3: externer Blocker (z. B. PhoneBlock) stellt dem
+                # Namen einen Marker wie "SPAM:" voran - siehe
+                # const.py:CONF_SPAM_NAME_PREFIXES / spam.py:is_spam_name.
+                or is_spam_name(getattr(call, "Name", None), spam_name_markers)
+            )
             unsorted_by_type[bucket].append(call)
 
         # Failed outgoing dial attempts the FRITZ!Box's own TR-064 call

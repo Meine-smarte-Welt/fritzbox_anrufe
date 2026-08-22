@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): b03e665eba0cb346c8877988da845a957a6737f9a8a6de8811fe2199a0e4e9b7
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 564dc067bc31355e96e5521884969f228cf27bba73cae7bfb1b6d8ac9633a7f0
 """Coordinator + audio access for the FRITZ!Box answering machine (TAM).
 
 EXPERIMENTAL - see the module docstring in :mod:`.tam` for details on what
@@ -21,12 +21,13 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import (
     CONF_AUTO_MARK_READ,
+    CONF_SPAM_NAME_PREFIXES,
     CONF_SPAM_NUMBERS,
     DEFAULT_AUTO_MARK_READ,
     EVENT_NEW_VOICEMAIL_MESSAGE,
     TAM_MEDIA_URL_BASE,
 )
-from .spam import is_spam_number, parse_spam_patterns
+from .spam import is_spam_name, is_spam_number, parse_name_markers, parse_spam_patterns
 from .tam import FritzTam, TamMessage
 
 _LOGGER = logging.getLogger(__name__)
@@ -98,11 +99,17 @@ class FritzTamCoordinator(DataUpdateCoordinator[list[TamMessage]]):
                 f"Fehler beim Abrufen der Anrufbeantworter-Nachrichten: {ex}"
             ) from ex
         # Seit v1.0.6b1: siehe spam.py/call_log.py - für Nachrichten gibt es
-        # kein REJECTED_CALL_TYPE-Äquivalent, hier zählt ausschließlich der
-        # Abgleich gegen die vom Nutzer gepflegte Spam-Nummernliste.
+        # kein REJECTED_CALL_TYPE-Äquivalent, hier zählt der Abgleich gegen die
+        # vom Nutzer gepflegte Spam-Nummernliste sowie (seit v1.2.3) gegen die
+        # Namens-Marker (z. B. "SPAM:" von externen Blockern wie PhoneBlock).
         spam_patterns = parse_spam_patterns(self.config_entry.options.get(CONF_SPAM_NUMBERS))
+        spam_name_markers = parse_name_markers(
+            self.config_entry.options.get(CONF_SPAM_NAME_PREFIXES)
+        )
         for message in messages:
-            message.spam = is_spam_number(message.Number, spam_patterns)
+            message.spam = is_spam_number(message.Number, spam_patterns) or is_spam_name(
+                getattr(message, "Name", None), spam_name_markers
+            )
         if previous_messages is not None:
             self._fire_new_message_events(previous_messages, messages)
         return messages

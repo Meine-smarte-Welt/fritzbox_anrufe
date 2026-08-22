@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 10ad669abc160bc54dd79087757cff21306105c72f9864820e574f01f790cf99
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 7fbbbb916a16a78a10623d599aa24d91f9b1953cee3f134a83ca66c9ef44d4a5
 """Config flow for fritzbox_anrufe."""
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ from .const import (
     CONF_AUTO_MARK_READ,
     CONF_PHONEBOOK,
     CONF_PREFIXES,
+    CONF_SPAM_NAME_PREFIXES,
     CONF_SPAM_NUMBERS,
     CONF_TAM_COUNT,
     DEFAULT_AUTO_MARK_READ,
@@ -587,6 +588,17 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
                 description={"suggested_value": options.get(CONF_SPAM_NUMBERS)},
             )
         ] = vol.Any(None, _TolerantOptionalTextSelector())
+        # Namens-Marker-Spam-Erkennung (seit v1.2.3) - Freitextliste von
+        # Namens-Präfix-Markern (z. B. "SPAM:" von externen Blockern wie
+        # PhoneBlock), Standard leer = aus. Exakt derselbe Validator-/
+        # Selector-Aufbau wie CONF_SPAM_NUMBERS oben (siehe dortige
+        # ausführliche Bugfix-Historie zum toleranten Selector).
+        schema[
+            vol.Optional(
+                CONF_SPAM_NAME_PREFIXES,
+                description={"suggested_value": options.get(CONF_SPAM_NAME_PREFIXES)},
+            )
+        ] = vol.Any(None, _TolerantOptionalTextSelector())
         return vol.Schema(schema)
 
     async def async_step_init(
@@ -626,6 +638,7 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
             )
 
         spam_numbers_input: str | None = user_input.get(CONF_SPAM_NUMBERS)
+        spam_name_input: str | None = user_input.get(CONF_SPAM_NAME_PREFIXES)
 
         return self.async_create_entry(
             title="",
@@ -638,6 +651,7 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
                 CONF_PREFIXES: self._get_list_of_prefixes(prefixes),
                 CONF_AUTO_MARK_READ: user_input.get(CONF_AUTO_MARK_READ, DEFAULT_AUTO_MARK_READ),
                 CONF_SPAM_NUMBERS: self._get_list_of_prefixes(spam_numbers_input) or [],
+                CONF_SPAM_NAME_PREFIXES: self._get_list_of_prefixes(spam_name_input) or [],
                 **_parse_history_input(user_input),
             },
         )

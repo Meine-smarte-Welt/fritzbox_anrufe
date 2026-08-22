@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 2e300431c40ce61953fc92a4e92e661caa7c825b26683a3ce6d70c6ebc04872b
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 026ae8bc8890be324f074d17f5fce1269d87edbb420566bdfc1aae18cf3eea11
 """Shared spam-number matching for calls and answering-machine messages.
 
 Seit v1.0.6b1 - Hintergrund/Recherche-Ergebnis
@@ -57,3 +57,34 @@ def is_spam_number(number: str | None, patterns: list[str]) -> bool:
     if not normalized:
         return False
     return any(normalized.startswith(pattern) for pattern in patterns)
+
+
+def parse_name_markers(raw_markers: list[str] | None) -> list[str]:
+    """Normalize a raw (Options-Flow) list of name-prefix spam markers.
+
+    Seit v1.2.3 (siehe const.py:CONF_SPAM_NAME_PREFIXES) - für externe
+    Blocker wie PhoneBlock, die dem Anrufernamen einen Marker wie "SPAM:"
+    voranstellen. Anders als bei Nummern (:func:`normalize_number`) bleibt der
+    Text ansonsten unverändert - ein Marker enthält bewusst Zeichen außerhalb
+    von Ziffern. Für den späteren, case-insensitiven Abgleich wird hier auf
+    Kleinschreibung vereinheitlicht, umschließender Leerraum entfernt und
+    leere Einträge verworfen.
+    """
+    if not raw_markers:
+        return []
+    return [marker.strip().lower() for marker in raw_markers if marker and marker.strip()]
+
+
+def is_spam_name(name: str | None, markers: list[str]) -> bool:
+    """Return True if ``name`` starts (case-insensitively) with any marker.
+
+    Abgleich bewusst nur am ANFANG des (getrimmten) Namens - genau so, wie
+    Tools wie PhoneBlock den Marker voranstellen (z. B. "SPAM: 0123..."). Ein
+    leerer Marker-Liste (Standard) bedeutet: Erkennung aus, immer ``False``.
+    """
+    if not markers or not name:
+        return False
+    normalized = name.strip().lower()
+    if not normalized:
+        return False
+    return any(normalized.startswith(marker) for marker in markers)

@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 69cadf3c875e12376cc945e1b072393f2459c6dc5763d484261b2afe031be0a6
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 5f5a5f281453ca6c9bd5e8d072ce72704944e61ca0f3a921bee5b84743132fd0
 """Constants for the AVM Fritz!Box call monitor integration."""
 
 from collections.abc import Mapping
@@ -200,6 +200,19 @@ EVENT_NEW_VOICEMAIL_MESSAGE = f"{DOMAIN}_new_voicemail_message"
 # (Präfix-Abgleich), analog zu CONF_PREFIXES oben - bewusst keine eigene
 # DEFAULT_SPAM_NUMBERS-Konstante, options.get() liefert dann None/leer.
 CONF_SPAM_NUMBERS = "spam_numbers"
+
+# Namens-Marker-Spam-Erkennung (seit v1.2.3) - manche externen Blocker
+# (z. B. der PhoneBlock-USB-Stick, als FRITZ!Box-Telefonbuch/„Telefon"
+# eingebunden) sperren Nummern selbst und stellen dem Anrufernamen einen
+# Marker wie "SPAM:" voran, OHNE dass die FRITZ!Box den Anruf per eigener
+# Sperrliste ablehnt (kein REJECTED_CALL_TYPE) und OHNE dass die Nummer in
+# CONF_SPAM_NUMBERS steht - beide bisherigen Spam-Signale (siehe spam.py)
+# greifen dann nicht. CONF_SPAM_NAME_PREFIXES ist eine vom Nutzer gepflegte
+# Freitextliste solcher Namens-Präfix-Marker (Abgleich am Namensanfang,
+# Groß-/Kleinschreibung egal), analog zu CONF_SPAM_NUMBERS - bewusst keine
+# eigene DEFAULT-Konstante, options.get() liefert dann None/leer, d. h. die
+# Erkennung ist standardmäßig AUS und wirkt erst, wenn ein Marker gesetzt ist.
+CONF_SPAM_NAME_PREFIXES = "spam_name_prefixes"
 
 # --- Zweiter Anrufbeantworter (seit v1.0.6b1) ---------------------------
 # Manche FRITZ!Box-Modelle/-Konfigurationen erlauben einen zweiten
