@@ -359,10 +359,21 @@ einem Gesamturteil "ist das Spam":
    Spam-Nummern/-Vorwahlen überein (Options-Flow, `spam_numbers`,
    kommagetrennt) - Präfix-Abgleich, es reicht also z. B. eine Vorwahl wie
    `0900` für alle Nummern, die damit beginnen.
+3. **Der (Telefonbuch-)Name beginnt mit einem Marker** (seit Version 1.2.3,
+   Options-Flow `spam_name_prefixes`, kommagetrennt, Groß-/Kleinschreibung
+   egal, **Standard leer = aus**). Gedacht für externe Blocker, die die
+   FRITZ!Box gar nicht selbst sperren lassen, sondern die Nummer extern
+   blockieren und dem Namen einen Marker voranstellen - z. B. der
+   **PhoneBlock**-USB-Stick, der als Telefonbuch/„Telefon" eingebunden ist
+   und `SPAM:` vor den Namen schreibt. In diesem Fall greifen Signal 1 und 2
+   nicht (die FRITZ!Box lehnt den Anruf nicht ab, und die Nummer steht nicht
+   in `spam_numbers`); trägst du hier `SPAM:` ein, werden solche Einträge
+   erkannt. Der Abgleich erfolgt nur am **Anfang** des Namens.
 
 Ein Anruf oder eine Anrufbeantworter-Nachricht gilt als Spam, sobald
-**mindestens eines** der beiden Signale zutrifft. Ohne konfigurierte Liste
-(`spam_numbers` leer) wirkt ausschließlich das erste Signal. Das Ergebnis
+**mindestens eines** der drei Signale zutrifft. Ohne konfigurierte Listen
+(`spam_numbers` und `spam_name_prefixes` leer) wirkt ausschließlich das erste
+Signal. Das Ergebnis
 steht als `spam`-Feld (`true`/`false`) in den `calls`- und
 `messages`-Attributlisten der jeweiligen Sensoren sowie im Event-Payload
 von `fritzbox_anrufe_new_voicemail_message` zur Verfügung - nutzbar für
@@ -1196,6 +1207,18 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
+- **1.2.3**: **Spam-Erkennung per Namens-Marker (z. B. „SPAM:").** Neben der
+  bisherigen Spam-Erkennung (FRITZ!Box-eigene Sperrliste oder eigene
+  Nummernliste) kann jetzt ein Anruf bzw. eine Anrufbeantworter-Nachricht auch
+  dann als Spam markiert werden, wenn der (Telefonbuch-)Name mit einem
+  konfigurierbaren Marker **beginnt**. Das hilft bei externen Blockern wie dem
+  **PhoneBlock**-USB-Stick, der Nummern selbst sperrt und dem Namen z. B.
+  „SPAM:" voranstellt, ohne dass die FRITZ!Box den Anruf ablehnt oder die
+  Nummer in der eigenen Liste steht. Neue Options-Flow-Einstellung
+  **„Spam-Namensmarker"** (kommagetrennt, Groß-/Kleinschreibung egal), **Standard
+  leer = aus**. Zum tatsächlichen Ausblenden zusätzlich den Karten-Schalter
+  „Spam ausblenden" aktivieren. Keine Änderung an bestehenden Konfigurationen,
+  solange kein Marker gesetzt ist.
 - **1.2.2**: **Editor: eigenes Klappmenü für die Anrufbeantworter-Sensoren.**
   Im grafischen Karten-Editor sind die Anrufbeantworter-Entitäten (die
   Sensoren `entity_voicemail` bis `entity_voicemail_5` sowie die Ein/Aus-
@@ -1490,25 +1513,25 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.2.2) |
+| Datei | SHA256 (Version 1.2.3) |
 | --- | --- |
 | `__init__.py` | `85eaddff90e92ebc314aa5e7474f97707e9e2fdfa02525cc7ff0f359cd962f6c` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
-| `call_log.py` | `c7115af494200e8a19dae9efaed855680b4ac8186b81788aeacb6c5aae8721f9` |
-| `config_flow.py` | `10ad669abc160bc54dd79087757cff21306105c72f9864820e574f01f790cf99` |
-| `const.py` | `69cadf3c875e12376cc945e1b072393f2459c6dc5763d484261b2afe031be0a6` |
+| `call_log.py` | `935c8c856ec3e116ad222e197f7827e1f171f22c5ff3aec9a0881ef4bb3c32cb` |
+| `config_flow.py` | `7fbbbb916a16a78a10623d599aa24d91f9b1953cee3f134a83ca66c9ef44d4a5` |
+| `const.py` | `5f5a5f281453ca6c9bd5e8d072ce72704944e61ca0f3a921bee5b84743132fd0` |
 | `http.py` | `4d98f8fb1236eb7960d0d3470f0eef1a0e3a45e48e713fe121faa1481a6b70df` |
 | `sensor.py` | `4116f337557a8eea43d8a85f47293928e20651c04d7b6516e5bf8b1e6a5a1b90` |
-| `spam.py` | `2e300431c40ce61953fc92a4e92e661caa7c825b26683a3ce6d70c6ebc04872b` |
+| `spam.py` | `026ae8bc8890be324f074d17f5fce1269d87edbb420566bdfc1aae18cf3eea11` |
 | `switch.py` | `7cdbb0e5d3c5d1c8fa3cc5cad1cba6fa1f666b6c7eb1e034fbed40861b0e73c2` |
 | `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
-| `voicemail.py` | `b03e665eba0cb346c8877988da845a957a6737f9a8a6de8811fe2199a0e4e9b7` |
+| `voicemail.py` | `564dc067bc31355e96e5521884969f228cf27bba73cae7bfb1b6d8ac9633a7f0` |
 | `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
 | `www/fritzbox-anrufe-card.js` | `f923f9263fb3fa0891baf94c16c012e8079be74a9812a3ab870b6d26c07ab151` |
-| `manifest.json` | `32c209a011f9d094790649d90492cbfbfb4264243b13d9a6b257b5ca338a53f2` |
-| `strings.json` | `7141f53bb34bf7ee725238b0406ce0e1f9875c3e7cf4076032e43008f752a93b` |
-| `translations/de.json` | `b50b22d3cd943bea2b835fc5e73039ccdb3704bd95655fff86e0430cec0bd4fd` |
-| `translations/en.json` | `7141f53bb34bf7ee725238b0406ce0e1f9875c3e7cf4076032e43008f752a93b` |
+| `manifest.json` | `5ac6fd3c930dbf510d0d73d4a4c5192d392145adf395c75fc4112eec796f62a7` |
+| `strings.json` | `e39c88f37db74218b39ea4eccb98b8531399a88256a5417eecb9367e48cff9d4` |
+| `translations/de.json` | `6dc4fc4054c298acb0bbde5a031999bed68cd4b5830cd29b030c553f956398c0` |
+| `translations/en.json` | `e39c88f37db74218b39ea4eccb98b8531399a88256a5417eecb9367e48cff9d4` |
 | `icons.json` | `b1ebf716e78af310f50d29096270ab340a0d82d8f6183347c79d08ee7fdd495c` |
 
 ## Fehlerbehebung
