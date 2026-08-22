@@ -228,14 +228,16 @@
           "call_log_count_verpasst": "Verpasste Anrufe: Anzahl (falls 'Anzahl Anrufe' gewählt)",
           "call_log_days_verpasst": "Verpasste Anrufe: Anzahl Tage (falls 'Anzahl Tage' gewählt)",
           "auto_mark_read": "Nach Wiedergabe automatisch als gelesen markieren",
-          "spam_numbers": "Spam-Nummern/-Vorwahlen (kommagetrennte Liste)"
+          "spam_numbers": "Spam-Nummern/-Vorwahlen (kommagetrennte Liste)",
+          "spam_name_prefixes": "Spam-Namensmarker (kommagetrennte Liste)"
         },
         "data_description": {
           "call_log_limit_type_eingehend": "Bestimmt, ob der Sensor fritzbox_anrufe_eingehend (Angenommene Anrufe) nach Anzahl oder nach Zeitraum begrenzt wird.",
           "call_log_limit_type_ausgehend": "Bestimmt, ob der Sensor fritzbox_anrufe_ausgehend nach Anzahl oder nach Zeitraum begrenzt wird.",
           "call_log_limit_type_verpasst": "Bestimmt, ob der Sensor fritzbox_anrufe_verpasst nach Anzahl oder nach Zeitraum begrenzt wird.",
           "auto_mark_read": "Wenn aktiviert, wird beim Abspielen einer Anrufbeantworter-Nachricht über diese Integration (Dashboard-Karte oder Service) die 'Neu'-Markierung auch direkt auf der FRITZ!Box entfernt - wie bei echter FRITZ!Box-Hardware/-Apps. Standardmäßig aus, da dies einen von allen Geräten/Apps geteilten Zustand auf der Box ändert (z. B. auch die Anzahl ungelesener Nachrichten in FRITZ!App Fon), nicht nur dieses Dashboard. Experimentell, siehe README.",
-          "spam_numbers": "Ein Anruf oder eine Anrufbeantworter-Nachricht wird als Spam markiert, wenn die Nummer mit einem dieser Einträge als Präfix übereinstimmt, ODER wenn die FRITZ!Box den Anruf bereits selbst blockiert hat. Die FRITZ!Box hat keine native, automatische Spam-Erkennung - diese Liste wird von dir gepflegt. Leer lassen, um dich nur auf die eigene Sperrliste der FRITZ!Box zu verlassen."
+          "spam_numbers": "Ein Anruf oder eine Anrufbeantworter-Nachricht wird als Spam markiert, wenn die Nummer mit einem dieser Einträge als Präfix übereinstimmt, ODER wenn die FRITZ!Box den Anruf bereits selbst blockiert hat. Die FRITZ!Box hat keine native, automatische Spam-Erkennung - diese Liste wird von dir gepflegt. Leer lassen, um dich nur auf die eigene Sperrliste der FRITZ!Box zu verlassen.",
+          "spam_name_prefixes": "Markiert einen Anruf oder eine Anrufbeantworter-Nachricht zusätzlich als Spam, wenn der (Telefonbuch-)Name mit einem dieser Marker beginnt - für externe Blocker wie den PhoneBlock-USB-Stick, die Nummern selbst sperren und dem Namen z. B. \"SPAM:\" voranstellen, ohne dass die FRITZ!Box den Anruf ablehnt oder die Nummer in deiner Spam-Liste steht. Kommagetrennt, Groß-/Kleinschreibung egal, Abgleich am Namensanfang. Leer lassen zum Deaktivieren. Tipp: Um diese Einträge auch auszublenden, zusätzlich \"Spam ausblenden\" auf der Dashboard-Karte aktivieren."
         }
       },
       "manage_tams": {
