@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): ca1c55519ec8f49257ecaa9f3549f2ad03883ae0cb62c4e73b630d31c47af032
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 22867173c8e31ba3b3330ef31c98f39f553412e73db39c31f9da1d82a234b47e
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -1437,6 +1437,10 @@ class FritzboxAnrufeCard extends HTMLElement {
       entity_tam_switch_3: guessSwitch("anrufbeantworter_3_schalter"),
       entity_tam_switch_4: guessSwitch("anrufbeantworter_4_schalter"),
       entity_tam_switch_5: guessSwitch("anrufbeantworter_5_schalter"),
+      // Einstellungen-Sensor (seit v1.3.0b1) - der von der Integration
+      // angelegte sensor.fritzbox_anrufe_einstellungen wird für neue Karten
+      // automatisch vorbelegt.
+      entity_settings: guess("einstellungen"),
     };
   }
 
@@ -1453,10 +1457,33 @@ class FritzboxAnrufeCard extends HTMLElement {
     return FILTER_ORDER.filter((type) => {
       if (this._config[`show_${type}`] === false) return false;
       if (type === FILTER_VOICEMAIL && !this._config.entity_voicemail) return false;
-      // Einstellungen-Tab nur bei gesetztem Sensor (seit v1.3.0b0).
-      if (type === FILTER_SETTINGS && !this._config.entity_settings) return false;
+      // Einstellungen-Tab: seit v1.3.0b1 sichtbar, sobald die Kategorie
+      // aktiviert ist (show_einstellungen). Der zugehörige Sensor wird - falls
+      // nicht explizit gesetzt - automatisch gefunden (_settingsEntityId());
+      // fehlt er ganz, zeigt _renderSettings() einen Hinweis, statt den Tab
+      // stillschweigend zu verstecken (das war die Verwirrung in b0).
       return true;
     });
+  }
+
+  // Ermittelt den Einstellungen-Sensor: bevorzugt die explizite Konfiguration,
+  // sonst der von der Integration angelegte sensor.fritzbox_anrufe_einstellungen
+  // (Auto-Fallback seit v1.3.0b1, damit das Einschalten der Kategorie allein
+  // genügt). Leerer String, wenn nichts gefunden wird.
+  _settingsEntityId() {
+    if (this._config && this._config.entity_settings) return this._config.entity_settings;
+    if (!this._hass || !this._hass.states) return "";
+    const ids = Object.keys(this._hass.states);
+    return (
+      ids.find(
+        (id) =>
+          id.startsWith("sensor.") &&
+          id.includes("einstellungen") &&
+          (id.includes("fritzbox") || id.includes("anrufe"))
+      ) ||
+      ids.find((id) => id.startsWith("sensor.") && id.endsWith("_einstellungen")) ||
+      ""
+    );
   }
 
   // Anruf-Typen (ohne "alle"), die in der "Alle"-Sammelansicht enthalten
@@ -1494,9 +1521,10 @@ class FritzboxAnrufeCard extends HTMLElement {
       this._config.entity_tam_switch_3,
       this._config.entity_tam_switch_4,
       this._config.entity_tam_switch_5,
-      // Einstellungen-Sensor (seit v1.3.0b0) - damit der Zahnrad-Tab neu
-      // rendert, sobald seine Geräte-/Telefonbuchdaten eintreffen.
-      this._config.entity_settings,
+      // Einstellungen-Sensor (seit v1.3.0b0; b1: inkl. Auto-Fallback) - damit
+      // der Zahnrad-Tab neu rendert, sobald seine Geräte-/Telefonbuchdaten
+      // eintreffen.
+      this._settingsEntityId(),
     ].filter(Boolean);
     const statePart = ids
       .map((id) => {
@@ -1799,10 +1827,32 @@ class FritzboxAnrufeCard extends HTMLElement {
   // Repeater und (lesend) das Telefonbuch. Rein anzeigend; Bearbeiten des
   // Telefonbuchs ist für eine spätere Beta vorgesehen.
   _renderSettings() {
-    const entityId = this._config.entity_settings;
-    const stateObj = entityId && this._hass ? this._hass.states[entityId] : null;
+    const entityId = this._settingsEntityId();
+    if (!entityId) {
+      return `
+        <div class="settings-view">
+          <div class="settings-experimental">Experimentell – siehe README.</div>
+          <div class="empty">
+            Kein Einstellungen-Sensor gefunden.<br />
+            Bitte im Karten-Editor unter „Sensoren" den Sensor
+            <code>sensor.fritzbox_anrufe_einstellungen</code> auswählen
+            (er wird von der Integration angelegt).
+          </div>
+        </div>
+      `;
+    }
+    const stateObj = this._hass ? this._hass.states[entityId] : null;
     if (!stateObj) {
-      return `<div class="empty">Einstellungen-Sensor nicht verfügbar.</div>`;
+      return `
+        <div class="settings-view">
+          <div class="settings-experimental">Experimentell – siehe README.</div>
+          <div class="empty">
+            Einstellungen-Sensor <code>${escapeHtml(entityId)}</code> ist nicht
+            verfügbar (lädt evtl. noch oder das FRITZ!Box-Konto/FRITZ!OS liefert
+            die Daten nicht). Siehe README.
+          </div>
+        </div>
+      `;
     }
     const attrs = stateObj.attributes || {};
     const numbers = Array.isArray(attrs.numbers) ? attrs.numbers : [];
