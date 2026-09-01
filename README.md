@@ -1207,6 +1207,14 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
+- **1.3.0b1** (Vorabversion): **Fix für die „Einstellungen"-Kategorie (Zahnrad).**
+  In 1.3.0b0 erschien der Zahnrad-Tab nur, wenn sowohl die Kategorie aktiviert
+  *als auch* der Sensor `entity_settings` gesetzt war - wer nur die Kategorie
+  einschaltete, sah nichts. Jetzt erscheint der Tab bereits beim Einschalten der
+  Kategorie; der zugehörige Sensor `sensor.fritzbox_anrufe_einstellungen` wird
+  automatisch gefunden (und für neue Karten vorbelegt). Fehlt er ganz, zeigt der
+  Tab einen klaren Hinweis statt sich stillschweigend auszublenden. Sonst
+  unverändert zu 1.3.0b0.
 - **1.3.0b0** (Vorabversion): Mehrere Neuerungen an Karte und Integration.
   **(1)** Die Anrufbeantworter-Kategorie-Schalter liegen im Karten-Editor jetzt
   in einem eigenen Klapp-Untermenü unter „Kategorien" (analog zu „Sensoren").
@@ -1532,7 +1540,7 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.3.0b0) |
+| Datei | SHA256 (Version 1.3.0b1) |
 | --- | --- |
 | `__init__.py` | `f513ee0ff2c3847a19067db6abf93f83f0876ed61427058789516d6d96309f74` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
@@ -1547,8 +1555,8 @@ die komplette Datei, z. B. `sha256sum manifest.json`).
 | `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
 | `voicemail.py` | `564dc067bc31355e96e5521884969f228cf27bba73cae7bfb1b6d8ac9633a7f0` |
 | `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
-| `www/fritzbox-anrufe-card.js` | `ca1c55519ec8f49257ecaa9f3549f2ad03883ae0cb62c4e73b630d31c47af032` |
-| `manifest.json` | `6f149d30aa6bace2edae668d437f703040d057fbca54604cf034e1ad28f15019` |
+| `www/fritzbox-anrufe-card.js` | `22867173c8e31ba3b3330ef31c98f39f553412e73db39c31f9da1d82a234b47e` |
+| `manifest.json` | `1ac226e4aee826c039e413845d6bfefac52221625bfc752a38f21405d1543638` |
 | `strings.json` | `4551203e08227b717fd22491f8770c285d637f292e4e90c48733beb038dd4a45` |
 | `translations/de.json` | `a90ed9d1f4582b5d4a4431b379cebb9a979461acb825d58632fc533f66e1bb18` |
 | `translations/en.json` | `4551203e08227b717fd22491f8770c285d637f292e4e90c48733beb038dd4a45` |
