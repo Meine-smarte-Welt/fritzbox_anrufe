@@ -1207,6 +1207,25 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
+- **1.3.0b0** (Vorabversion): Mehrere Neuerungen an Karte und Integration.
+  **(1)** Die Anrufbeantworter-Kategorie-Schalter liegen im Karten-Editor jetzt
+  in einem eigenen Klapp-Untermenü unter „Kategorien" (analog zu „Sensoren").
+  **(2)** Neue Option **„Überschrift anzeigen" (`show_title`)** - blendet die
+  Kartenüberschrift „FRITZ!Box Anrufe" auf Wunsch aus (praktisch z. B. in einem
+  Bubble-Card-Popup). **(3)** Die Karte ersetzt beim Umschalten der Liste nicht
+  mehr ihren kompletten Shadow-DOM-Inhalt - von außen eingefügte Styles (z. B.
+  eines globalen UIX-Themes/card_mod) überstehen jetzt einen Tab-Wechsel. **(4)**
+  Erfolglose ausgehende Anrufe (ohne Gespräch) werden nun persistent gespeichert
+  und überstehen einen Home-Assistant-Neustart. **(5, EXPERIMENTELL)** Neue
+  optionale Kategorie **„Einstellungen" (Zahnrad, `show_einstellungen`)** mit
+  einem neuen Sensor `fritzbox_anrufe_einstellungen`: zeigt angemeldete
+  DECT-Mobilteile, die Rufnummern der Box und (nur lesend) das Telefonbuch.
+  Datenquelle sind die dokumentierten TR-064-Aktionen `GetNumbers`/
+  `GetDECTHandsetList`/`GetDECTHandsetInfo` - die vollständige Telefoniegeräte-
+  Tabelle der FRITZ!Box-Oberfläche (inkl. FON/App-Geräten, interner **6xx-
+  Nummern und Repeatern) ist über TR-064 nicht sauber abrufbar und für eine
+  spätere Beta vorgesehen; das **Bearbeiten** des Telefonbuchs folgt ebenfalls
+  in einer späteren Beta. Als Vorabversion (`b0`) zum Testen gedacht.
 - **1.2.3**: **Spam-Erkennung per Namens-Marker (z. B. „SPAM:").** Neben der
   bisherigen Spam-Erkennung (FRITZ!Box-eigene Sperrliste oder eigene
   Nummernliste) kann jetzt ein Anruf bzw. eine Anrufbeantworter-Nachricht auch
@@ -1513,26 +1532,27 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.2.3) |
+| Datei | SHA256 (Version 1.3.0b0) |
 | --- | --- |
-| `__init__.py` | `85eaddff90e92ebc314aa5e7474f97707e9e2fdfa02525cc7ff0f359cd962f6c` |
+| `__init__.py` | `f513ee0ff2c3847a19067db6abf93f83f0876ed61427058789516d6d96309f74` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
-| `call_log.py` | `935c8c856ec3e116ad222e197f7827e1f171f22c5ff3aec9a0881ef4bb3c32cb` |
+| `call_log.py` | `06375eae8516c56b35582eb2b12f7ae09910fc908458d7a90912a45edc19c9d5` |
 | `config_flow.py` | `7fbbbb916a16a78a10623d599aa24d91f9b1953cee3f134a83ca66c9ef44d4a5` |
-| `const.py` | `5f5a5f281453ca6c9bd5e8d072ce72704944e61ca0f3a921bee5b84743132fd0` |
+| `const.py` | `32956d9a63be71721d0fef11b125045476ebda97b5a8d94083f796e6b14396d0` |
 | `http.py` | `4d98f8fb1236eb7960d0d3470f0eef1a0e3a45e48e713fe121faa1481a6b70df` |
-| `sensor.py` | `4116f337557a8eea43d8a85f47293928e20651c04d7b6516e5bf8b1e6a5a1b90` |
+| `sensor.py` | `eae654e6021a58e44403f4c090e85f6c7fe5f0468e88585206dfc1ea861bf4be` |
+| `settings_data.py` | `9e86228658be8a5df0604ee556df9e61e0d62fa56daa1c3357035a439e8a973f` |
 | `spam.py` | `026ae8bc8890be324f074d17f5fce1269d87edbb420566bdfc1aae18cf3eea11` |
 | `switch.py` | `7cdbb0e5d3c5d1c8fa3cc5cad1cba6fa1f666b6c7eb1e034fbed40861b0e73c2` |
 | `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
 | `voicemail.py` | `564dc067bc31355e96e5521884969f228cf27bba73cae7bfb1b6d8ac9633a7f0` |
 | `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
-| `www/fritzbox-anrufe-card.js` | `f923f9263fb3fa0891baf94c16c012e8079be74a9812a3ab870b6d26c07ab151` |
-| `manifest.json` | `5ac6fd3c930dbf510d0d73d4a4c5192d392145adf395c75fc4112eec796f62a7` |
-| `strings.json` | `e39c88f37db74218b39ea4eccb98b8531399a88256a5417eecb9367e48cff9d4` |
-| `translations/de.json` | `6dc4fc4054c298acb0bbde5a031999bed68cd4b5830cd29b030c553f956398c0` |
-| `translations/en.json` | `e39c88f37db74218b39ea4eccb98b8531399a88256a5417eecb9367e48cff9d4` |
-| `icons.json` | `b1ebf716e78af310f50d29096270ab340a0d82d8f6183347c79d08ee7fdd495c` |
+| `www/fritzbox-anrufe-card.js` | `ca1c55519ec8f49257ecaa9f3549f2ad03883ae0cb62c4e73b630d31c47af032` |
+| `manifest.json` | `6f149d30aa6bace2edae668d437f703040d057fbca54604cf034e1ad28f15019` |
+| `strings.json` | `4551203e08227b717fd22491f8770c285d637f292e4e90c48733beb038dd4a45` |
+| `translations/de.json` | `a90ed9d1f4582b5d4a4431b379cebb9a979461acb825d58632fc533f66e1bb18` |
+| `translations/en.json` | `4551203e08227b717fd22491f8770c285d637f292e4e90c48733beb038dd4a45` |
+| `icons.json` | `ef4a351842f873eecfae2af949615a1888f4923f96d942a9251326d94f1bdc2b` |
 
 ## Fehlerbehebung
 
