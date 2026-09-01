@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): f923f9263fb3fa0891baf94c16c012e8079be74a9812a3ab870b6d26c07ab151
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): ca1c55519ec8f49257ecaa9f3549f2ad03883ae0cb62c4e73b630d31c47af032
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -337,9 +337,14 @@
 
 const FILTER_ALL = "alle";
 const FILTER_VOICEMAIL = "anrufbeantworter";
+// Einstellungen-Tab (Zahnrad, seit v1.3.0b0, EXPERIMENTELL) - kein Anruf-
+// Filter, sondern eine eigene Ansicht (Telefonie-/DECT-Geräte + Telefonbuch),
+// siehe _renderSettings(). Standardmäßig aus (show_einstellungen) und nur mit
+// gesetztem entity_settings sichtbar (siehe _visibleFilterTypes()).
+const FILTER_SETTINGS = "einstellungen";
 // "anrufbeantworter" is a tab like any other (5th icon in the header row),
 // not a section rendered underneath the call list - see _renderMainContent().
-const FILTER_ORDER = ["alle", "eingehend", "ausgehend", "verpasst", FILTER_VOICEMAIL];
+const FILTER_ORDER = ["alle", "eingehend", "ausgehend", "verpasst", FILTER_VOICEMAIL, FILTER_SETTINGS];
 
 const FILTER_META = {
   alle: { icon: "mdi:phone-log", label: "Alle" },
@@ -349,6 +354,7 @@ const FILTER_META = {
   ausgehend: { icon: "mdi:phone-outgoing", label: "Ausgehend" },
   verpasst: { icon: "mdi:phone-missed", label: "Verpasst" },
   anrufbeantworter: { icon: "mdi:voicemail", label: "Anrufbeantworter" },
+  einstellungen: { icon: "mdi:cog", label: "Einstellungen" },
 };
 
 // Maximale Anzahl direkt in dieser Karte anzeigbarer Anrufbeantworter (seit
@@ -574,6 +580,16 @@ function sanitizeColor(value) {
 
 const CONFIG_DEFAULTS = {
   title: "FRITZ!Box Anrufe",
+  // Überschrift der Karte (ha-card-Header) anzeigen (seit v1.3.0b0). Standard
+  // AN = bisheriges Verhalten. Bei false wird kein Header gerendert - hilfreich
+  // z. B. in einem Bubble-Card-Popup, das ohnehin schon einen Titel hat.
+  show_title: true,
+  // Einstellungen-Kategorie/-Tab (Zahnrad, seit v1.3.0b0, EXPERIMENTELL) -
+  // Standard AUS, zeigt DECT-/Telefoniegeräte und (lesend) das Telefonbuch,
+  // siehe _renderSettings()/_visibleFilterTypes(). Benötigt zusätzlich einen
+  // gesetzten entity_settings-Sensor, sonst bleibt der Tab ausgeblendet.
+  show_einstellungen: false,
+  entity_settings: "",
   max_rows: 10,
   // Kategorien/Tabs (Alle/Gesamt, Angenommen, Ausgehend, Verpasst,
   // Anrufbeantworter) einzeln ein-/ausblendbar. show_anrufbeantworter
@@ -835,6 +851,31 @@ const BASE_CARD_STYLES = `
     text-align: center;
     color: var(--secondary-text-color, #727272);
   }
+  /* Einstellungen-Ansicht (Zahnrad-Tab, seit v1.3.0b0) */
+  .settings-view { display: flex; flex-direction: column; gap: 14px; }
+  .settings-experimental {
+    font-size: 0.8em;
+    color: var(--secondary-text-color, #727272);
+    font-style: italic;
+  }
+  .settings-section-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--primary-text-color, #212121);
+  }
+  .settings-list { display: flex; flex-direction: column; }
+  .settings-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--divider-color, #e0e0e0);
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-row-icon { color: var(--state-icon-color, var(--secondary-text-color, #727272)); }
+  .settings-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .settings-row-meta { color: var(--secondary-text-color, #727272); font-size: 0.9em; }
+  .settings-more { padding: 6px 0; color: var(--secondary-text-color, #727272); font-size: 0.9em; }
 `;
 
 // Schwelle empirisch ermittelt (siehe PR-Beschreibung/Commit): bei den fünf
@@ -1412,6 +1453,8 @@ class FritzboxAnrufeCard extends HTMLElement {
     return FILTER_ORDER.filter((type) => {
       if (this._config[`show_${type}`] === false) return false;
       if (type === FILTER_VOICEMAIL && !this._config.entity_voicemail) return false;
+      // Einstellungen-Tab nur bei gesetztem Sensor (seit v1.3.0b0).
+      if (type === FILTER_SETTINGS && !this._config.entity_settings) return false;
       return true;
     });
   }
@@ -1451,6 +1494,9 @@ class FritzboxAnrufeCard extends HTMLElement {
       this._config.entity_tam_switch_3,
       this._config.entity_tam_switch_4,
       this._config.entity_tam_switch_5,
+      // Einstellungen-Sensor (seit v1.3.0b0) - damit der Zahnrad-Tab neu
+      // rendert, sobald seine Geräte-/Telefonbuchdaten eintreffen.
+      this._config.entity_settings,
     ].filter(Boolean);
     const statePart = ids
       .map((id) => {
@@ -1741,7 +1787,102 @@ class FritzboxAnrufeCard extends HTMLElement {
     if (this._activeFilter === FILTER_VOICEMAIL) {
       return this._renderVoicemailRows();
     }
+    if (this._activeFilter === FILTER_SETTINGS) {
+      return this._renderSettings();
+    }
     return this._renderRows();
+  }
+
+  // Einstellungen-Ansicht (Zahnrad-Tab, seit v1.3.0b0, EXPERIMENTELL) - liest
+  // die Attribute des konfigurierten entity_settings-Sensors (siehe
+  // settings_data.py/sensor.py): Telefonie-Rufnummern, DECT-Mobilteile,
+  // Repeater und (lesend) das Telefonbuch. Rein anzeigend; Bearbeiten des
+  // Telefonbuchs ist für eine spätere Beta vorgesehen.
+  _renderSettings() {
+    const entityId = this._config.entity_settings;
+    const stateObj = entityId && this._hass ? this._hass.states[entityId] : null;
+    if (!stateObj) {
+      return `<div class="empty">Einstellungen-Sensor nicht verfügbar.</div>`;
+    }
+    const attrs = stateObj.attributes || {};
+    const numbers = Array.isArray(attrs.numbers) ? attrs.numbers : [];
+    const handsets = Array.isArray(attrs.dect_handsets) ? attrs.dect_handsets : [];
+    const repeaters = Array.isArray(attrs.repeaters) ? attrs.repeaters : [];
+    const contacts = Array.isArray(attrs.contacts) ? attrs.contacts : [];
+
+    const section = (title, bodyHtml) => `
+      <div class="settings-section">
+        <div class="settings-section-title">${escapeHtml(title)}</div>
+        ${bodyHtml}
+      </div>
+    `;
+
+    const handsetHtml = handsets.length
+      ? `<div class="settings-list">${handsets
+          .map(
+            (h) => `
+          <div class="settings-row">
+            <ha-icon class="settings-row-icon" icon="mdi:phone-classic"></ha-icon>
+            <span class="settings-row-name">${escapeHtml(h.name || `DECT ${h.id}`)}</span>
+            <span class="settings-row-meta">${escapeHtml(h.id ? `ID ${h.id}` : "")}</span>
+          </div>`
+          )
+          .join("")}</div>`
+      : `<div class="empty">Keine DECT-Mobilteile gemeldet.</div>`;
+
+    const numberHtml = numbers.length
+      ? `<div class="settings-list">${numbers
+          .map(
+            (n) => `
+          <div class="settings-row">
+            <ha-icon class="settings-row-icon" icon="mdi:phone"></ha-icon>
+            <span class="settings-row-name">${escapeHtml(n.name || n.number || "")}</span>
+            <span class="settings-row-meta">${escapeHtml(n.number || "")}</span>
+          </div>`
+          )
+          .join("")}</div>`
+      : `<div class="empty">Keine Rufnummern gemeldet.</div>`;
+
+    const repeaterHtml = repeaters.length
+      ? `<div class="settings-list">${repeaters
+          .map(
+            (r) => `
+          <div class="settings-row">
+            <ha-icon class="settings-row-icon" icon="mdi:access-point"></ha-icon>
+            <span class="settings-row-name">${escapeHtml(r.name || "")}</span>
+          </div>`
+          )
+          .join("")}</div>`
+      : "";
+
+    const maxContacts = Number(this._config.max_rows) || 10;
+    const shownContacts = contacts.slice(0, Math.max(maxContacts, 10));
+    const contactHtml = contacts.length
+      ? `<div class="settings-list">${shownContacts
+          .map(
+            (c) => `
+          <div class="settings-row">
+            <ha-icon class="settings-row-icon" icon="mdi:account"></ha-icon>
+            <span class="settings-row-name">${escapeHtml(c.name || "")}</span>
+            <span class="settings-row-meta">${escapeHtml((c.numbers || []).join(", "))}</span>
+          </div>`
+          )
+          .join("")}${
+          contacts.length > shownContacts.length
+            ? `<div class="settings-more">… und ${contacts.length - shownContacts.length} weitere</div>`
+            : ""
+        }</div>`
+      : `<div class="empty">Kein Telefonbuch geladen.</div>`;
+
+    return `
+      <div class="settings-view">
+        <div class="settings-experimental">Experimentell – Anzeige, siehe README.</div>
+        ${section("Telefoniegeräte (DECT)", handsetHtml)}
+        ${repeaters.length ? section("DECT-Repeater", repeaterHtml) : ""}
+        ${section("Rufnummern", numberHtml)}
+        ${section("Telefonbuch", contactHtml)}
+      </div>
+    `;
   }
 
   _renderRows() {
@@ -2154,9 +2295,38 @@ class FritzboxAnrufeCard extends HTMLElement {
       this._activeFilter = this._defaultFilter();
     }
 
-    this.shadowRoot.innerHTML = `
-      <style>${this._styles()}</style>
-      <ha-card header="${escapeHtml(this._config.title)}">
+    // Persistente Wurzelknoten (seit v1.3.0b0, Hint „Theme geht beim
+    // Tab-Wechsel verloren"): NICHT mehr den kompletten shadowRoot.innerHTML
+    // ersetzen. Ein voller innerHTML-Reset entfernt auch von AUSSEN in den
+    // Shadow-Root injizierte <style>-Elemente (z. B. von card_mod bzw. einem
+    // globalen UIX-Theme). Die wurden zwar beim ersten Öffnen angewandt, gingen
+    // aber bei jedem Re-Render (Tab-/Filterwechsel) wieder verloren, weil sie
+    // mit weggeräumt wurden. Stattdessen: ein eigener, dauerhafter <style> plus
+    // ein Inhalts-Container, deren Inhalt hier nur AKTUALISIERT wird - fremde
+    // Geschwisterknoten im Shadow-Root (die externen Styles) bleiben erhalten.
+    if (
+      !this._styleEl ||
+      !this._contentEl ||
+      this._styleEl.parentNode !== this.shadowRoot ||
+      this._contentEl.parentNode !== this.shadowRoot
+    ) {
+      this.shadowRoot.textContent = "";
+      this._styleEl = document.createElement("style");
+      this._contentEl = document.createElement("div");
+      this._contentEl.className = "fba-root";
+      this.shadowRoot.appendChild(this._styleEl);
+      this.shadowRoot.appendChild(this._contentEl);
+    }
+    this._styleEl.textContent = this._styles();
+
+    // Überschrift optional (seit v1.3.0b0, show_title). Ohne header-Attribut
+    // rendert ha-card keine Kopfzeile.
+    const headerAttr =
+      this._config.show_title === false
+        ? ""
+        : ` header="${escapeHtml(this._config.title)}"`;
+    this._contentEl.innerHTML = `
+      <ha-card${headerAttr}>
         <div class="card-content">
           ${this._renderLiveBanner()}
           ${this._renderTabs()}
@@ -2484,6 +2654,9 @@ class FritzboxAnrufeCard extends HTMLElement {
 
 const EDITOR_LABELS = {
   title: "Titel",
+  show_title: "Überschrift (Titel) anzeigen",
+  show_einstellungen: "Kategorie 'Einstellungen' anzeigen (experimentell)",
+  entity_settings: "Sensor: Einstellungen/Telefoniegeräte (optional, experimentell)",
   entity_live: "Sensor: Live-Anrufmonitor (optional)",
   entity_eingehend: "Sensor: Angenommene Anrufe",
   entity_ausgehend: "Sensor: Ausgehende Anrufe",
@@ -2622,6 +2795,10 @@ const EDITOR_SCHEMA = [
           { name: "entity_tam_switch_5", selector: { entity: { domain: "switch" } } },
         ],
       },
+      // Einstellungen-Sensor (seit v1.3.0b0, EXPERIMENTELL) - liefert die
+      // Telefonie-/DECT-Geräte und (lesend) das Telefonbuch für den
+      // Zahnrad-Tab. Nur wirksam mit aktivierter Kategorie "Einstellungen".
+      { name: "entity_settings", selector: { entity: { domain: "sensor" } } },
     ],
   },
   {
@@ -2636,15 +2813,32 @@ const EDITOR_SCHEMA = [
       { name: "show_eingehend", selector: { boolean: {} } },
       { name: "show_ausgehend", selector: { boolean: {} } },
       { name: "show_verpasst", selector: { boolean: {} } },
-      { name: "show_anrufbeantworter", selector: { boolean: {} } },
-      // Grundzustand je Anrufbeantworter-Slot (seit v1.2.0) - siehe
-      // CONFIG_DEFAULTS/_renderTamPicker(). Nur mit dem jeweils
-      // zugehörigen entity_voicemail_N gesetzt von Bedeutung.
-      { name: "show_voicemail_1", selector: { boolean: {} } },
-      { name: "show_voicemail_2", selector: { boolean: {} } },
-      { name: "show_voicemail_3", selector: { boolean: {} } },
-      { name: "show_voicemail_4", selector: { boolean: {} } },
-      { name: "show_voicemail_5", selector: { boolean: {} } },
+      // Einstellungen-Kategorie (seit v1.3.0b0, Zahnrad-Tab) - Standard AUS,
+      // siehe CONFIG_DEFAULTS/_visibleFilterTypes(). EXPERIMENTELL.
+      { name: "show_einstellungen", selector: { boolean: {} } },
+      // Die Anrufbeantworter-Kategorie-Schalter (seit v1.3.0b0) als eigenes,
+      // zuklappbares Unter-Akkordeon innerhalb von "Kategorien" (analog zu
+      // "Sensoren" seit v1.2.2) - `flatten: true`, also rein visuelle
+      // Gruppierung, die Feldnamen/Config bleiben unverändert. Enthält den
+      // Kategorie-Hauptschalter `show_anrufbeantworter` sowie den Grundzustand
+      // je Slot (`show_voicemail_1..5`, seit v1.2.0 - nur mit gesetztem
+      // entity_voicemail_N von Bedeutung, siehe _renderTamPicker()).
+      {
+        name: "",
+        type: "expandable",
+        title: "Anrufbeantworter",
+        icon: "mdi:voicemail",
+        flatten: true,
+        expanded: false,
+        schema: [
+          { name: "show_anrufbeantworter", selector: { boolean: {} } },
+          { name: "show_voicemail_1", selector: { boolean: {} } },
+          { name: "show_voicemail_2", selector: { boolean: {} } },
+          { name: "show_voicemail_3", selector: { boolean: {} } },
+          { name: "show_voicemail_4", selector: { boolean: {} } },
+          { name: "show_voicemail_5", selector: { boolean: {} } },
+        ],
+      },
     ],
   },
   {
@@ -2655,6 +2849,8 @@ const EDITOR_SCHEMA = [
     flatten: true,
     expanded: false,
     schema: [
+      // Überschrift der Karte ein-/ausblenden (seit v1.3.0b0).
+      { name: "show_title", selector: { boolean: {} } },
       // "slider" statt "box": das Zahlenfeld ("box") ließ sich bei manchen
       // Nutzern nicht zuverlässig per Tastatur bearbeiten (Eingaben wurden
       // teils zurückgesetzt) - ein Schieberegler kommt komplett ohne

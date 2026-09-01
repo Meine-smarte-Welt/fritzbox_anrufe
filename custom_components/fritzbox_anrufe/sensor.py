@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 4116f337557a8eea43d8a85f47293928e20651c04d7b6516e5bf8b1e6a5a1b90
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): eae654e6021a58e44403f4c090e85f6c7fe5f0468e88585206dfc1ea861bf4be
 """Sensor to monitor incoming/outgoing phone calls on a Fritz!Box router."""
 
 from collections.abc import Mapping
@@ -40,10 +40,12 @@ from .const import (
     DOMAIN,
     POST_CALL_REFRESH_DELAY_SECONDS,
     SERIAL_NUMBER,
+    SETTINGS_SENSOR_KEY,
     TAM_MEDIA_URL_BASE,
     TAM_MEDIA_URL_BASES,
     FritzState,
 )
+from .settings_data import FritzSettingsCoordinator
 from .tam import TamMessage
 from .voicemail import FritzTamCoordinator
 
@@ -142,6 +144,21 @@ async def async_setup_entry(
                 config_entry_id=config_entry.entry_id,
                 translation_key=f"{DOMAIN}_{call_type}",
                 media_url_base=TAM_MEDIA_URL_BASES[slot],
+            )
+        )
+
+    # Einstellungen-Sensor (EXPERIMENTELL, seit v1.3.0b0) - Telefonie-/DECT-
+    # Geräte + Telefonbuch (lesend). Nur, wenn der Coordinator erstellt werden
+    # konnte (siehe __init__.py). Ist er nicht verfügbar, gibt es diesen Sensor
+    # schlicht nicht - die Karte blendet ihren Zahnrad-Tab dann ohnehin aus.
+    if runtime_data.settings_coordinator is not None:
+        entities.append(
+            FritzBoxSettingsSensor(
+                coordinator=runtime_data.settings_coordinator,
+                unique_id=f"{unique_id}-{SETTINGS_SENSOR_KEY}",
+                phonebook_name=config_entry.title,
+                device_info=device_info,
+                translation_key=f"{DOMAIN}_{SETTINGS_SENSOR_KEY}",
             )
         )
 
@@ -541,6 +558,61 @@ class FritzBoxVoicemailSensor(CoordinatorEntity[FritzTamCoordinator], SensorEnti
     async def async_delete_voicemail_message(self, message_id: str) -> None:
         """Handle the ``delete_voicemail_message`` entity service call."""
         await self.coordinator.delete_message(message_id)
+
+
+class FritzBoxSettingsSensor(CoordinatorEntity[FritzSettingsCoordinator], SensorEntity):
+    """Telefonie-/Geräte- und Telefonbuch-Sensor (fritzbox_anrufe_einstellungen).
+
+    EXPERIMENTELL (seit v1.3.0b0) - siehe settings_data.py. Füttert den
+    optionalen „Einstellungen"-Tab (Zahnrad) der Dashboard-Karte. Der Zustand
+    ist die Anzahl der angemeldeten DECT-Mobilteile; die eigentlichen Daten
+    (Rufnummern, DECT-Mobilteile, Repeater, Telefonbuch-Kontakte) stehen in den
+    Attributen. Hinweis: bei sehr großen Telefonbüchern kann das
+    ``contacts``-Attribut groß werden (Home Assistant warnt ggf. bei sehr
+    großen Attributwerten) - das ist für diese experimentelle Anzeige
+    beabsichtigt und betrifft nur diesen einen, optionalen Sensor.
+    """
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:cog"
+
+    def __init__(
+        self,
+        coordinator: FritzSettingsCoordinator,
+        unique_id: str,
+        phonebook_name: str,
+        device_info: DeviceInfo,
+        translation_key: str = f"{DOMAIN}_{SETTINGS_SENSOR_KEY}",
+    ) -> None:
+        """Initialize the settings sensor."""
+        super().__init__(coordinator)
+        self._attr_translation_key = translation_key
+        self._attr_translation_placeholders = {"phonebook_name": phonebook_name}
+        self._attr_unique_id = unique_id
+        self._attr_device_info = device_info
+
+    @property
+    def _data(self) -> dict[str, Any]:
+        return self.coordinator.data or {}
+
+    @property
+    @override
+    def native_value(self) -> int:
+        """Anzahl der angemeldeten DECT-Mobilteile (einfacher Zustandswert)."""
+        return len(self._data.get("dect_handsets", []))
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Telefonie-/Geräte- und Telefonbuchdaten für die Einstellungen-Kategorie."""
+        data = self._data
+        return {
+            "numbers": data.get("numbers", []),
+            "dect_handsets": data.get("dect_handsets", []),
+            "repeaters": data.get("repeaters", []),
+            "phonebook_id": data.get("phonebook_id"),
+            "contacts": data.get("contacts", []),
+        }
 
 
 class FritzBoxCallMonitor:

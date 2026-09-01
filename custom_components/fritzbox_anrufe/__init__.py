@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 85eaddff90e92ebc314aa5e7474f97707e9e2fdfa02525cc7ff0f359cd962f6c
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): f513ee0ff2c3847a19067db6abf93f83f0876ed61427058789516d6d96309f74
 """The fritzbox_anrufe integration."""
 
 from dataclasses import dataclass, field
@@ -20,6 +20,7 @@ from homeassistant.loader import async_get_integration
 
 from .base import FritzBoxPhonebook
 from .call_log import FritzCallLogCoordinator
+from .settings_data import FritzSettingsCoordinator
 from .const import (
     CALL_TYPE_INCOMING,
     CALL_TYPE_LIVE,
@@ -32,6 +33,7 @@ from .const import (
     DOMAIN,
     PLATFORMS,
     SERIAL_NUMBER,
+    SETTINGS_SENSOR_KEY,
     SWITCH_TRANSLATION_KEYS_VOICEMAIL,
     TAM_MEDIA_URL_BASES,
     migrated_tam_count,
@@ -260,6 +262,8 @@ def _async_reserve_entity_ids(
     }
     for call_type in CALL_TYPES_VOICEMAIL[:tam_count]:
         reservations[f"{unique_id}-{call_type}"] = f"{DOMAIN}_{call_type}"
+    # Einstellungen-Sensor (EXPERIMENTELL, seit v1.3.0b0).
+    reservations[f"{unique_id}-{SETTINGS_SENSOR_KEY}"] = f"{DOMAIN}_{SETTINGS_SENSOR_KEY}"
     for sensor_unique_id, suggested_object_id in reservations.items():
         registry.async_get_or_create(
             "sensor",
@@ -308,6 +312,10 @@ class FritzBoxRuntimeData:
     # Anforderung, daher als direkter Umbau statt zusätzlicher Alias-Felder.
     # Immer mindestens 1 Element (siehe async_setup_entry - MIN_TAM_COUNT).
     tam_coordinators: list[FritzTamCoordinator] = field(default_factory=list)
+    # Einstellungen-Kategorie (Zahnrad-Tab der Karte, EXPERIMENTELL seit
+    # v1.3.0b0) - Telefonie-/DECT-Geräte + Telefonbuch (lesend). Optional; kann
+    # None sein, falls die Erstellung fehlschlägt.
+    settings_coordinator: FritzSettingsCoordinator | None = None
 
 
 type FritzBoxCallMonitorConfigEntry = ConfigEntry[FritzBoxRuntimeData]
@@ -390,12 +398,23 @@ async def async_setup_entry(
     call_log_coordinator = FritzCallLogCoordinator(
         hass, config_entry, fritz_call, tam_coordinator=tam_coordinators[0]
     )
+    # Persistierte, erfolglose ausgehende Anrufe (seit v1.3.0b0) VOR dem ersten
+    # Refresh laden, damit sie sofort in den "ausgehend"-Topf einfließen und
+    # einen HA-Neustart überstehen - siehe call_log.py:async_load_synthetic().
+    await call_log_coordinator.async_load_synthetic()
     # Deliberately not using async_config_entry_first_refresh() here: a
     # missing "Anrufliste" permission or disabled TR-064 on the FRITZ!Box
     # account must not prevent the whole integration (incl. the working
     # call-monitor sensor) from loading. The three history sensors simply
     # stay "unavailable" until the coordinator can fetch data successfully.
     await call_log_coordinator.async_refresh()
+
+    # Einstellungen-Coordinator (EXPERIMENTELL, seit v1.3.0b0) - darf das Setup
+    # nicht blockieren: async_refresh() (nicht async_config_entry_first_refresh),
+    # bei fehlender Berechtigung/nicht unterstützter Aktion bleibt der zugehörige
+    # Sensor schlicht "nicht verfügbar".
+    settings_coordinator = FritzSettingsCoordinator(hass, config_entry, fritzbox_phonebook)
+    await settings_coordinator.async_refresh()
 
     unique_id = f"{config_entry.data[SERIAL_NUMBER]}-{config_entry.data[CONF_PHONEBOOK]}"
     _async_reserve_entity_ids(hass, config_entry, unique_id, tam_count=tam_count)
@@ -404,6 +423,7 @@ async def async_setup_entry(
         phonebook=fritzbox_phonebook,
         call_log_coordinator=call_log_coordinator,
         tam_coordinators=tam_coordinators,
+        settings_coordinator=settings_coordinator,
     )
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 

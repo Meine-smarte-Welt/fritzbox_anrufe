@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 5f5a5f281453ca6c9bd5e8d072ce72704944e61ca0f3a921bee5b84743132fd0
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 32956d9a63be71721d0fef11b125045476ebda97b5a8d94083f796e6b14396d0
 """Constants for the AVM Fritz!Box call monitor integration."""
 
 from collections.abc import Mapping
@@ -56,6 +56,12 @@ CALL_TYPE_MISSED = "verpasst"
 CALL_TYPE_LIVE = "live"
 
 CALL_TYPES = (CALL_TYPE_INCOMING, CALL_TYPE_OUTGOING, CALL_TYPE_MISSED)
+
+# Einstellungen-Sensor (fritzbox_anrufe_einstellungen) - EXPERIMENTELL, seit
+# v1.3.0b0. Füttert den optionalen „Einstellungen"-Tab (Zahnrad) der Karte mit
+# Telefonie-/DECT-Geräten und (nur lesend) dem Telefonbuch, siehe
+# settings_data.py. Standardmäßig auf der Karte ausgeblendet (show_settings).
+SETTINGS_SENSOR_KEY = "einstellungen"
 
 # --- Anrufbeantworter-Sensor (fritzbox_anrufe_anrufbeantworter) - EXPERIMENTELL ---
 # Deckt nur Anrufbeantworter/Sprachnachrichten ab, bewusst kein Fax (siehe

@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 935c8c856ec3e116ad222e197f7827e1f171f22c5ff3aec9a0881ef4bb3c32cb
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 06375eae8516c56b35582eb2b12f7ae09910fc908458d7a90912a45edc19c9d5
 """Coordinator to poll the FRITZ!Box call list (incoming/outgoing/missed).
 
 Unlike the call monitor (TCP port 1012), which only streams live call
@@ -51,8 +51,12 @@ buffered in-memory (``_synthetic_outgoing_calls``, thread-safe via
 own background thread) and merged into the "ausgehend" bucket on every
 ``_fetch_calls()``, de-duplicated against the just-downloaded TR-064 data
 by (minute, called number) in case a future FRITZ!OS version ever does log
-them after all. Being in-memory only, they do not survive a Home Assistant
-restart - only attempts observed while this integration is running show up.
+them after all. Seit v1.3.0b0 werden diese Einträge zusätzlich über einen
+``helpers.storage.Store`` persistiert (siehe ``async_load_synthetic``/
+``_async_save_synthetic``) und beim Setup wiederhergestellt, sodass sie einen
+Home-Assistant-Neustart überstehen (zuvor waren sie rein im Speicher und gingen
+bei jedem Neustart verloren). Gepruned wird weiterhin auf das gemeinsame
+Abruf-Zeitfenster (``SHARED_CALL_LOG_FETCH_DAYS``).
 """
 
 from __future__ import annotations
@@ -76,6 +80,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -93,6 +98,7 @@ from .const import (
     CONF_SPAM_NAME_PREFIXES,
     CONF_SPAM_NUMBERS,
     DEFAULT_CALL_LOG_COUNT,
+    DOMAIN,
     DEFAULT_CALL_LOG_DAYS,
     DEFAULT_CALL_LOG_LIMIT_TYPE,
     DEVICE_ANSWERING_MACHINE,
@@ -108,6 +114,72 @@ from .voicemail import FritzTamCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 CALL_LOG_UPDATE_INTERVAL = timedelta(minutes=5)
+
+# Persistenz der synthetischen (erfolglosen) ausgehenden Anrufe (seit
+# v1.3.0b0) - siehe FritzCallLogCoordinator.add_synthetic_outgoing_call und die
+# Modul-Docstring. Diese Einträge stammen ausschließlich aus dem Live-
+# Callmonitor und tauchen in der TR-064-Anrufliste nie auf; damit sie einen
+# Home-Assistant-Neustart überstehen, werden sie zusätzlich in einem
+# helpers.storage.Store gesichert (JSON, ein Format-String je Config-Entry).
+_SYNTHETIC_STORAGE_VERSION = 1
+# Der Zeitstempel im FRITZ!Box-Call-Format ("%d.%m.%y %H:%M"), den auch
+# fritzconnection.lib.fritzcall.Call.date parst.
+_CALL_DATE_FORMAT = "%d.%m.%y %H:%M"
+
+
+def _synthetic_storage_key(entry_id: str) -> str:
+    """Storage-Key für die persistierten synthetischen Anrufe eines Entries."""
+    return f"{DOMAIN}.synthetic_outgoing.{entry_id}"
+
+
+def _serialize_synthetic_call(call: Call) -> dict[str, str | None]:
+    """Serialisiere einen synthetischen ausgehenden Anruf für den Store.
+
+    Bewusst nur die Felder, die :meth:`FritzBoxCallSensor.record_failed_outgoing_call`
+    tatsächlich setzt (siehe sensor.py) - der Rest ist für diese Einträge
+    ohnehin fix (``outcome`` = "nicht verbunden", ``spam`` = False,
+    ``tam_message`` = None) und wird beim Deserialisieren wieder gesetzt.
+    """
+    return {
+        "id": getattr(call, "Id", None),
+        "type": getattr(call, "Type", None),
+        "date": getattr(call, "Date", None),
+        "duration": getattr(call, "Duration", None),
+        "caller": getattr(call, "Caller", None),
+        "called": getattr(call, "Called", None),
+        "device": getattr(call, "Device", None),
+    }
+
+
+def _deserialize_synthetic_call(data: dict) -> Call | None:
+    """Baue aus einem Store-Eintrag wieder ein synthetisches ``Call``-Objekt.
+
+    Gibt ``None`` zurück, wenn der Eintrag beschädigt ist oder kein gültiges
+    Datum trägt (dann kann er ohnehin nicht ins Zeitfenster einsortiert
+    werden) - der Aufrufer verwirft solche Einträge stillschweigend.
+    """
+    if not isinstance(data, dict):
+        return None
+    raw_date = data.get("date")
+    if not raw_date:
+        return None
+    try:
+        datetime.strptime(raw_date, _CALL_DATE_FORMAT)
+    except (ValueError, TypeError):
+        return None
+    call = Call()
+    call.Id = data.get("id")
+    call.Type = data.get("type") or str(OUT_CALL_TYPE)
+    call.Date = raw_date
+    call.Duration = data.get("duration") or "0:00"
+    call.Caller = data.get("caller")
+    call.Called = data.get("called")
+    call.Device = data.get("device")
+    call.Path = None
+    call.outcome = CALL_OUTCOME_NOT_CONNECTED
+    call.tam_message = None
+    call.spam = False
+    return call
 
 
 def _find_matching_tam_message(call: Call, tam_messages: list[TamMessage]) -> TamMessage | None:
@@ -295,6 +367,11 @@ class FritzCallLogCoordinator(DataUpdateCoordinator[CallLogData]):
         # hence the lock, rather than relying on GIL-level atomicity.
         self._synthetic_outgoing_lock = Lock()
         self._synthetic_outgoing_calls: list[Call] = []
+        # Persistenz dieser Einträge über einen HA-Neustart hinweg (seit
+        # v1.3.0b0) - siehe async_load_synthetic()/_async_save_synthetic().
+        self._synthetic_store: Store = Store(
+            hass, _SYNTHETIC_STORAGE_VERSION, _synthetic_storage_key(config_entry.entry_id)
+        )
 
     def _limit_for(self, call_type: str) -> tuple[str, int]:
         """Return (limit_type, value) for one call-list sensor's own option."""
@@ -417,17 +494,81 @@ class FritzCallLogCoordinator(DataUpdateCoordinator[CallLogData]):
         """
         with self._synthetic_outgoing_lock:
             self._synthetic_outgoing_calls.append(call)
+        # Sofort (asynchron) persistieren, damit der Eintrag einen HA-Neustart
+        # übersteht (seit v1.3.0b0). add_job() ist thread-sicher und schiebt
+        # die Speicher-Coroutine auf den Event-Loop - dieser Aufruf kommt aus
+        # dem Callmonitor-Hintergrundthread, nicht aus dem Loop.
+        self.hass.add_job(self._async_save_synthetic)
 
     def _pop_synthetic_outgoing_calls(self) -> list[Call]:
         """Thread-safely prune (to the shared fetch window) and snapshot the buffer."""
         cutoff = datetime.now() - timedelta(days=SHARED_CALL_LOG_FETCH_DAYS)
         with self._synthetic_outgoing_lock:
+            before = len(self._synthetic_outgoing_calls)
             self._synthetic_outgoing_calls = [
                 call
                 for call in self._synthetic_outgoing_calls
                 if isinstance(call.date, datetime) and call.date >= cutoff
             ]
-            return list(self._synthetic_outgoing_calls)
+            pruned = before != len(self._synthetic_outgoing_calls)
+            snapshot = list(self._synthetic_outgoing_calls)
+        # Falls das Fenster-Pruning etwas entfernt hat, die persistierte Kopie
+        # nachziehen (seit v1.3.0b0), damit sie nicht unbegrenzt wächst.
+        if pruned:
+            self.hass.add_job(self._async_save_synthetic)
+        return snapshot
+
+    async def async_load_synthetic(self) -> None:
+        """Lade persistierte synthetische ausgehende Anrufe (seit v1.3.0b0).
+
+        Einmal beim Setup aufgerufen, BEVOR der erste ``async_refresh()``
+        läuft (siehe __init__.py), damit die wiederhergestellten Einträge im
+        ersten Fetch-Durchlauf bereits in den „ausgehend\"-Topf einfließen.
+        Beschädigte Einträge und solche außerhalb des Zeitfensters werden
+        verworfen.
+        """
+        try:
+            stored = await self._synthetic_store.async_load()
+        except Exception as ex:  # noqa: BLE001 - defektes Store-File darf das Setup nicht verhindern
+            _LOGGER.warning(
+                "Konnte gespeicherte erfolglose ausgehende Anrufe nicht laden: %s", ex
+            )
+            return
+        if not stored:
+            return
+        cutoff = datetime.now() - timedelta(days=SHARED_CALL_LOG_FETCH_DAYS)
+        restored: list[Call] = []
+        for entry in stored.get("calls", []):
+            call = _deserialize_synthetic_call(entry)
+            if call is None:
+                continue
+            if not (isinstance(call.date, datetime) and call.date >= cutoff):
+                continue
+            restored.append(call)
+        with self._synthetic_outgoing_lock:
+            # Vorhandene (in dieser Sitzung bereits eingetroffene) Einträge
+            # nicht überschreiben - de-dupliziert nach (Datum, Zielnummer).
+            existing_keys = {
+                (c.Date, c.Called) for c in self._synthetic_outgoing_calls
+            }
+            for call in restored:
+                if (call.Date, call.Called) not in existing_keys:
+                    self._synthetic_outgoing_calls.append(call)
+
+    async def _async_save_synthetic(self) -> None:
+        """Persistiere den aktuellen Puffer synthetischer Anrufe (seit v1.3.0b0)."""
+        with self._synthetic_outgoing_lock:
+            payload = {
+                "calls": [
+                    _serialize_synthetic_call(call) for call in self._synthetic_outgoing_calls
+                ]
+            }
+        try:
+            await self._synthetic_store.async_save(payload)
+        except Exception as ex:  # noqa: BLE001 - Speicherfehler darf die Karte nicht stören
+            _LOGGER.warning(
+                "Konnte erfolglose ausgehende Anrufe nicht speichern: %s", ex
+            )
 
     def get_call(self, call_type: str, call_id: str) -> Call | None:
         """Look up one currently-known call by its bucket + raw Id string.

@@ -32,6 +32,9 @@
       },
       "fritzbox_anrufe_anrufbeantworter_5": {
         "default": "mdi:voicemail"
+      },
+      "fritzbox_anrufe_einstellungen": {
+        "default": "mdi:cog"
       }
     },
     "switch": {
