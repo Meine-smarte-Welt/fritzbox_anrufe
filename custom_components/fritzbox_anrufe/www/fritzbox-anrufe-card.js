@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 22867173c8e31ba3b3330ef31c98f39f553412e73db39c31f9da1d82a234b47e
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 37d0357e6b69a7a27e42bfce8b3fe9b521888720854b0190ffc67b8761084fc8
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -338,9 +338,10 @@
 const FILTER_ALL = "alle";
 const FILTER_VOICEMAIL = "anrufbeantworter";
 // Einstellungen-Tab (Zahnrad, seit v1.3.0b0, EXPERIMENTELL) - kein Anruf-
-// Filter, sondern eine eigene Ansicht (Telefonie-/DECT-Geräte + Telefonbuch),
-// siehe _renderSettings(). Standardmäßig aus (show_einstellungen) und nur mit
-// gesetztem entity_settings sichtbar (siehe _visibleFilterTypes()).
+// Filter, sondern eine eigene Ansicht (Telefoniegeräte-Tabelle, seit
+// v1.3.0b2), siehe _renderSettings(). Standardmäßig aus (show_einstellungen);
+// sichtbar, sobald die Kategorie aktiviert ist - der Sensor wird automatisch
+// gefunden (siehe _settingsEntityId()/_visibleFilterTypes()).
 const FILTER_SETTINGS = "einstellungen";
 // "anrufbeantworter" is a tab like any other (5th icon in the header row),
 // not a section rendered underneath the call list - see _renderMainContent().
@@ -585,10 +586,14 @@ const CONFIG_DEFAULTS = {
   // z. B. in einem Bubble-Card-Popup, das ohnehin schon einen Titel hat.
   show_title: true,
   // Einstellungen-Kategorie/-Tab (Zahnrad, seit v1.3.0b0, EXPERIMENTELL) -
-  // Standard AUS, zeigt DECT-/Telefoniegeräte und (lesend) das Telefonbuch,
-  // siehe _renderSettings()/_visibleFilterTypes(). Benötigt zusätzlich einen
-  // gesetzten entity_settings-Sensor, sonst bleibt der Tab ausgeblendet.
+  // Standard AUS, zeigt seit v1.3.0b2 die Telefoniegeräte-Tabelle (Name/
+  // Anschluss/ausgehende/ankommende/interne Nummer je Gerät, Detail-Popup,
+  // Anrufbeantworter-Schalter), siehe _renderSettings()/_visibleFilterTypes().
   show_einstellungen: false,
+  // Rückwärtskompatibel: ein explizit gesetzter Einstellungen-Sensor wird
+  // weiterhin bevorzugt (siehe _settingsEntityId()); ein Editor-Picker dafür
+  // existiert seit v1.3.0b2 aber nicht mehr - der Sensor wird automatisch
+  // gefunden.
   entity_settings: "",
   max_rows: 10,
   // Kategorien/Tabs (Alle/Gesamt, Angenommen, Ausgehend, Verpasst,
@@ -876,6 +881,98 @@ const BASE_CARD_STYLES = `
   .settings-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .settings-row-meta { color: var(--secondary-text-color, #727272); font-size: 0.9em; }
   .settings-more { padding: 6px 0; color: var(--secondary-text-color, #727272); font-size: 0.9em; }
+  .settings-note {
+    margin-top: 8px;
+    font-size: 0.82em;
+    color: var(--secondary-text-color, #727272);
+  }
+  /* Telefoniegeräte-Tabelle (seit v1.3.0b2) */
+  .settings-table { display: flex; flex-direction: column; overflow-x: auto; }
+  .settings-table-head,
+  .settings-table-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 1.6fr) minmax(72px, 0.9fr) minmax(70px, 1fr) minmax(70px, 1fr) minmax(74px, 1fr);
+    gap: 8px;
+    align-items: center;
+    padding: 7px 4px;
+    min-width: 460px;
+  }
+  .settings-table-head {
+    font-size: 0.78em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--secondary-text-color, #727272);
+    border-bottom: 2px solid var(--divider-color, #e0e0e0);
+  }
+  .settings-table-row { border-bottom: 1px solid var(--divider-color, #e0e0e0); }
+  .settings-table-row:last-child { border-bottom: none; }
+  .settings-table-row.clickable { cursor: pointer; }
+  .settings-table-row.clickable:hover { background: var(--secondary-background-color, rgba(0,0,0,0.04)); }
+  .settings-table .col-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .settings-table .settings-device-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .settings-table .col-num { font-variant-numeric: tabular-nums; font-size: 0.92em; }
+  .settings-table .col-intern { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .device-tam-toggle {
+    display: inline-flex;
+    align-items: center;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    color: var(--secondary-text-color, #727272);
+    --mdc-icon-size: 22px;
+  }
+  .device-tam-toggle.on { color: var(--fba-color-answered, var(--success-color, #43a047)); }
+  .device-tam-toggle[disabled] { opacity: 0.4; cursor: default; }
+  /* Detail-Popup (seit v1.3.0b2) */
+  .settings-popup-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.45);
+  }
+  .settings-popup {
+    background: var(--card-background-color, var(--ha-card-background, #fff));
+    color: var(--primary-text-color, #212121);
+    border-radius: var(--ha-card-border-radius, 12px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    width: min(360px, 100%);
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .settings-popup-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--divider-color, #e0e0e0);
+  }
+  .settings-popup-title { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .settings-popup-close {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--secondary-text-color, #727272);
+    padding: 2px;
+    display: inline-flex;
+  }
+  .settings-popup-body { padding: 6px 14px 14px; }
+  .settings-popup-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--divider-color, #e0e0e0);
+  }
+  .settings-popup-line:last-child { border-bottom: none; }
+  .settings-popup-label { color: var(--secondary-text-color, #727272); }
+  .settings-popup-value { font-weight: 500; text-align: right; word-break: break-word; }
 `;
 
 // Schwelle empirisch ermittelt (siehe PR-Beschreibung/Commit): bei den fünf
@@ -1277,6 +1374,9 @@ class FritzboxAnrufeCard extends HTMLElement {
     // reiner UI-Laufzeitstatus, wird in setConfig() aus dem dauerhaft
     // gespeicherten Grundzustand (show_voicemail_1-5) neu befüllt.
     this._tamPickerVisible = {};
+    // Welche Telefoniegeräte-Zeile gerade ihr Detail-Popup zeigt (Einstellungen-
+    // Tab, seit v1.3.0b2) - reiner UI-Laufzeitstatus, null = kein Popup offen.
+    this._settingsPopupIndex = null;
     this._hass = null;
     this._config = null;
     this._objectUrls = [];
@@ -1309,6 +1409,7 @@ class FritzboxAnrufeCard extends HTMLElement {
     for (let n = 1; n <= MAX_TAM_SLOTS; n += 1) {
       this._tamPickerVisible[n] = this._config[`show_voicemail_${n}`] !== false;
     }
+    this._settingsPopupIndex = null;
     this._lastSignature = null;
     this._render();
   }
@@ -1437,10 +1538,10 @@ class FritzboxAnrufeCard extends HTMLElement {
       entity_tam_switch_3: guessSwitch("anrufbeantworter_3_schalter"),
       entity_tam_switch_4: guessSwitch("anrufbeantworter_4_schalter"),
       entity_tam_switch_5: guessSwitch("anrufbeantworter_5_schalter"),
-      // Einstellungen-Sensor (seit v1.3.0b1) - der von der Integration
-      // angelegte sensor.fritzbox_anrufe_einstellungen wird für neue Karten
-      // automatisch vorbelegt.
-      entity_settings: guess("einstellungen"),
+      // Kein entity_settings mehr: der von der Integration angelegte
+      // sensor.fritzbox_anrufe_einstellungen wird seit v1.3.0b2 immer
+      // automatisch gefunden (siehe _settingsEntityId()); ein eigener Picker
+      // (und damit ein Stub-Vorschlag) entfällt.
     };
   }
 
@@ -1822,10 +1923,12 @@ class FritzboxAnrufeCard extends HTMLElement {
   }
 
   // Einstellungen-Ansicht (Zahnrad-Tab, seit v1.3.0b0, EXPERIMENTELL) - liest
-  // die Attribute des konfigurierten entity_settings-Sensors (siehe
-  // settings_data.py/sensor.py): Telefonie-Rufnummern, DECT-Mobilteile,
-  // Repeater und (lesend) das Telefonbuch. Rein anzeigend; Bearbeiten des
-  // Telefonbuchs ist für eine spätere Beta vorgesehen.
+  // die Attribute des Einstellungen-Sensors (siehe settings_data.py/sensor.py):
+  // die Telefoniegeräte-Tabelle (Name/Anschluss/ausgehende/ankommende/interne
+  // Nummer je Gerät, seit v1.3.0b2 aus data.lua) sowie die Rufnummern als
+  // Fallback. Je Gerät ein Detail-Popup; hinter jedem Anrufbeantworter ein
+  // Ein/Aus-Schalter (siehe _renderTamSwitchRow/_toggleTamSwitch). Das
+  // Telefonbuch wird seit v1.3.0b2 bewusst NICHT mehr angezeigt.
   _renderSettings() {
     const entityId = this._settingsEntityId();
     if (!entityId) {
@@ -1834,9 +1937,9 @@ class FritzboxAnrufeCard extends HTMLElement {
           <div class="settings-experimental">Experimentell – siehe README.</div>
           <div class="empty">
             Kein Einstellungen-Sensor gefunden.<br />
-            Bitte im Karten-Editor unter „Sensoren" den Sensor
-            <code>sensor.fritzbox_anrufe_einstellungen</code> auswählen
-            (er wird von der Integration angelegt).
+            Er wird von der Integration angelegt
+            (<code>sensor.fritzbox_anrufe_einstellungen</code>) und automatisch
+            verwendet, sobald die Kategorie „Einstellungen" aktiviert ist.
           </div>
         </div>
       `;
@@ -1855,10 +1958,9 @@ class FritzboxAnrufeCard extends HTMLElement {
       `;
     }
     const attrs = stateObj.attributes || {};
+    const devices = Array.isArray(attrs.devices) ? attrs.devices : [];
     const numbers = Array.isArray(attrs.numbers) ? attrs.numbers : [];
-    const handsets = Array.isArray(attrs.dect_handsets) ? attrs.dect_handsets : [];
-    const repeaters = Array.isArray(attrs.repeaters) ? attrs.repeaters : [];
-    const contacts = Array.isArray(attrs.contacts) ? attrs.contacts : [];
+    const fallback = attrs.devices_fallback === true;
 
     const section = (title, bodyHtml) => `
       <div class="settings-section">
@@ -1867,70 +1969,169 @@ class FritzboxAnrufeCard extends HTMLElement {
       </div>
     `;
 
-    const handsetHtml = handsets.length
-      ? `<div class="settings-list">${handsets
-          .map(
-            (h) => `
-          <div class="settings-row">
-            <ha-icon class="settings-row-icon" icon="mdi:phone-classic"></ha-icon>
-            <span class="settings-row-name">${escapeHtml(h.name || `DECT ${h.id}`)}</span>
-            <span class="settings-row-meta">${escapeHtml(h.id ? `ID ${h.id}` : "")}</span>
-          </div>`
-          )
-          .join("")}</div>`
-      : `<div class="empty">Keine DECT-Mobilteile gemeldet.</div>`;
-
-    const numberHtml = numbers.length
-      ? `<div class="settings-list">${numbers
-          .map(
-            (n) => `
-          <div class="settings-row">
-            <ha-icon class="settings-row-icon" icon="mdi:phone"></ha-icon>
-            <span class="settings-row-name">${escapeHtml(n.name || n.number || "")}</span>
-            <span class="settings-row-meta">${escapeHtml(n.number || "")}</span>
-          </div>`
-          )
-          .join("")}</div>`
-      : `<div class="empty">Keine Rufnummern gemeldet.</div>`;
-
-    const repeaterHtml = repeaters.length
-      ? `<div class="settings-list">${repeaters
-          .map(
-            (r) => `
-          <div class="settings-row">
-            <ha-icon class="settings-row-icon" icon="mdi:access-point"></ha-icon>
-            <span class="settings-row-name">${escapeHtml(r.name || "")}</span>
-          </div>`
-          )
-          .join("")}</div>`
-      : "";
-
-    const maxContacts = Number(this._config.max_rows) || 10;
-    const shownContacts = contacts.slice(0, Math.max(maxContacts, 10));
-    const contactHtml = contacts.length
-      ? `<div class="settings-list">${shownContacts
-          .map(
-            (c) => `
-          <div class="settings-row">
-            <ha-icon class="settings-row-icon" icon="mdi:account"></ha-icon>
-            <span class="settings-row-name">${escapeHtml(c.name || "")}</span>
-            <span class="settings-row-meta">${escapeHtml((c.numbers || []).join(", "))}</span>
-          </div>`
-          )
-          .join("")}${
-          contacts.length > shownContacts.length
-            ? `<div class="settings-more">… und ${contacts.length - shownContacts.length} weitere</div>`
+    // --- Telefoniegeräte-Tabelle -------------------------------------------
+    let deviceHtml;
+    if (devices.length) {
+      const rows = devices
+        .map((dev, idx) => this._renderDeviceRow(dev, idx))
+        .join("");
+      deviceHtml = `
+        <div class="settings-table" role="table">
+          <div class="settings-table-head" role="row">
+            <span class="col-name">Name</span>
+            <span class="col-anschluss">Anschluss</span>
+            <span class="col-num">Ausgehend</span>
+            <span class="col-num">Ankommend</span>
+            <span class="col-num">Intern</span>
+          </div>
+          ${rows}
+        </div>
+        ${
+          fallback
+            ? `<div class="settings-note">Hinweis: Die ausgehende/ankommende/interne
+                 Rufnummern-Zuordnung konnte nicht gelesen werden (data.lua nicht
+                 verfügbar); es werden nur die per TR-064 gemeldeten Geräte gezeigt.</div>`
             : ""
-        }</div>`
-      : `<div class="empty">Kein Telefonbuch geladen.</div>`;
+        }`;
+    } else {
+      const numberHtml = numbers.length
+        ? `<div class="settings-list">${numbers
+            .map(
+              (n) => `
+            <div class="settings-row">
+              <ha-icon class="settings-row-icon" icon="mdi:phone"></ha-icon>
+              <span class="settings-row-name">${escapeHtml(n.name || n.number || "")}</span>
+              <span class="settings-row-meta">${escapeHtml(n.number || "")}</span>
+            </div>`
+            )
+            .join("")}</div>`
+        : "";
+      deviceHtml = `
+        <div class="empty">
+          Keine Telefoniegeräte gelesen. Das FRITZ!Box-Konto/FRITZ!OS liefert die
+          Telefoniegeräte-Tabelle (data.lua) hier nicht. Siehe README.
+        </div>
+        ${numbers.length ? section("Rufnummern", numberHtml) : ""}`;
+    }
 
     return `
       <div class="settings-view">
         <div class="settings-experimental">Experimentell – Anzeige, siehe README.</div>
-        ${section("Telefoniegeräte (DECT)", handsetHtml)}
-        ${repeaters.length ? section("DECT-Repeater", repeaterHtml) : ""}
-        ${section("Rufnummern", numberHtml)}
-        ${section("Telefonbuch", contactHtml)}
+        ${section("Telefoniegeräte", deviceHtml)}
+        ${this._renderDevicePopup(devices)}
+      </div>
+    `;
+  }
+
+  // Eine Zeile der Telefoniegeräte-Tabelle. Anklickbar (öffnet das Detail-
+  // Popup, siehe _renderDevicePopup); hinter einem Anrufbeantworter zusätzlich
+  // ein Ein/Aus-Schalter (nur, wenn ein passender Schalter konfiguriert ist).
+  _renderDeviceRow(dev, idx) {
+    const name = dev.name || "";
+    const anschluss = dev.anschluss || dev.type || "";
+    const outgoing = dev.outgoing || "";
+    const incoming = dev.incoming || "";
+    const intern = dev.intern || "";
+    const icon = this._deviceIcon(dev);
+    const tamToggle = dev.is_tam ? this._deviceTamToggle(dev) : "";
+    return `
+      <div class="settings-table-row clickable" role="row" data-device-index="${idx}" title="Details anzeigen">
+        <span class="col-name" role="cell">
+          <ha-icon class="settings-row-icon" icon="${icon}"></ha-icon>
+          <span class="settings-device-name">${escapeHtml(name)}</span>
+        </span>
+        <span class="col-anschluss" role="cell">${escapeHtml(anschluss)}</span>
+        <span class="col-num" role="cell">${escapeHtml(outgoing) || "–"}</span>
+        <span class="col-num" role="cell">${escapeHtml(incoming) || "–"}</span>
+        <span class="col-num col-intern" role="cell">
+          <span>${escapeHtml(intern) || "–"}</span>
+          ${tamToggle}
+        </span>
+      </div>
+    `;
+  }
+
+  // mdi-Symbol je Gerätetyp (best effort, rein optisch).
+  _deviceIcon(dev) {
+    if (dev.is_tam) return "mdi:answering-machine";
+    const token = `${dev.type || ""} ${dev.anschluss || ""} ${dev.name || ""}`.toLowerCase();
+    if (token.includes("dect") || token.includes("mobilteil")) return "mdi:phone-classic";
+    if (token.includes("app")) return "mdi:cellphone";
+    if (token.includes("fon") || token.includes("telefon")) return "mdi:phone";
+    return "mdi:phone";
+  }
+
+  // Ordnet einer Anrufbeantworter-Zeile den passenden konfigurierten Ein/Aus-
+  // Schalter zu (tam_index 1 -> entity_tam_switch, 2 -> _2 …) und liefert die
+  // bestehende Schalter-Schaltfläche (Klasse .tam-switch-toggle, derselbe
+  // Klick-Handler wie im Anrufbeantworter-Tab, siehe _toggleTamSwitch). Ohne
+  // passenden konfigurierten Schalter erscheint nichts.
+  _deviceTamSwitchEntity(dev) {
+    const n = Number(dev.tam_index) || 1;
+    const key = this._tamSwitchKey(n);
+    return (this._config && this._config[key]) || "";
+  }
+
+  _deviceTamToggle(dev) {
+    const entityId = this._deviceTamSwitchEntity(dev);
+    if (!entityId) return "";
+    const stateObj = this._entityState(entityId);
+    const state = stateObj ? stateObj.state : undefined;
+    const isOn = state === "on";
+    const unavailable = !stateObj || state === "unavailable";
+    return `
+      <button
+        class="tam-switch-toggle device-tam-toggle${isOn ? " on" : ""}"
+        data-entity="${escapeHtml(entityId)}"
+        data-state="${escapeHtml(state || "")}"
+        title="Anrufbeantworter ${isOn ? "ausschalten" : "einschalten"}"
+        ${unavailable ? "disabled" : ""}
+      >
+        <ha-icon icon="${isOn ? "mdi:toggle-switch" : "mdi:toggle-switch-off-outline"}"></ha-icon>
+      </button>
+    `;
+  }
+
+  // Detail-Popup zu einer Gerätezeile (seit v1.3.0b2) - bewusst KEIN natives
+  // dialog()/confirm() (siehe Moduldoku: die misslingen im Companion-App-
+  // WebView), sondern ein eigenes Overlay im Shadow-Root. Offen, wenn
+  // this._settingsPopupIndex auf eine gültige Zeile zeigt.
+  _renderDevicePopup(devices) {
+    const idx = this._settingsPopupIndex;
+    if (idx === null || idx === undefined) return "";
+    const dev = devices[idx];
+    if (!dev) return "";
+    const line = (label, value) => `
+      <div class="settings-popup-line">
+        <span class="settings-popup-label">${escapeHtml(label)}</span>
+        <span class="settings-popup-value">${escapeHtml(value) || "–"}</span>
+      </div>`;
+    const tamToggle = dev.is_tam ? this._deviceTamToggle(dev) : "";
+    return `
+      <div class="settings-popup-backdrop">
+        <div class="settings-popup" role="dialog" aria-modal="true">
+          <div class="settings-popup-head">
+            <ha-icon icon="${this._deviceIcon(dev)}"></ha-icon>
+            <span class="settings-popup-title">${escapeHtml(dev.name || "")}</span>
+            <button class="settings-popup-close" title="Schließen" aria-label="Schließen">
+              <ha-icon icon="mdi:close"></ha-icon>
+            </button>
+          </div>
+          <div class="settings-popup-body">
+            ${line("Anschluss", dev.anschluss || dev.type || "")}
+            ${line("Rufnummer ausgehend", dev.outgoing || "")}
+            ${line("Rufnummer ankommend", dev.incoming || "")}
+            ${line("Intern", dev.intern || "")}
+            ${
+              tamToggle
+                ? `<div class="settings-popup-line">
+                     <span class="settings-popup-label">Anrufbeantworter</span>
+                     <span class="settings-popup-value">${tamToggle}</span>
+                   </div>`
+                : ""
+            }
+          </div>
+        </div>
       </div>
     `;
   }
@@ -2415,10 +2616,44 @@ class FritzboxAnrufeCard extends HTMLElement {
     // Anrufbeantworter Ein/Aus-Schalter (seit v1.1.0, nur bei aktivem
     // show_tam_switch gerendert, siehe _renderTamSwitches()).
     this.shadowRoot.querySelectorAll(".tam-switch-toggle").forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (event) => {
+        // In der Telefoniegeräte-Tabelle steckt der Schalter in einer
+        // anklickbaren Zeile (öffnet sonst das Detail-Popup) - der Klick auf
+        // den Schalter darf das Popup NICHT mitöffnen.
+        event.stopPropagation();
         this._toggleTamSwitch(btn.dataset.entity, btn.dataset.state);
       });
     });
+
+    // Telefoniegeräte-Tabelle (Einstellungen-Tab, seit v1.3.0b2): Klick auf
+    // eine Zeile öffnet das Detail-Popup; Klick auf das Overlay/den
+    // Schließen-Button schließt es wieder. Reiner UI-Laufzeitstatus
+    // (this._settingsPopupIndex), daher ein einfacher Re-Render.
+    this.shadowRoot.querySelectorAll(".settings-table-row.clickable").forEach((row) => {
+      row.addEventListener("click", (event) => {
+        if (event.target.closest(".tam-switch-toggle")) return;
+        const idx = Number(row.dataset.deviceIndex);
+        this._settingsPopupIndex = Number.isInteger(idx) ? idx : null;
+        this._render();
+      });
+    });
+    const popupBackdrop = this.shadowRoot.querySelector(".settings-popup-backdrop");
+    if (popupBackdrop) {
+      popupBackdrop.addEventListener("click", (event) => {
+        // Nur ein Klick auf den Hintergrund (nicht auf das Popup selbst) schließt.
+        if (event.target === popupBackdrop) {
+          this._settingsPopupIndex = null;
+          this._render();
+        }
+      });
+    }
+    const popupClose = this.shadowRoot.querySelector(".settings-popup-close");
+    if (popupClose) {
+      popupClose.addEventListener("click", () => {
+        this._settingsPopupIndex = null;
+        this._render();
+      });
+    }
 
     // Akkordeon-Abschnitte (seit v1.2.0, siehe _renderVoicemailAccordion()) -
     // bewusst KEIN _render() hier: das native <details>-Element klappt sich
@@ -2706,7 +2941,6 @@ const EDITOR_LABELS = {
   title: "Titel",
   show_title: "Überschrift (Titel) anzeigen",
   show_einstellungen: "Kategorie 'Einstellungen' anzeigen (experimentell)",
-  entity_settings: "Sensor: Einstellungen/Telefoniegeräte (optional, experimentell)",
   entity_live: "Sensor: Live-Anrufmonitor (optional)",
   entity_eingehend: "Sensor: Angenommene Anrufe",
   entity_ausgehend: "Sensor: Ausgehende Anrufe",
@@ -2845,10 +3079,9 @@ const EDITOR_SCHEMA = [
           { name: "entity_tam_switch_5", selector: { entity: { domain: "switch" } } },
         ],
       },
-      // Einstellungen-Sensor (seit v1.3.0b0, EXPERIMENTELL) - liefert die
-      // Telefonie-/DECT-Geräte und (lesend) das Telefonbuch für den
-      // Zahnrad-Tab. Nur wirksam mit aktivierter Kategorie "Einstellungen".
-      { name: "entity_settings", selector: { entity: { domain: "sensor" } } },
+      // Der Einstellungen-Sensor (sensor.fritzbox_anrufe_einstellungen) wird
+      // seit v1.3.0b2 IMMER automatisch gefunden (siehe _settingsEntityId());
+      // ein eigener Sensor-Picker entfällt daher (Nutzerwunsch).
     ],
   },
   {

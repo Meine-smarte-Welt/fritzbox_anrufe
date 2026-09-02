@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): eae654e6021a58e44403f4c090e85f6c7fe5f0468e88585206dfc1ea861bf4be
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 36aebd42fd68280a785dde333e8d97e5b56fae19388e0b778a3ec976ea4bf1a0
 """Sensor to monitor incoming/outgoing phone calls on a Fritz!Box router."""
 
 from collections.abc import Mapping
@@ -561,16 +561,15 @@ class FritzBoxVoicemailSensor(CoordinatorEntity[FritzTamCoordinator], SensorEnti
 
 
 class FritzBoxSettingsSensor(CoordinatorEntity[FritzSettingsCoordinator], SensorEntity):
-    """Telefonie-/Geräte- und Telefonbuch-Sensor (fritzbox_anrufe_einstellungen).
+    """Telefoniegeräte-Sensor (fritzbox_anrufe_einstellungen).
 
-    EXPERIMENTELL (seit v1.3.0b0) - siehe settings_data.py. Füttert den
-    optionalen „Einstellungen"-Tab (Zahnrad) der Dashboard-Karte. Der Zustand
-    ist die Anzahl der angemeldeten DECT-Mobilteile; die eigentlichen Daten
-    (Rufnummern, DECT-Mobilteile, Repeater, Telefonbuch-Kontakte) stehen in den
-    Attributen. Hinweis: bei sehr großen Telefonbüchern kann das
-    ``contacts``-Attribut groß werden (Home Assistant warnt ggf. bei sehr
-    großen Attributwerten) - das ist für diese experimentelle Anzeige
-    beabsichtigt und betrifft nur diesen einen, optionalen Sensor.
+    EXPERIMENTELL (seit v1.3.0b0, erweitert v1.3.0b2) - siehe settings_data.py.
+    Füttert den optionalen „Einstellungen"-Tab (Zahnrad) der Dashboard-Karte.
+    Der Zustand ist die Anzahl der Telefoniegeräte; die eigentlichen Daten
+    (Telefoniegeräte-Tabelle mit ausgehender/ankommender/interner Nummer,
+    Rufnummern, DECT-Mobilteile) stehen in den Attributen. Das Telefonbuch wird
+    seit v1.3.0b2 NICHT mehr ausgewertet (Nutzerwunsch: nicht editierbar/nicht
+    vollständig darstellbar).
     """
 
     _attr_has_entity_name = True
@@ -598,20 +597,28 @@ class FritzBoxSettingsSensor(CoordinatorEntity[FritzSettingsCoordinator], Sensor
     @property
     @override
     def native_value(self) -> int:
-        """Anzahl der angemeldeten DECT-Mobilteile (einfacher Zustandswert)."""
-        return len(self._data.get("dect_handsets", []))
+        """Anzahl der Telefoniegeräte (einfacher Zustandswert).
+
+        Fällt auf die Anzahl der DECT-Mobilteile zurück, falls die
+        Telefoniegeräte-Tabelle (data.lua, experimentell) nicht abrufbar war.
+        """
+        data = self._data
+        devices = data.get("devices")
+        if devices:
+            return len(devices)
+        return len(data.get("dect_handsets", []))
 
     @property
     @override
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Telefonie-/Geräte- und Telefonbuchdaten für die Einstellungen-Kategorie."""
+        """Telefoniegerätedaten für die Einstellungen-Kategorie."""
         data = self._data
         return {
+            "devices": data.get("devices", []),
+            "devices_fallback": data.get("devices_fallback", False),
             "numbers": data.get("numbers", []),
             "dect_handsets": data.get("dect_handsets", []),
             "repeaters": data.get("repeaters", []),
-            "phonebook_id": data.get("phonebook_id"),
-            "contacts": data.get("contacts", []),
         }
 
 
