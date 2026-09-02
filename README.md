@@ -1207,6 +1207,62 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
+- **1.3.0**: Erste stabile Version der 1.3.0-Reihe. Sie bündelt die Neuerungen der
+  Vorabversionen 1.3.0b0–b3:
+  **(1)** Die Anrufbeantworter-Kategorie-Schalter liegen im grafischen
+  Karten-Editor in einem eigenen Klapp-Untermenü unter „Kategorien".
+  **(2)** Neue Option **„Überschrift (Titel) anzeigen"** (`show_title`) – bei „aus"
+  rendert die Karte keine Kopfzeile (praktisch z. B. in einem Bubble-Card-Popup).
+  **(3)** Ein globales Theme / `card_mod` übersteht jetzt den **Tab-Wechsel**
+  (die Karte tauscht nicht mehr ihren kompletten Shadow-DOM aus).
+  **(4)** **Erfolglose ausgehende Anrufe** (besetzt/nicht angenommen) überstehen
+  einen Home-Assistant-Neustart (persistente Speicherung).
+  **(5)** Neue optionale Kategorie **„Einstellungen" (Zahnrad, `show_einstellungen`)**:
+  eine Liste der **Telefoniegeräte** (FRITZ!App Fon, DECT-Telefone/-Repeater,
+  FON-Telefone) und der **Anrufbeantworter mit Ein/Aus-Schalter**. Die
+  Anrufbeantworter-Zeilen stammen aus der Karten-Konfiguration (den bereits
+  gesetzten Anrufbeantworter-Sensoren/-Schaltern); die übrigen Geräte kommen aus
+  einem neuen, automatisch verwendeten Sensor `sensor.fritzbox_anrufe_einstellungen`.
+  **Heimnetz-/Netzwerkgeräte** (LAN/WLAN-Geräte wie PCs, Sonos, Hue …) werden dabei
+  herausgefiltert. **Bewusst nicht enthalten:** die pro Gerät zugeordneten
+  ausgehenden/ankommenden/internen Rufnummern und das Telefonbuch – die
+  Rufnummern-Zuordnung stellt die FRITZ!Box weder über TR-064 noch zuverlässig
+  über die Weboberfläche bereit (auch vergleichbare Projekte bilden sie nicht ab),
+  daher wurde sie entfernt statt dauerhaft „–" anzuzeigen. Die Kategorie ist als
+  **experimentell** gekennzeichnet.
+- **1.3.0b3** (Vorabversion): **Fix für die Telefoniegeräte-Tabelle.** In 1.3.0b2
+  wurden fälschlich **alle Heimnetz-/Netzwerkgeräte** (LAN/WLAN-Geräte wie PCs,
+  Sonos, Hue …) mit angezeigt – die Karte hatte die (längere) Netzwerk-Geräteliste
+  aus `data.lua` erwischt statt der Telefonieliste. Jetzt werden **nur echte
+  Telefoniegeräte** übernommen (Anrufbeantworter, FRITZ!App Fon, DECT-Telefone
+  und -Repeater, FON-Telefone); Netzwerkgeräte werden herausgefiltert, und es
+  wird die Liste mit den **meisten Telefonen** gewählt (nicht die längste
+  Rohliste). Trägt die Box zu einem Gerät keine ausgehende/ankommende/interne
+  Nummer bei (die betroffene FRITZ!OS-Version liefert sie nicht mit), zeigt die
+  Karte dafür jetzt einen **klaren Hinweis** statt nur „–". **Weiterhin
+  EXPERIMENTELL/unbestätigt:** Ob deine Box die Nummern-Zuordnung überhaupt über
+  `data.lua` herausgibt, hängt von FRITZ!OS ab; DECT-Repeater lassen sich meist
+  nicht mit Nummern auflösen.
+- **1.3.0b2** (Vorabversion): **Telefoniegeräte-Tabelle in der „Einstellungen"-
+  Kategorie (Zahnrad).** Der Zahnrad-Tab zeigt jetzt – dem Screenshot der
+  FRITZ!Box-Oberfläche nachempfunden – eine **Tabelle aller Telefoniegeräte**
+  (Anrufbeantworter, FRITZ!App Fon, DECT-Mobilteile, FON-Telefone) mit
+  **Anschluss, ausgehender/ankommender Rufnummer und interner Nummer (**6xx)**.
+  Ein Klick auf eine Zeile öffnet ein **Detail-Popup** (Rufnummer ausgehend /
+  ankommend / intern); **hinter jedem Anrufbeantworter** sitzt – wie in der
+  Kategorie „Anrufbeantworter" – ein **Ein/Aus-Schalter** (nutzt den bereits
+  konfigurierten `entity_tam_switch`/`…_2…5`). Das **Telefonbuch** wird nicht
+  mehr angezeigt (nicht editierbar und nicht vollständig darstellbar). Der
+  Sensor-Picker **„Einstellungen/Telefoniegeräte" entfällt** – der Sensor
+  `sensor.fritzbox_anrufe_einstellungen` wird immer automatisch verwendet.
+  **Wichtig/EXPERIMENTELL:** Die Geräte-Tabelle stammt aus der Web-UI-Seite
+  `data.lua?page=fondevices` (dieselbe klassische Anmeldung wie beim
+  Anrufbeantworter-Download). Deren Format ist **nicht unabhängig bestätigt** und
+  konnte nicht gegen echte Hardware verifiziert werden. Liefert die Box sie nicht
+  (Rechte/FRITZ!OS/HTTPS-only), fällt die Tabelle auf die per TR-064 gemeldeten
+  Geräte **ohne** Nummern-Zuordnung zurück und zeigt einen Hinweis – bitte dann
+  mit FRITZ!OS-Version als GitHub-Issue melden (im Debug-Log stehen die
+  erkannten JSON-Schlüssel). Punkte 1–4 aus 1.3.0b0 sind davon unberührt.
 - **1.3.0b1** (Vorabversion): **Fix für die „Einstellungen"-Kategorie (Zahnrad).**
   In 1.3.0b0 erschien der Zahnrad-Tab nur, wenn sowohl die Kategorie aktiviert
   *als auch* der Sensor `entity_settings` gesetzt war - wer nur die Kategorie
@@ -1540,7 +1596,7 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.3.0b1) |
+| Datei | SHA256 (Version 1.3.0) |
 | --- | --- |
 | `__init__.py` | `f513ee0ff2c3847a19067db6abf93f83f0876ed61427058789516d6d96309f74` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
@@ -1548,15 +1604,15 @@ die komplette Datei, z. B. `sha256sum manifest.json`).
 | `config_flow.py` | `7fbbbb916a16a78a10623d599aa24d91f9b1953cee3f134a83ca66c9ef44d4a5` |
 | `const.py` | `32956d9a63be71721d0fef11b125045476ebda97b5a8d94083f796e6b14396d0` |
 | `http.py` | `4d98f8fb1236eb7960d0d3470f0eef1a0e3a45e48e713fe121faa1481a6b70df` |
-| `sensor.py` | `eae654e6021a58e44403f4c090e85f6c7fe5f0468e88585206dfc1ea861bf4be` |
-| `settings_data.py` | `9e86228658be8a5df0604ee556df9e61e0d62fa56daa1c3357035a439e8a973f` |
+| `sensor.py` | `36aebd42fd68280a785dde333e8d97e5b56fae19388e0b778a3ec976ea4bf1a0` |
+| `settings_data.py` | `693495289679a14a983d728634de4f2216cdd7aa4e478591ece6da219cb15d94` |
 | `spam.py` | `026ae8bc8890be324f074d17f5fce1269d87edbb420566bdfc1aae18cf3eea11` |
 | `switch.py` | `7cdbb0e5d3c5d1c8fa3cc5cad1cba6fa1f666b6c7eb1e034fbed40861b0e73c2` |
 | `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
 | `voicemail.py` | `564dc067bc31355e96e5521884969f228cf27bba73cae7bfb1b6d8ac9633a7f0` |
 | `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
-| `www/fritzbox-anrufe-card.js` | `22867173c8e31ba3b3330ef31c98f39f553412e73db39c31f9da1d82a234b47e` |
-| `manifest.json` | `1ac226e4aee826c039e413845d6bfefac52221625bfc752a38f21405d1543638` |
+| `www/fritzbox-anrufe-card.js` | `ea2966bb345525beab98e1bb4c87aeba2794ecba1dd60e37c9b7f75902ec3039` |
+| `manifest.json` | `bd3bef61dffe8052dd47f6e272ab6d75aa4cf5fe14e21440e492c1894487ff69` |
 | `strings.json` | `4551203e08227b717fd22491f8770c285d637f292e4e90c48733beb038dd4a45` |
 | `translations/de.json` | `a90ed9d1f4582b5d4a4431b379cebb9a979461acb825d58632fc533f66e1bb18` |
 | `translations/en.json` | `4551203e08227b717fd22491f8770c285d637f292e4e90c48733beb038dd4a45` |
