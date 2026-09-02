@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 4af8179c2e6b8dc6eddb88d79d9b18eb0b96af827d5dae2002170e6132b97e80
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): ea2966bb345525beab98e1bb4c87aeba2794ecba1dd60e37c9b7f75902ec3039
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -1374,9 +1374,6 @@ class FritzboxAnrufeCard extends HTMLElement {
     // reiner UI-Laufzeitstatus, wird in setConfig() aus dem dauerhaft
     // gespeicherten Grundzustand (show_voicemail_1-5) neu befüllt.
     this._tamPickerVisible = {};
-    // Welche Telefoniegeräte-Zeile gerade ihr Detail-Popup zeigt (Einstellungen-
-    // Tab, seit v1.3.0b2) - reiner UI-Laufzeitstatus, null = kein Popup offen.
-    this._settingsPopupIndex = null;
     this._hass = null;
     this._config = null;
     this._objectUrls = [];
@@ -1409,7 +1406,6 @@ class FritzboxAnrufeCard extends HTMLElement {
     for (let n = 1; n <= MAX_TAM_SLOTS; n += 1) {
       this._tamPickerVisible[n] = this._config[`show_voicemail_${n}`] !== false;
     }
-    this._settingsPopupIndex = null;
     this._lastSignature = null;
     this._render();
   }
@@ -1922,13 +1918,13 @@ class FritzboxAnrufeCard extends HTMLElement {
     return this._renderRows();
   }
 
-  // Einstellungen-Ansicht (Zahnrad-Tab, seit v1.3.0b0, EXPERIMENTELL) - liest
-  // die Attribute des Einstellungen-Sensors (siehe settings_data.py/sensor.py):
-  // die Telefoniegeräte-Tabelle (Name/Anschluss/ausgehende/ankommende/interne
-  // Nummer je Gerät, seit v1.3.0b2 aus data.lua) sowie die Rufnummern als
-  // Fallback. Je Gerät ein Detail-Popup; hinter jedem Anrufbeantworter ein
-  // Ein/Aus-Schalter (siehe _renderTamSwitchRow/_toggleTamSwitch). Das
-  // Telefonbuch wird seit v1.3.0b2 bewusst NICHT mehr angezeigt.
+  // Einstellungen-Ansicht (Zahnrad-Tab, seit v1.3.0b0, EXPERIMENTELL) - eine
+  // schlichte Liste der Telefoniegeräte: die Anrufbeantworter (mit Ein/Aus-
+  // Schalter) kommen aus der KARTEN-Konfiguration (entity_voicemail_N /
+  // entity_tam_switch_N - zuverlässiger als aus data.lua), die übrigen
+  // Telefoniegeräte (DECT/FON/FRITZ!App Fon) aus dem Einstellungen-Sensor
+  // (settings_data.py). Seit v1.3.0 OHNE per-Gerät-Rufnummern (die FRITZ!Box
+  // liefert die Zuordnung nicht zuverlässig) und ohne Telefonbuch.
   _renderSettings() {
     const entityId = this._settingsEntityId();
     if (!entityId) {
@@ -1959,8 +1955,11 @@ class FritzboxAnrufeCard extends HTMLElement {
     }
     const attrs = stateObj.attributes || {};
     const devices = Array.isArray(attrs.devices) ? attrs.devices : [];
-    const numbers = Array.isArray(attrs.numbers) ? attrs.numbers : [];
     const fallback = attrs.devices_fallback === true;
+    // Nicht-Anrufbeantworter-Telefoniegeräte aus dem Sensor (DECT-Telefone/
+    // -Repeater, FON, FRITZ!App Fon). Die Anrufbeantworter-Zeilen kommen aus der
+    // Karten-Konfiguration (siehe unten) - zuverlässiger als aus data.lua.
+    const phones = devices.filter((d) => d && !d.is_tam);
 
     const section = (title, bodyHtml) => `
       <div class="settings-section">
@@ -1969,123 +1968,88 @@ class FritzboxAnrufeCard extends HTMLElement {
       </div>
     `;
 
-    // --- Telefoniegeräte-Tabelle -------------------------------------------
-    let deviceHtml;
-    if (devices.length) {
-      const rows = devices
-        .map((dev, idx) => this._renderDeviceRow(dev, idx))
-        .join("");
-      // Trägt IRGENDEIN Gerät eine ausgehende/ankommende/interne Nummer? Wenn
-      // nicht (die FRITZ!Box liefert die Zuordnung auf dieser FRITZ!OS-Version
-      // nicht mit), das ehrlich vermerken statt nur „–" ohne Erklärung.
-      const anyNumbers = devices.some(
-        (d) => (d.outgoing || "") || (d.incoming || "") || (d.intern || "")
-      );
-      deviceHtml = `
-        <div class="settings-table" role="table">
-          <div class="settings-table-head" role="row">
-            <span class="col-name">Name</span>
-            <span class="col-anschluss">Anschluss</span>
-            <span class="col-num">Ausgehend</span>
-            <span class="col-num">Ankommend</span>
-            <span class="col-num">Intern</span>
-          </div>
-          ${rows}
-        </div>
-        ${
-          fallback
-            ? `<div class="settings-note">Hinweis: Die ausgehende/ankommende/interne
-                 Rufnummern-Zuordnung konnte nicht gelesen werden (data.lua nicht
-                 verfügbar); es werden nur die per TR-064 gemeldeten Geräte gezeigt.</div>`
-            : !anyNumbers
-              ? `<div class="settings-note">Hinweis: Diese FRITZ!Box/FRITZ!OS liefert die
-                   ausgehende/ankommende/interne Rufnummern-Zuordnung nicht mit – daher „–".
-                   Die Geräteliste ist auf echte Telefoniegeräte gefiltert (ohne Heimnetz-/
-                   Netzwerkgeräte). Siehe README.</div>`
+    // Anrufbeantworter-Zeilen (mit Ein/Aus-Schalter) aus der Konfiguration.
+    const abHtml = this._configuredTamSlots()
+      .map((slot) => this._renderSettingsAbRow(slot))
+      .join("");
+    // Übrige Telefoniegeräte (nur Name + Anschluss, seit v1.3.0 ohne Rufnummern).
+    const phoneHtml = phones
+      .map((dev) => this._renderSettingsDeviceRow(dev))
+      .join("");
+
+    const listHtml =
+      abHtml || phoneHtml
+        ? `<div class="settings-list">${abHtml}${phoneHtml}</div>${
+            fallback
+              ? `<div class="settings-note">Hinweis: Die Telefoniegeräte konnten nicht
+                   aus der FRITZ!Box-Oberfläche gelesen werden; es werden die per
+                   TR-064 gemeldeten DECT-Geräte gezeigt.</div>`
               : ""
-        }`;
-    } else {
-      const numberHtml = numbers.length
-        ? `<div class="settings-list">${numbers
-            .map(
-              (n) => `
-            <div class="settings-row">
-              <ha-icon class="settings-row-icon" icon="mdi:phone"></ha-icon>
-              <span class="settings-row-name">${escapeHtml(n.name || n.number || "")}</span>
-              <span class="settings-row-meta">${escapeHtml(n.number || "")}</span>
-            </div>`
-            )
-            .join("")}</div>`
-        : "";
-      deviceHtml = `
-        <div class="empty">
-          Keine Telefoniegeräte gelesen. Das FRITZ!Box-Konto/FRITZ!OS liefert die
-          Telefoniegeräte-Tabelle (data.lua) hier nicht. Siehe README.
-        </div>
-        ${numbers.length ? section("Rufnummern", numberHtml) : ""}`;
-    }
+          }`
+        : `<div class="empty">
+             Keine Telefoniegeräte gefunden. Anrufbeantworter erscheinen hier, sobald
+             im Karten-Editor der/die Anrufbeantworter-Schalter (Sensoren) gesetzt sind.
+             Siehe README.
+           </div>`;
 
     return `
       <div class="settings-view">
         <div class="settings-experimental">Experimentell – Anzeige, siehe README.</div>
-        ${section("Telefoniegeräte", deviceHtml)}
-        ${this._renderDevicePopup(devices)}
+        ${section("Telefoniegeräte", listHtml)}
       </div>
     `;
   }
 
-  // Eine Zeile der Telefoniegeräte-Tabelle. Anklickbar (öffnet das Detail-
-  // Popup, siehe _renderDevicePopup); hinter einem Anrufbeantworter zusätzlich
-  // ein Ein/Aus-Schalter (nur, wenn ein passender Schalter konfiguriert ist).
-  _renderDeviceRow(dev, idx) {
+  // Konfigurierte Anrufbeantworter-Slots (1..5): ein Slot zählt, sobald für ihn
+  // ein Anrufbeantworter-Sensor ODER ein Ein/Aus-Schalter konfiguriert ist.
+  // Liefert je Slot Nummer, Anzeigename und (falls vorhanden) Schalter-Entity.
+  _configuredTamSlots() {
+    const slots = [];
+    for (let n = 1; n <= MAX_TAM_SLOTS; n += 1) {
+      const entityId = this._config[this._tamEntityKey(n)];
+      const switchEntityId = this._config[this._tamSwitchKey(n)];
+      if (entityId || switchEntityId) {
+        slots.push({
+          n,
+          name: n === 1 ? "Anrufbeantworter" : `Anrufbeantworter ${n}`,
+          switchEntity: switchEntityId || "",
+        });
+      }
+    }
+    return slots;
+  }
+
+  // Eine Anrufbeantworter-Zeile in der Einstellungen-Liste: Symbol, Name,
+  // Anschluss-Text und - falls ein Schalter konfiguriert ist - der bekannte
+  // Ein/Aus-Schalter (Klasse .tam-switch-toggle, gleicher Klick-Handler wie im
+  // Anrufbeantworter-Tab, siehe _toggleTamSwitch).
+  _renderSettingsAbRow(slot) {
+    return `
+      <div class="settings-row">
+        <ha-icon class="settings-row-icon" icon="mdi:answering-machine"></ha-icon>
+        <span class="settings-row-name">${escapeHtml(slot.name)}</span>
+        <span class="settings-row-meta">Anrufbeantworter</span>
+        ${slot.switchEntity ? this._settingsSwitchButton(slot.switchEntity) : ""}
+      </div>
+    `;
+  }
+
+  // Eine Telefoniegeräte-Zeile (Nicht-Anrufbeantworter): Symbol, Name, Anschluss.
+  _renderSettingsDeviceRow(dev) {
     const name = dev.name || "";
     const anschluss = dev.anschluss || dev.type || "";
-    const outgoing = dev.outgoing || "";
-    const incoming = dev.incoming || "";
-    const intern = dev.intern || "";
-    const icon = this._deviceIcon(dev);
-    const tamToggle = dev.is_tam ? this._deviceTamToggle(dev) : "";
     return `
-      <div class="settings-table-row clickable" role="row" data-device-index="${idx}" title="Details anzeigen">
-        <span class="col-name" role="cell">
-          <ha-icon class="settings-row-icon" icon="${icon}"></ha-icon>
-          <span class="settings-device-name">${escapeHtml(name)}</span>
-        </span>
-        <span class="col-anschluss" role="cell">${escapeHtml(anschluss)}</span>
-        <span class="col-num" role="cell">${escapeHtml(outgoing) || "–"}</span>
-        <span class="col-num" role="cell">${escapeHtml(incoming) || "–"}</span>
-        <span class="col-num col-intern" role="cell">
-          <span>${escapeHtml(intern) || "–"}</span>
-          ${tamToggle}
-        </span>
+      <div class="settings-row">
+        <ha-icon class="settings-row-icon" icon="${this._deviceIcon(dev)}"></ha-icon>
+        <span class="settings-row-name">${escapeHtml(name)}</span>
+        <span class="settings-row-meta">${escapeHtml(anschluss)}</span>
       </div>
     `;
   }
 
-  // mdi-Symbol je Gerätetyp (best effort, rein optisch).
-  _deviceIcon(dev) {
-    if (dev.is_tam) return "mdi:answering-machine";
-    const token = `${dev.type || ""} ${dev.anschluss || ""} ${dev.name || ""}`.toLowerCase();
-    if (token.includes("dect") || token.includes("mobilteil")) return "mdi:phone-classic";
-    if (token.includes("app")) return "mdi:cellphone";
-    if (token.includes("fon") || token.includes("telefon")) return "mdi:phone";
-    return "mdi:phone";
-  }
-
-  // Ordnet einer Anrufbeantworter-Zeile den passenden konfigurierten Ein/Aus-
-  // Schalter zu (tam_index 1 -> entity_tam_switch, 2 -> _2 …) und liefert die
-  // bestehende Schalter-Schaltfläche (Klasse .tam-switch-toggle, derselbe
-  // Klick-Handler wie im Anrufbeantworter-Tab, siehe _toggleTamSwitch). Ohne
-  // passenden konfigurierten Schalter erscheint nichts.
-  _deviceTamSwitchEntity(dev) {
-    const n = Number(dev.tam_index) || 1;
-    const key = this._tamSwitchKey(n);
-    return (this._config && this._config[key]) || "";
-  }
-
-  _deviceTamToggle(dev) {
-    const entityId = this._deviceTamSwitchEntity(dev);
-    if (!entityId) return "";
+  // Ein/Aus-Schalter-Schaltfläche für einen Switch-Entity (wiederverwendet die
+  // bestehende .tam-switch-toggle-Optik + den bestehenden Klick-Handler).
+  _settingsSwitchButton(entityId) {
     const stateObj = this._entityState(entityId);
     const state = stateObj ? stateObj.state : undefined;
     const isOn = state === "on";
@@ -2103,48 +2067,14 @@ class FritzboxAnrufeCard extends HTMLElement {
     `;
   }
 
-  // Detail-Popup zu einer Gerätezeile (seit v1.3.0b2) - bewusst KEIN natives
-  // dialog()/confirm() (siehe Moduldoku: die misslingen im Companion-App-
-  // WebView), sondern ein eigenes Overlay im Shadow-Root. Offen, wenn
-  // this._settingsPopupIndex auf eine gültige Zeile zeigt.
-  _renderDevicePopup(devices) {
-    const idx = this._settingsPopupIndex;
-    if (idx === null || idx === undefined) return "";
-    const dev = devices[idx];
-    if (!dev) return "";
-    const line = (label, value) => `
-      <div class="settings-popup-line">
-        <span class="settings-popup-label">${escapeHtml(label)}</span>
-        <span class="settings-popup-value">${escapeHtml(value) || "–"}</span>
-      </div>`;
-    const tamToggle = dev.is_tam ? this._deviceTamToggle(dev) : "";
-    return `
-      <div class="settings-popup-backdrop">
-        <div class="settings-popup" role="dialog" aria-modal="true">
-          <div class="settings-popup-head">
-            <ha-icon icon="${this._deviceIcon(dev)}"></ha-icon>
-            <span class="settings-popup-title">${escapeHtml(dev.name || "")}</span>
-            <button class="settings-popup-close" title="Schließen" aria-label="Schließen">
-              <ha-icon icon="mdi:close"></ha-icon>
-            </button>
-          </div>
-          <div class="settings-popup-body">
-            ${line("Anschluss", dev.anschluss || dev.type || "")}
-            ${line("Rufnummer ausgehend", dev.outgoing || "")}
-            ${line("Rufnummer ankommend", dev.incoming || "")}
-            ${line("Intern", dev.intern || "")}
-            ${
-              tamToggle
-                ? `<div class="settings-popup-line">
-                     <span class="settings-popup-label">Anrufbeantworter</span>
-                     <span class="settings-popup-value">${tamToggle}</span>
-                   </div>`
-                : ""
-            }
-          </div>
-        </div>
-      </div>
-    `;
+  // mdi-Symbol je Gerätetyp (best effort, rein optisch).
+  _deviceIcon(dev) {
+    if (dev.is_tam) return "mdi:answering-machine";
+    const token = `${dev.type || ""} ${dev.anschluss || ""} ${dev.name || ""}`.toLowerCase();
+    if (token.includes("dect") || token.includes("mobilteil")) return "mdi:phone-classic";
+    if (token.includes("app")) return "mdi:cellphone";
+    if (token.includes("fon") || token.includes("telefon")) return "mdi:phone";
+    return "mdi:phone";
   }
 
   _renderRows() {
@@ -2628,43 +2558,12 @@ class FritzboxAnrufeCard extends HTMLElement {
     // show_tam_switch gerendert, siehe _renderTamSwitches()).
     this.shadowRoot.querySelectorAll(".tam-switch-toggle").forEach((btn) => {
       btn.addEventListener("click", (event) => {
-        // In der Telefoniegeräte-Tabelle steckt der Schalter in einer
-        // anklickbaren Zeile (öffnet sonst das Detail-Popup) - der Klick auf
-        // den Schalter darf das Popup NICHT mitöffnen.
+        // Der Schalter kann in einer Listenzeile sitzen - ein etwaiger
+        // Zeilen-Klick darf nicht zusätzlich ausgelöst werden.
         event.stopPropagation();
         this._toggleTamSwitch(btn.dataset.entity, btn.dataset.state);
       });
     });
-
-    // Telefoniegeräte-Tabelle (Einstellungen-Tab, seit v1.3.0b2): Klick auf
-    // eine Zeile öffnet das Detail-Popup; Klick auf das Overlay/den
-    // Schließen-Button schließt es wieder. Reiner UI-Laufzeitstatus
-    // (this._settingsPopupIndex), daher ein einfacher Re-Render.
-    this.shadowRoot.querySelectorAll(".settings-table-row.clickable").forEach((row) => {
-      row.addEventListener("click", (event) => {
-        if (event.target.closest(".tam-switch-toggle")) return;
-        const idx = Number(row.dataset.deviceIndex);
-        this._settingsPopupIndex = Number.isInteger(idx) ? idx : null;
-        this._render();
-      });
-    });
-    const popupBackdrop = this.shadowRoot.querySelector(".settings-popup-backdrop");
-    if (popupBackdrop) {
-      popupBackdrop.addEventListener("click", (event) => {
-        // Nur ein Klick auf den Hintergrund (nicht auf das Popup selbst) schließt.
-        if (event.target === popupBackdrop) {
-          this._settingsPopupIndex = null;
-          this._render();
-        }
-      });
-    }
-    const popupClose = this.shadowRoot.querySelector(".settings-popup-close");
-    if (popupClose) {
-      popupClose.addEventListener("click", () => {
-        this._settingsPopupIndex = null;
-        this._render();
-      });
-    }
 
     // Akkordeon-Abschnitte (seit v1.2.0, siehe _renderVoicemailAccordion()) -
     // bewusst KEIN _render() hier: das native <details>-Element klappt sich

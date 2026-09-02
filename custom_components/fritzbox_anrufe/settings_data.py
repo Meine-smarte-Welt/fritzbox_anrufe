@@ -1,20 +1,20 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): adebda114dd5cc984f732e27d3fb21daab89f3b0dc12faeb4965d705193673a4
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 693495289679a14a983d728634de4f2216cdd7aa4e478591ece6da219cb15d94
 """Telefonie-/Gerätedaten für die Einstellungen-Kategorie.
 
-EXPERIMENTELL (seit v1.3.0b0, erweitert in v1.3.0b2/b3) - siehe README. Diese
-Daten füttern den optionalen „Einstellungen"-Tab (Zahnrad) der Dashboard-Karte.
+EXPERIMENTELL (seit v1.3.0b0) - siehe README. Diese Daten füttern den optionalen
+„Einstellungen"-Tab (Zahnrad) der Dashboard-Karte.
 
-v1.3.0b3: Es werden jetzt NUR echte Telefoniegeräte übernommen
-(:func:`_is_telephony_entry`) - die vorher fälschlich mit angezeigten Heimnetz-/
+Ziel: die **Telefoniegeräte** der FRITZ!Box auflisten (FRITZ!App Fon,
+DECT-Telefone/-Repeater, FON-Telefone) mit Name und Anschluss. Es werden NUR
+echte Telefoniegeräte übernommen (:func:`_is_telephony_entry`) - Heimnetz-/
 Netzwerkgeräte (LAN/WLAN-Hosts wie PCs, Sonos, Hue …) werden herausgefiltert;
-zudem wird die Liste mit den MEISTEN Telefonen gewählt, nicht die längste
-Rohliste.
+von mehreren Kandidatenlisten wird die mit den MEISTEN Telefonen gewählt.
 
-Ziel (seit v1.3.0b2): die **Telefoniegeräte-Tabelle** der FRITZ!Box-Oberfläche
-nachbilden - je Gerät (Anrufbeantworter, FRITZ!App Fon, DECT-Mobilteile,
-FON-Telefone) mit Anschluss, ausgehender/ankommender Rufnummer und interner
-Nummer (**6xx). Das Telefonbuch wird bewusst NICHT mehr angezeigt (nicht
-editierbar und nicht vollständig darstellbar - Nutzerwunsch).
+Seit v1.3.0 werden **keine per-Gerät-Rufnummern** (ausgehend/ankommend/intern)
+mehr ausgegeben: Diese Zuordnung liefert die FRITZ!Box nicht zuverlässig über
+TR-064/data.lua (auch die Referenz FRITZ-Portal bildet sie nicht ab). Die
+Anrufbeantworter-Zeilen samt Ein/Aus-Schalter erzeugt die KARTE aus ihrer
+eigenen Konfiguration; das Telefonbuch wird bewusst nicht angezeigt.
 
 Datenquellen (in dieser Reihenfolge zusammengeführt):
 
@@ -349,32 +349,27 @@ def parse_fon_devices(payload: object) -> list[dict[str, object]]:
         max(telephony_lists, key=len) if telephony_lists else []
     )
     rows: list[dict[str, object]] = []
-    tam_index = 0
     for entry in devices:
         name = _first(entry, _NAME_KEYS)
         if not name:
             continue
         raw_type = _first(entry, _TYPE_KEYS)
-        outgoing = _first(entry, _OUTGOING_KEYS)
-        incoming = _first(entry, _INCOMING_KEYS)
-        intern = _first(entry, _INTERN_KEYS)
         low = f"{raw_type} {name}".lower()
         is_tam = any(tok in low for tok in _TAM_TYPE_TOKENS)
-        if is_tam:
-            tam_index += 1
         rows.append(
             {
                 "name": name,
                 "type": raw_type,
                 "anschluss": _anschluss_for(raw_type, name),
-                "outgoing": outgoing,
-                "incoming": incoming,
-                "intern": intern,
+                # Seit v1.3.0 werden KEINE per-Gerät-Rufnummern mehr ausgegeben:
+                # Die ausgehende/ankommende/interne Nummern-Zuordnung liefert die
+                # FRITZ!Box nicht zuverlässig über TR-064/data.lua (auch die
+                # Referenz FRITZ-Portal bildet sie nicht ab) - daher entfernt.
+                # ``is_tam`` bleibt nur, um AB-Einträge aus dieser Web-Geräteliste
+                # zu erkennen; die eigentlichen Anrufbeantworter-Zeilen (inkl.
+                # Ein/Aus-Schalter) erzeugt die Karte aus ihrer eigenen
+                # Konfiguration (siehe _renderSettings()).
                 "is_tam": is_tam,
-                # 1-basierter Index NUR unter den Anrufbeantwortern, damit die
-                # Karte die Zeile dem passenden Ein/Aus-Schalter zuordnen kann
-                # (entity_tam_switch / entity_tam_switch_N).
-                "tam_index": tam_index if is_tam else 0,
             }
         )
     return rows
