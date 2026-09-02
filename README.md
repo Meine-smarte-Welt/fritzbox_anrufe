@@ -1207,8 +1207,7 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
-- **1.3.0**: Erste stabile Version der 1.3.0-Reihe. Sie bündelt die Neuerungen der
-  Vorabversionen 1.3.0b0–b3:
+- **1.3.0**: Mehrere Neuerungen an Karte und Integration:
   **(1)** Die Anrufbeantworter-Kategorie-Schalter liegen im grafischen
   Karten-Editor in einem eigenen Klapp-Untermenü unter „Kategorien".
   **(2)** Neue Option **„Überschrift (Titel) anzeigen"** (`show_title`) – bei „aus"
@@ -1230,66 +1229,6 @@ die dortigen Maintainer den Fehler beheben.
   über die Weboberfläche bereit (auch vergleichbare Projekte bilden sie nicht ab),
   daher wurde sie entfernt statt dauerhaft „–" anzuzeigen. Die Kategorie ist als
   **experimentell** gekennzeichnet.
-- **1.3.0b3** (Vorabversion): **Fix für die Telefoniegeräte-Tabelle.** In 1.3.0b2
-  wurden fälschlich **alle Heimnetz-/Netzwerkgeräte** (LAN/WLAN-Geräte wie PCs,
-  Sonos, Hue …) mit angezeigt – die Karte hatte die (längere) Netzwerk-Geräteliste
-  aus `data.lua` erwischt statt der Telefonieliste. Jetzt werden **nur echte
-  Telefoniegeräte** übernommen (Anrufbeantworter, FRITZ!App Fon, DECT-Telefone
-  und -Repeater, FON-Telefone); Netzwerkgeräte werden herausgefiltert, und es
-  wird die Liste mit den **meisten Telefonen** gewählt (nicht die längste
-  Rohliste). Trägt die Box zu einem Gerät keine ausgehende/ankommende/interne
-  Nummer bei (die betroffene FRITZ!OS-Version liefert sie nicht mit), zeigt die
-  Karte dafür jetzt einen **klaren Hinweis** statt nur „–". **Weiterhin
-  EXPERIMENTELL/unbestätigt:** Ob deine Box die Nummern-Zuordnung überhaupt über
-  `data.lua` herausgibt, hängt von FRITZ!OS ab; DECT-Repeater lassen sich meist
-  nicht mit Nummern auflösen.
-- **1.3.0b2** (Vorabversion): **Telefoniegeräte-Tabelle in der „Einstellungen"-
-  Kategorie (Zahnrad).** Der Zahnrad-Tab zeigt jetzt – dem Screenshot der
-  FRITZ!Box-Oberfläche nachempfunden – eine **Tabelle aller Telefoniegeräte**
-  (Anrufbeantworter, FRITZ!App Fon, DECT-Mobilteile, FON-Telefone) mit
-  **Anschluss, ausgehender/ankommender Rufnummer und interner Nummer (**6xx)**.
-  Ein Klick auf eine Zeile öffnet ein **Detail-Popup** (Rufnummer ausgehend /
-  ankommend / intern); **hinter jedem Anrufbeantworter** sitzt – wie in der
-  Kategorie „Anrufbeantworter" – ein **Ein/Aus-Schalter** (nutzt den bereits
-  konfigurierten `entity_tam_switch`/`…_2…5`). Das **Telefonbuch** wird nicht
-  mehr angezeigt (nicht editierbar und nicht vollständig darstellbar). Der
-  Sensor-Picker **„Einstellungen/Telefoniegeräte" entfällt** – der Sensor
-  `sensor.fritzbox_anrufe_einstellungen` wird immer automatisch verwendet.
-  **Wichtig/EXPERIMENTELL:** Die Geräte-Tabelle stammt aus der Web-UI-Seite
-  `data.lua?page=fondevices` (dieselbe klassische Anmeldung wie beim
-  Anrufbeantworter-Download). Deren Format ist **nicht unabhängig bestätigt** und
-  konnte nicht gegen echte Hardware verifiziert werden. Liefert die Box sie nicht
-  (Rechte/FRITZ!OS/HTTPS-only), fällt die Tabelle auf die per TR-064 gemeldeten
-  Geräte **ohne** Nummern-Zuordnung zurück und zeigt einen Hinweis – bitte dann
-  mit FRITZ!OS-Version als GitHub-Issue melden (im Debug-Log stehen die
-  erkannten JSON-Schlüssel). Punkte 1–4 aus 1.3.0b0 sind davon unberührt.
-- **1.3.0b1** (Vorabversion): **Fix für die „Einstellungen"-Kategorie (Zahnrad).**
-  In 1.3.0b0 erschien der Zahnrad-Tab nur, wenn sowohl die Kategorie aktiviert
-  *als auch* der Sensor `entity_settings` gesetzt war - wer nur die Kategorie
-  einschaltete, sah nichts. Jetzt erscheint der Tab bereits beim Einschalten der
-  Kategorie; der zugehörige Sensor `sensor.fritzbox_anrufe_einstellungen` wird
-  automatisch gefunden (und für neue Karten vorbelegt). Fehlt er ganz, zeigt der
-  Tab einen klaren Hinweis statt sich stillschweigend auszublenden. Sonst
-  unverändert zu 1.3.0b0.
-- **1.3.0b0** (Vorabversion): Mehrere Neuerungen an Karte und Integration.
-  **(1)** Die Anrufbeantworter-Kategorie-Schalter liegen im Karten-Editor jetzt
-  in einem eigenen Klapp-Untermenü unter „Kategorien" (analog zu „Sensoren").
-  **(2)** Neue Option **„Überschrift anzeigen" (`show_title`)** - blendet die
-  Kartenüberschrift „FRITZ!Box Anrufe" auf Wunsch aus (praktisch z. B. in einem
-  Bubble-Card-Popup). **(3)** Die Karte ersetzt beim Umschalten der Liste nicht
-  mehr ihren kompletten Shadow-DOM-Inhalt - von außen eingefügte Styles (z. B.
-  eines globalen UIX-Themes/card_mod) überstehen jetzt einen Tab-Wechsel. **(4)**
-  Erfolglose ausgehende Anrufe (ohne Gespräch) werden nun persistent gespeichert
-  und überstehen einen Home-Assistant-Neustart. **(5, EXPERIMENTELL)** Neue
-  optionale Kategorie **„Einstellungen" (Zahnrad, `show_einstellungen`)** mit
-  einem neuen Sensor `fritzbox_anrufe_einstellungen`: zeigt angemeldete
-  DECT-Mobilteile, die Rufnummern der Box und (nur lesend) das Telefonbuch.
-  Datenquelle sind die dokumentierten TR-064-Aktionen `GetNumbers`/
-  `GetDECTHandsetList`/`GetDECTHandsetInfo` - die vollständige Telefoniegeräte-
-  Tabelle der FRITZ!Box-Oberfläche (inkl. FON/App-Geräten, interner **6xx-
-  Nummern und Repeatern) ist über TR-064 nicht sauber abrufbar und für eine
-  spätere Beta vorgesehen; das **Bearbeiten** des Telefonbuchs folgt ebenfalls
-  in einer späteren Beta. Als Vorabversion (`b0`) zum Testen gedacht.
 - **1.2.3**: **Spam-Erkennung per Namens-Marker (z. B. „SPAM:").** Neben der
   bisherigen Spam-Erkennung (FRITZ!Box-eigene Sperrliste oder eigene
   Nummernliste) kann jetzt ein Anruf bzw. eine Anrufbeantworter-Nachricht auch
