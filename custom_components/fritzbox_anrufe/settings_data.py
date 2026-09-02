@@ -1,8 +1,14 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 7cf4f58426505d673f0980182b7d341d7478a1c77731044d8a2d23df29ee3813
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): adebda114dd5cc984f732e27d3fb21daab89f3b0dc12faeb4965d705193673a4
 """Telefonie-/Gerätedaten für die Einstellungen-Kategorie.
 
-EXPERIMENTELL (seit v1.3.0b0, erweitert in v1.3.0b2) - siehe README. Diese
+EXPERIMENTELL (seit v1.3.0b0, erweitert in v1.3.0b2/b3) - siehe README. Diese
 Daten füttern den optionalen „Einstellungen"-Tab (Zahnrad) der Dashboard-Karte.
+
+v1.3.0b3: Es werden jetzt NUR echte Telefoniegeräte übernommen
+(:func:`_is_telephony_entry`) - die vorher fälschlich mit angezeigten Heimnetz-/
+Netzwerkgeräte (LAN/WLAN-Hosts wie PCs, Sonos, Hue …) werden herausgefiltert;
+zudem wird die Liste mit den MEISTEN Telefonen gewählt, nicht die längste
+Rohliste.
 
 Ziel (seit v1.3.0b2): die **Telefoniegeräte-Tabelle** der FRITZ!Box-Oberfläche
 nachbilden - je Gerät (Anrufbeantworter, FRITZ!App Fon, DECT-Mobilteile,
@@ -88,6 +94,56 @@ _INTERN_KEYS = ("intern", "internal", "internalNumbers", "internnumber", "intern
 # Rohe Gerätetypen, die einen Anrufbeantworter kennzeichnen (Schalter anzeigen).
 _TAM_TYPE_TOKENS = ("tam", "answer", "anrufbeantworter")
 
+# Telefonie-Klassifizierung (seit v1.3.0b3): NUR echte Telefoniegeräte
+# (Anrufbeantworter, FRITZ!App Fon, DECT-Telefone/-Repeater, FON-Telefone)
+# sollen erscheinen - NICHT die Netzwerk-/Heimnetzgeräte (LAN/WLAN-Hosts wie
+# PCs, Sonos, Hue …), die manche data.lua-Seiten in derselben Antwort mitliefern.
+# Rückmeldung/Screenshots eines Nutzers zeigten, dass die vorherige, zu weite
+# Heuristik die (längere) Hostliste erwischte.
+_TELEPHONY_TYPE_TOKENS = (
+    "dect",
+    "fon",
+    "tam",
+    "isdn",
+    "pots",
+    "sip",
+    "voip",
+    "app",
+    "handset",
+    "mobilteil",
+)
+# Name-Marker, die ein Gerät eindeutig als Telefon ausweisen (falls der Typ
+# nichts hergibt).
+_TELEPHONY_NAME_TOKENS = (
+    "fritz!fon",
+    "fritzfon",
+    "mobilteil",
+    "handset",
+    "anrufbeantworter",
+    "app fon",
+    "fritz!app",
+    "dect",
+    "telefon",
+)
+# Typen, die ein reines Netzwerk-/Heimnetzgerät markieren (werden verworfen,
+# sofern das Gerät nicht zugleich klar als Telefon erkennbar ist).
+_NETWORK_TYPE_TOKENS = (
+    "lan",
+    "wlan",
+    "wifi",
+    "wan",
+    "ethernet",
+    "powerline",
+    "dlan",
+    "plc",
+    "usb",
+    "guest",
+    "any",
+    "host",
+    "smarthome",
+    "ip",
+)
+
 
 def parse_numbers_xml(raw: str | None) -> list[dict[str, str]]:
     """Parse the ``NewNumberList`` XML from ``GetNumbers`` into plain dicts.
@@ -167,7 +223,12 @@ def _first(entry: dict, keys: tuple[str, ...]) -> str:
 
 
 def _looks_like_device(entry: dict) -> bool:
-    """Heuristik: sieht dieser Dict wie eine Telefoniegeräte-Zeile aus?"""
+    """Heuristik: sieht dieser Dict wie eine (irgendeine) Gerätezeile aus?
+
+    Bewusst weit - dient nur dazu, im JSON überhaupt Geräte-Listen zu FINDEN.
+    Die eigentliche Trennung „Telefon vs. Netzwerkgerät" macht
+    :func:`_is_telephony_entry` (seit v1.3.0b3).
+    """
     if not isinstance(entry, dict):
         return False
     has_name = bool(_first(entry, _NAME_KEYS))
@@ -175,6 +236,44 @@ def _looks_like_device(entry: dict) -> bool:
         key in entry for key in (*_OUTGOING_KEYS, *_INCOMING_KEYS, *_INTERN_KEYS, *_TYPE_KEYS)
     )
     return has_name and has_phone_field
+
+
+def _is_telephony_entry(entry: dict) -> bool:
+    """True nur für echte Telefoniegeräte (nicht für LAN/WLAN-Heimnetzgeräte).
+
+    Seit v1.3.0b3. Grund: manche ``data.lua``-Seiten liefern in derselben
+    Antwort eine (oft längere) Liste der Heimnetz-/Netzwerkgeräte mit (PCs,
+    Sonos, Hue, NAS …, Typ ``lan``/``wlan``/``any``); die dürfen im
+    Telefonie-Tab NICHT erscheinen. Ein Gerät gilt als Telefon, wenn sein Typ
+    ODER Name klar telefonisch ist; ein reiner Netzwerk-Typ ohne solchen
+    Telefon-Marker wird verworfen.
+    """
+    if not isinstance(entry, dict):
+        return False
+    raw_type = _first(entry, _TYPE_KEYS).lower()
+    name = _first(entry, _NAME_KEYS).lower()
+    blob = f"{raw_type} {name}"
+    is_phone = (
+        any(tok in raw_type for tok in _TELEPHONY_TYPE_TOKENS)
+        or any(tok in name for tok in _TELEPHONY_NAME_TOKENS)
+        or any(tok in blob for tok in _TAM_TYPE_TOKENS)
+    )
+    if is_phone:
+        return True
+    # Kein Telefon-Marker: nur behalten, wenn es auch nicht klar ein
+    # Netzwerkgerät ist UND es eine per-Gerät-Rufnummer trägt (dann ist es
+    # vermutlich doch ein Telefoniegerät mit unbekanntem Typ).
+    is_network = any(tok in raw_type for tok in _NETWORK_TYPE_TOKENS) or any(
+        key in entry for key in ("ip", "ipaddress", "ipv4", "mac", "UID", "uid")
+    )
+    if is_network:
+        return False
+    has_number = bool(
+        _first(entry, _OUTGOING_KEYS)
+        or _first(entry, _INCOMING_KEYS)
+        or _first(entry, _INTERN_KEYS)
+    )
+    return has_number
 
 
 def _find_device_lists(obj: object, depth: int = 0) -> list[list[dict]]:
@@ -239,9 +338,16 @@ def parse_fon_devices(payload: object) -> list[dict[str, object]]:
     Feldnamen. Unbekanntes ergibt eine leere Liste (kein Fehler).
     """
     lists = _find_device_lists(payload)
-    # Nimm die längste plausible Liste (die eigentliche Gerätetabelle ist i. d. R.
-    # länger als z. B. eine Basis-Info-Liste).
-    devices: list[dict] = max(lists, key=len) if lists else []
+    # Jede Kandidaten-Liste auf ECHTE Telefoniegeräte filtern (seit v1.3.0b3,
+    # siehe _is_telephony_entry) und die Liste mit den MEISTEN Telefonen nehmen -
+    # NICHT mehr die längste Rohliste (das war die (längere) Netzwerk-Hostliste).
+    telephony_lists = [
+        [e for e in lst if _is_telephony_entry(e)] for lst in lists
+    ]
+    telephony_lists = [lst for lst in telephony_lists if lst]
+    devices: list[dict] = (
+        max(telephony_lists, key=len) if telephony_lists else []
+    )
     rows: list[dict[str, object]] = []
     tam_index = 0
     for entry in devices:

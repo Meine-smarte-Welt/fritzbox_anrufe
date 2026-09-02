@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 37d0357e6b69a7a27e42bfce8b3fe9b521888720854b0190ffc67b8761084fc8
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 4af8179c2e6b8dc6eddb88d79d9b18eb0b96af827d5dae2002170e6132b97e80
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -1975,6 +1975,12 @@ class FritzboxAnrufeCard extends HTMLElement {
       const rows = devices
         .map((dev, idx) => this._renderDeviceRow(dev, idx))
         .join("");
+      // Trägt IRGENDEIN Gerät eine ausgehende/ankommende/interne Nummer? Wenn
+      // nicht (die FRITZ!Box liefert die Zuordnung auf dieser FRITZ!OS-Version
+      // nicht mit), das ehrlich vermerken statt nur „–" ohne Erklärung.
+      const anyNumbers = devices.some(
+        (d) => (d.outgoing || "") || (d.incoming || "") || (d.intern || "")
+      );
       deviceHtml = `
         <div class="settings-table" role="table">
           <div class="settings-table-head" role="row">
@@ -1991,7 +1997,12 @@ class FritzboxAnrufeCard extends HTMLElement {
             ? `<div class="settings-note">Hinweis: Die ausgehende/ankommende/interne
                  Rufnummern-Zuordnung konnte nicht gelesen werden (data.lua nicht
                  verfügbar); es werden nur die per TR-064 gemeldeten Geräte gezeigt.</div>`
-            : ""
+            : !anyNumbers
+              ? `<div class="settings-note">Hinweis: Diese FRITZ!Box/FRITZ!OS liefert die
+                   ausgehende/ankommende/interne Rufnummern-Zuordnung nicht mit – daher „–".
+                   Die Geräteliste ist auf echte Telefoniegeräte gefiltert (ohne Heimnetz-/
+                   Netzwerkgeräte). Siehe README.</div>`
+              : ""
         }`;
     } else {
       const numberHtml = numbers.length
