@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 693495289679a14a983d728634de4f2216cdd7aa4e478591ece6da219cb15d94
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 165f75b122a28ab27bca5a512ecb58160f68224a0c41b0ff3aa907da7fdd7310
 """Telefonie-/Gerätedaten für die Einstellungen-Kategorie.
 
 EXPERIMENTELL (seit v1.3.0b0) - siehe README. Diese Daten füttern den optionalen
@@ -517,6 +517,30 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
             )
         return rows
 
+    def _fetch_contacts(self) -> list[dict[str, object]]:
+        """Telefonbuch-Kontakte (nur LESEN) - seit v1.3.1 wieder optional anzeigbar.
+
+        Nutzt das bereits von der Integration geladene Telefonbuch
+        (:attr:`FritzBoxPhonebook.contacts`, für die Namensauflösung ohnehin
+        heruntergeladen) - daher KEIN zusätzlicher Netz-Abruf. Fehlt es (z. B.
+        kein Telefonbuch gewählt), bleibt die Liste leer. Die Anzeige ist in der
+        Karte per Option abschaltbar (show_settings_phonebook) und als
+        eingeklapptes Accordion umgesetzt.
+        """
+        try:
+            raw = getattr(self._phonebook, "contacts", None) or []
+        except Exception:  # noqa: BLE001 - defensiv, nie das Setup scheitern lassen
+            return []
+        contacts: list[dict[str, object]] = []
+        for contact in raw:
+            name = str(getattr(contact, "name", "") or "").strip()
+            numbers = [str(n).strip() for n in (getattr(contact, "numbers", None) or []) if str(n).strip()]
+            if not name and not numbers:
+                continue
+            contacts.append({"name": name, "numbers": numbers})
+        contacts.sort(key=lambda c: str(c["name"]).lower())
+        return contacts
+
     def _fetch(self) -> dict:
         numbers = self._fetch_numbers()
         dect = self._fetch_dect_handsets()
@@ -525,8 +549,9 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
         if not devices:
             devices = self._fallback_devices(dect, numbers)
             used_fallback = bool(devices)
+        contacts = self._fetch_contacts()
         # Nur wenn ALLES leer ist, gilt die Aktualisierung als gescheitert.
-        if not numbers and not dect and not devices:
+        if not numbers and not dect and not devices and not contacts:
             raise UpdateFailed(
                 "Keine Telefonie-/Gerätedaten abrufbar"
                 " (Aktion nicht unterstützt oder fehlende Berechtigung)"
@@ -539,6 +564,8 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
             # (also OHNE ausgehende/ankommende/interne Nummern) - die Karte
             # zeigt dann einen entsprechenden Hinweis.
             "devices_fallback": used_fallback,
+            # Telefonbuch (nur lesend, seit v1.3.1 optional in der Karte anzeigbar).
+            "contacts": contacts,
             "repeaters": [],
         }
 

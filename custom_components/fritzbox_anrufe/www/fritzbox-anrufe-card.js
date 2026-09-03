@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): ea2966bb345525beab98e1bb4c87aeba2794ecba1dd60e37c9b7f75902ec3039
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): bfd5b44c3e6c98a1afb0aff0790861d61d8fd257b55b95b405b3bbc261d0aeea
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -551,6 +551,8 @@ const CATEGORY_ICON_COLOR_KEYS = {
   ausgehend: "color_icon_ausgehend",
   verpasst: "color_icon_verpasst",
   anrufbeantworter: "color_icon_anrufbeantworter",
+  // Einstellungen-Tab (Zahnrad) - eigene Icon-Farbe (seit v1.3.1).
+  einstellungen: "color_icon_einstellungen",
 };
 
 // Defensive allowlist for user-supplied color values before they land
@@ -715,6 +717,11 @@ const CONFIG_DEFAULTS = {
   color_icon_ausgehend: "",
   color_icon_verpasst: "",
   color_icon_anrufbeantworter: "",
+  // Einstellungen-Tab-Icon-Farbe (seit v1.3.1).
+  color_icon_einstellungen: "",
+  // Telefonbuch in der Einstellungen-Kategorie optional anzeigen (seit v1.3.1,
+  // als eingeklapptes, scrollbares Accordion). Standard AUS.
+  show_settings_phonebook: false,
 };
 
 function withDefaults(config) {
@@ -885,6 +892,39 @@ const BASE_CARD_STYLES = `
     margin-top: 8px;
     font-size: 0.82em;
     color: var(--secondary-text-color, #727272);
+  }
+  /* Telefonbuch-Accordion (seit v1.3.1) */
+  .settings-accordion {
+    border: 1px solid var(--divider-color, #e0e0e0);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .settings-accordion-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-weight: 600;
+    list-style: none;
+    user-select: none;
+  }
+  .settings-accordion-summary::-webkit-details-marker { display: none; }
+  .settings-accordion-summary::after {
+    content: "";
+    margin-left: auto;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid var(--secondary-text-color, #727272);
+    border-bottom: 2px solid var(--secondary-text-color, #727272);
+    transform: rotate(45deg);
+    transition: transform 0.15s ease;
+  }
+  .settings-accordion[open] .settings-accordion-summary::after { transform: rotate(-135deg); }
+  .settings-accordion-body { padding: 0 12px 8px; }
+  .settings-phonebook-list {
+    max-height: 320px;
+    overflow-y: auto;
   }
   /* Telefoniegeräte-Tabelle (seit v1.3.0b2) */
   .settings-table { display: flex; flex-direction: column; overflow-x: auto; }
@@ -1374,6 +1414,9 @@ class FritzboxAnrufeCard extends HTMLElement {
     // reiner UI-Laufzeitstatus, wird in setConfig() aus dem dauerhaft
     // gespeicherten Grundzustand (show_voicemail_1-5) neu befüllt.
     this._tamPickerVisible = {};
+    // Auf-/Zuklapp-Zustand des optionalen Telefonbuch-Accordions im
+    // Einstellungen-Tab (seit v1.3.1) - reiner UI-Laufzeitstatus.
+    this._settingsPhonebookOpen = false;
     this._hass = null;
     this._config = null;
     this._objectUrls = [];
@@ -1956,6 +1999,7 @@ class FritzboxAnrufeCard extends HTMLElement {
     const attrs = stateObj.attributes || {};
     const devices = Array.isArray(attrs.devices) ? attrs.devices : [];
     const fallback = attrs.devices_fallback === true;
+    const contacts = Array.isArray(attrs.contacts) ? attrs.contacts : [];
     // Nicht-Anrufbeantworter-Telefoniegeräte aus dem Sensor (DECT-Telefone/
     // -Repeater, FON, FRITZ!App Fon). Die Anrufbeantworter-Zeilen kommen aus der
     // Karten-Konfiguration (siehe unten) - zuverlässiger als aus data.lua.
@@ -1996,7 +2040,40 @@ class FritzboxAnrufeCard extends HTMLElement {
       <div class="settings-view">
         <div class="settings-experimental">Experimentell – Anzeige, siehe README.</div>
         ${section("Telefoniegeräte", listHtml)}
+        ${this._renderSettingsPhonebook(contacts)}
       </div>
+    `;
+  }
+
+  // Telefonbuch (nur lesend) als optionales, eingeklapptes Accordion (seit
+  // v1.3.1). Nur sichtbar, wenn im Editor „Telefonbuch anzeigen"
+  // (show_settings_phonebook) aktiviert ist. Auf-/Zuklappen geschieht per
+  // nativem <details> direkt in der UI; der Zustand wird gemerkt
+  // (this._settingsPhonebookOpen), damit ein Re-Render ihn nicht zurücksetzt.
+  // Die Kontaktliste ist scrollbar (viele Einträge möglich).
+  _renderSettingsPhonebook(contacts) {
+    if (!this._config.show_settings_phonebook) return "";
+    const open = this._settingsPhonebookOpen ? " open" : "";
+    const body = contacts.length
+      ? `<div class="settings-phonebook-list">${contacts
+          .map(
+            (c) => `
+          <div class="settings-row">
+            <ha-icon class="settings-row-icon" icon="mdi:account"></ha-icon>
+            <span class="settings-row-name">${escapeHtml(c.name || "")}</span>
+            <span class="settings-row-meta">${escapeHtml((c.numbers || []).join(", "))}</span>
+          </div>`
+          )
+          .join("")}</div>`
+      : `<div class="empty">Kein Telefonbuch geladen (oder kein Telefonbuch gewählt).</div>`;
+    return `
+      <details class="settings-accordion settings-phonebook"${open}>
+        <summary class="settings-accordion-summary">
+          <ha-icon icon="mdi:contacts"></ha-icon>
+          <span>Telefonbuch${contacts.length ? ` (${contacts.length})` : ""}</span>
+        </summary>
+        <div class="settings-accordion-body">${body}</div>
+      </details>
     `;
   }
 
@@ -2026,7 +2103,7 @@ class FritzboxAnrufeCard extends HTMLElement {
   _renderSettingsAbRow(slot) {
     return `
       <div class="settings-row">
-        <ha-icon class="settings-row-icon" icon="mdi:answering-machine"></ha-icon>
+        <ha-icon class="settings-row-icon" icon="mdi:voicemail"></ha-icon>
         <span class="settings-row-name">${escapeHtml(slot.name)}</span>
         <span class="settings-row-meta">Anrufbeantworter</span>
         ${slot.switchEntity ? this._settingsSwitchButton(slot.switchEntity) : ""}
@@ -2069,7 +2146,7 @@ class FritzboxAnrufeCard extends HTMLElement {
 
   // mdi-Symbol je Gerätetyp (best effort, rein optisch).
   _deviceIcon(dev) {
-    if (dev.is_tam) return "mdi:answering-machine";
+    if (dev.is_tam) return "mdi:voicemail";
     const token = `${dev.type || ""} ${dev.anschluss || ""} ${dev.name || ""}`.toLowerCase();
     if (token.includes("dect") || token.includes("mobilteil")) return "mdi:phone-classic";
     if (token.includes("app")) return "mdi:cellphone";
@@ -2583,6 +2660,17 @@ class FritzboxAnrufeCard extends HTMLElement {
       });
     });
 
+    // Telefonbuch-Accordion (Einstellungen-Tab, seit v1.3.1) - Auf-/Zuklapp-
+    // Zustand merken, damit ein späterer Re-Render ihn nicht zurücksetzt. Wie
+    // beim Anrufbeantworter-Accordion bewusst KEIN _render() hier (das native
+    // <details> klappt sich selbst auf/zu).
+    const phonebookDetails = this.shadowRoot.querySelector(".settings-phonebook");
+    if (phonebookDetails) {
+      phonebookDetails.addEventListener("toggle", () => {
+        this._settingsPhonebookOpen = phonebookDetails.open;
+      });
+    }
+
     // Live-AB-Regler (seit v1.2.0, siehe _renderTamPicker()) - anders als
     // der Akkordeon-Toggle oben MUSS dies einen echten Re-Render auslösen,
     // da sich dadurch ändert, WELCHE Anrufbeantworter überhaupt angezeigt
@@ -2851,6 +2939,7 @@ const EDITOR_LABELS = {
   title: "Titel",
   show_title: "Überschrift (Titel) anzeigen",
   show_einstellungen: "Kategorie 'Einstellungen' anzeigen (experimentell)",
+  show_settings_phonebook: "Im 'Einstellungen'-Tab das Telefonbuch anzeigen (experimentell)",
   entity_live: "Sensor: Live-Anrufmonitor (optional)",
   entity_eingehend: "Sensor: Angenommene Anrufe",
   entity_ausgehend: "Sensor: Ausgehende Anrufe",
@@ -3009,6 +3098,9 @@ const EDITOR_SCHEMA = [
       // Einstellungen-Kategorie (seit v1.3.0b0, Zahnrad-Tab) - Standard AUS,
       // siehe CONFIG_DEFAULTS/_visibleFilterTypes(). EXPERIMENTELL.
       { name: "show_einstellungen", selector: { boolean: {} } },
+      // Optionales Telefonbuch im Einstellungen-Tab (seit v1.3.1) - nur
+      // wirksam bei aktiver Einstellungen-Kategorie.
+      { name: "show_settings_phonebook", selector: { boolean: {} } },
       // Die Anrufbeantworter-Kategorie-Schalter (seit v1.3.0b0) als eigenes,
       // zuklappbares Unter-Akkordeon innerhalb von "Kategorien" (analog zu
       // "Sensoren" seit v1.2.2) - `flatten: true`, also rein visuelle
@@ -3158,6 +3250,12 @@ const COLOR_EDITOR_FIELDS = [
   {
     key: "color_icon_anrufbeantworter",
     label: "Symbol Kategorie 'Anrufbeantworter'",
+    fallbackHex: "#727272",
+    note: CATEGORY_ICON_COLOR_NOTE,
+  },
+  {
+    key: "color_icon_einstellungen",
+    label: "Symbol Kategorie 'Einstellungen'",
     fallbackHex: "#727272",
     note: CATEGORY_ICON_COLOR_NOTE,
   },

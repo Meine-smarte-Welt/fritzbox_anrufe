@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 36aebd42fd68280a785dde333e8d97e5b56fae19388e0b778a3ec976ea4bf1a0
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 3f0263111a76a1d3efe09689d3f3273840e98f6bcff9adf1d7ac0a15d13de5e4
 """Sensor to monitor incoming/outgoing phone calls on a Fritz!Box router."""
 
 from collections.abc import Mapping
@@ -618,6 +618,8 @@ class FritzBoxSettingsSensor(CoordinatorEntity[FritzSettingsCoordinator], Sensor
             "devices_fallback": data.get("devices_fallback", False),
             "numbers": data.get("numbers", []),
             "dect_handsets": data.get("dect_handsets", []),
+            # Telefonbuch (nur lesend, seit v1.3.1 optional in der Karte anzeigbar).
+            "contacts": data.get("contacts", []),
             "repeaters": data.get("repeaters", []),
         }
 
