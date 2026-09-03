@@ -1207,6 +1207,15 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
+- **1.3.1**: Verbesserungen an der „Einstellungen"-Kategorie (Zahnrad):
+  **(1)** Die **Icon-Farbe des „Einstellungen"-Tabs** ist jetzt eigenständig
+  einstellbar (grafischer Farb-Editor → „Symbol Kategorie 'Einstellungen'").
+  **(2)** Die **Anrufbeantworter-Zeile hat wieder ein Symbol** (das zuvor
+  verwendete Icon wurde auf manchen FRITZ!OS-/Frontend-Ständen nicht angezeigt).
+  **(3)** Das **Telefonbuch ist wieder da** – optional zuschaltbar (Editor-Option
+  „Im 'Einstellungen'-Tab das Telefonbuch anzeigen") und als **eingeklapptes,
+  scrollbares Accordion**, das sich direkt in der Oberfläche auf- und zuklappen
+  lässt (nur lesend, keine Bearbeitung). Rein anzeigende Zusatz-Info zum Testen.
 - **1.3.0**: Mehrere Neuerungen an Karte und Integration:
   **(1)** Die Anrufbeantworter-Kategorie-Schalter liegen im grafischen
   Karten-Editor in einem eigenen Klapp-Untermenü unter „Kategorien".
@@ -1535,7 +1544,7 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.3.0) |
+| Datei | SHA256 (Version 1.3.1) |
 | --- | --- |
 | `__init__.py` | `f513ee0ff2c3847a19067db6abf93f83f0876ed61427058789516d6d96309f74` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
@@ -1543,15 +1552,15 @@ die komplette Datei, z. B. `sha256sum manifest.json`).
 | `config_flow.py` | `7fbbbb916a16a78a10623d599aa24d91f9b1953cee3f134a83ca66c9ef44d4a5` |
 | `const.py` | `32956d9a63be71721d0fef11b125045476ebda97b5a8d94083f796e6b14396d0` |
 | `http.py` | `4d98f8fb1236eb7960d0d3470f0eef1a0e3a45e48e713fe121faa1481a6b70df` |
-| `sensor.py` | `36aebd42fd68280a785dde333e8d97e5b56fae19388e0b778a3ec976ea4bf1a0` |
-| `settings_data.py` | `693495289679a14a983d728634de4f2216cdd7aa4e478591ece6da219cb15d94` |
+| `sensor.py` | `3f0263111a76a1d3efe09689d3f3273840e98f6bcff9adf1d7ac0a15d13de5e4` |
+| `settings_data.py` | `165f75b122a28ab27bca5a512ecb58160f68224a0c41b0ff3aa907da7fdd7310` |
 | `spam.py` | `026ae8bc8890be324f074d17f5fce1269d87edbb420566bdfc1aae18cf3eea11` |
 | `switch.py` | `7cdbb0e5d3c5d1c8fa3cc5cad1cba6fa1f666b6c7eb1e034fbed40861b0e73c2` |
 | `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
 | `voicemail.py` | `564dc067bc31355e96e5521884969f228cf27bba73cae7bfb1b6d8ac9633a7f0` |
 | `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
-| `www/fritzbox-anrufe-card.js` | `ea2966bb345525beab98e1bb4c87aeba2794ecba1dd60e37c9b7f75902ec3039` |
-| `manifest.json` | `bd3bef61dffe8052dd47f6e272ab6d75aa4cf5fe14e21440e492c1894487ff69` |
+| `www/fritzbox-anrufe-card.js` | `bfd5b44c3e6c98a1afb0aff0790861d61d8fd257b55b95b405b3bbc261d0aeea` |
+| `manifest.json` | `1df9e8e412330a7573a37ff3e1fb86b96ff45261e1e6926cbeff453b8da929a9` |
 | `strings.json` | `4551203e08227b717fd22491f8770c285d637f292e4e90c48733beb038dd4a45` |
 | `translations/de.json` | `a90ed9d1f4582b5d4a4431b379cebb9a979461acb825d58632fc533f66e1bb18` |
 | `translations/en.json` | `4551203e08227b717fd22491f8770c285d637f292e4e90c48733beb038dd4a45` |
