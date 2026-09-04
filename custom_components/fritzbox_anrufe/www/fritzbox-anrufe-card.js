@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): bfd5b44c3e6c98a1afb0aff0790861d61d8fd257b55b95b405b3bbc261d0aeea
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): e300cf2647384df71d52666c7fba57d2f24e1714fa0b4dbe6e1ae44ddde36e3f
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -720,8 +720,12 @@ const CONFIG_DEFAULTS = {
   // Einstellungen-Tab-Icon-Farbe (seit v1.3.1).
   color_icon_einstellungen: "",
   // Telefonbuch in der Einstellungen-Kategorie optional anzeigen (seit v1.3.1,
-  // als eingeklapptes, scrollbares Accordion). Standard AUS.
+  // als scrollbares Accordion). Standard AUS.
   show_settings_phonebook: false,
+  // Telefonbuch-Accordion beim Öffnen der Einstellungsseite gleich aufgeklappt
+  // zeigen (seit v1.4.0) - praktisch z. B. in einem Popup mit viel Platz.
+  // Standard AUS (eingeklappt). Nur wirksam mit show_settings_phonebook.
+  settings_phonebook_open: false,
 };
 
 function withDefaults(config) {
@@ -1416,6 +1420,7 @@ class FritzboxAnrufeCard extends HTMLElement {
     this._tamPickerVisible = {};
     // Auf-/Zuklapp-Zustand des optionalen Telefonbuch-Accordions im
     // Einstellungen-Tab (seit v1.3.1) - reiner UI-Laufzeitstatus.
+    // Grundzustand wird in setConfig aus settings_phonebook_open gesetzt.
     this._settingsPhonebookOpen = false;
     this._hass = null;
     this._config = null;
@@ -1449,6 +1454,9 @@ class FritzboxAnrufeCard extends HTMLElement {
     for (let n = 1; n <= MAX_TAM_SLOTS; n += 1) {
       this._tamPickerVisible[n] = this._config[`show_voicemail_${n}`] !== false;
     }
+    // Telefonbuch-Accordion: Grundzustand aus der Konfiguration (seit v1.4.0);
+    // ein späteres manuelles Auf-/Zuklappen überschreibt dies zur Laufzeit.
+    this._settingsPhonebookOpen = this._config.settings_phonebook_open === true;
     this._lastSignature = null;
     this._render();
   }
@@ -2940,6 +2948,7 @@ const EDITOR_LABELS = {
   show_title: "Überschrift (Titel) anzeigen",
   show_einstellungen: "Kategorie 'Einstellungen' anzeigen (experimentell)",
   show_settings_phonebook: "Im 'Einstellungen'-Tab das Telefonbuch anzeigen (experimentell)",
+  settings_phonebook_open: "Telefonbuch gleich aufgeklappt anzeigen",
   entity_live: "Sensor: Live-Anrufmonitor (optional)",
   entity_eingehend: "Sensor: Angenommene Anrufe",
   entity_ausgehend: "Sensor: Ausgehende Anrufe",
@@ -3101,6 +3110,9 @@ const EDITOR_SCHEMA = [
       // Optionales Telefonbuch im Einstellungen-Tab (seit v1.3.1) - nur
       // wirksam bei aktiver Einstellungen-Kategorie.
       { name: "show_settings_phonebook", selector: { boolean: {} } },
+      // Telefonbuch gleich aufgeklappt zeigen (seit v1.4.0) - nur wirksam mit
+      // show_settings_phonebook.
+      { name: "settings_phonebook_open", selector: { boolean: {} } },
       // Die Anrufbeantworter-Kategorie-Schalter (seit v1.3.0b0) als eigenes,
       // zuklappbares Unter-Akkordeon innerhalb von "Kategorien" (analog zu
       // "Sensoren" seit v1.2.2) - `flatten: true`, also rein visuelle
