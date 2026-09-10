@@ -1207,6 +1207,44 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Versionshistorie
 
+- **1.5.0**: Vier Neuerungen:
+  **(1) Zoomfaktor der Karte** (`zoom`, Standard 1): skaliert den gesamten
+  Karteninhalt per CSS `zoom` – hilfreich bei kleiner Schrift auf einem
+  iPad-/Wandpanel. Anders als ein per UIX/`card_mod` gesetzter Zoom bleibt dieser
+  Wert **beim Tab-Wechsel erhalten**. Einstellbar im Editor unter „Darstellung"
+  oder per YAML (`zoom: 1.3`).
+  **(2) Neues Event `fritzbox_anrufe_missed_call`** für verpasste Anrufe – in
+  Echtzeit über den Live-Anrufmonitor ausgelöst, sobald ein eingehender Anruf
+  klingelte, aber nie angenommen wurde (analog zu
+  `fritzbox_anrufe_new_voicemail_message`). Payload: `entry_id`, `number`,
+  `name`, `own_number`, `device`, `date`, `vip`. Direkt als Automations-Auslöser
+  für Benachrichtigungen nutzbar. (Anrufe, die am Anrufbeantworter mit einem
+  CONNECT angenommen werden, lösen dieses Event bewusst nicht aus.)
+  **(3) Dauerhafte Filter-/Sortier-Vorauswahl** per YAML: `default_own_number`
+  (nur Anrufe einer bestimmten eigenen Rufnummer) und `default_sort`
+  (`date_desc`/`date_asc`/`duration_desc`/`duration_asc`/`name_asc`/`name_desc`).
+  Diese Werte überstehen – anders als die Auswahl in der Filterleiste –
+  Reloads und Tab-Wechsel.
+  **(4) Niederländische Übersetzung** (`nl`) neben Deutsch und Englisch.
+  **(5) Eigene Anrufbeantworter-Namen** (`name_voicemail_1`–`name_voicemail_5`):
+  statt „Anrufbeantworter 1/2" lässt sich je Anrufbeantworter ein eigener Name
+  vergeben (z. B. „Büro", „Küche"). Er erscheint vor den Ein/Aus-Schaltern, über
+  den Nachrichten-Abschnitten/-Akkordeons und in der Einstellungen-Liste.
+  Einstellbar im Karten-Editor unter „Sensoren → Anrufbeantworter".
+- **1.4.0**: **Eigenes Logo/Icon** und eine kleine Komfort-Option.
+  **(1)** Die Integration bringt jetzt ein eigenes **Symbol** mit (grünes
+  Telefon mit Häkchen) – **inline** im Ordner `brand/` (`icon.png` 256×256,
+  `icon@2x.png` 512×512). Ab **Home Assistant 2026.3** erscheint es dadurch
+  automatisch unter „Geräte & Dienste"; ein Eintrag im zentralen
+  `home-assistant/brands`-Repo ist nicht mehr nötig (siehe Abschnitt
+  „Logo/Icon"). In HACS wird es evtl. erst nach einem HACS-Update angezeigt
+  (bekannter HACS-Frontend-Bug).
+  **(2)** Neue Option **„Telefonbuch gleich aufgeklappt anzeigen"**
+  (`settings_phonebook_open`): Ist das Telefonbuch im „Einstellungen"-Tab
+  aktiviert, kann es jetzt beim Öffnen der Seite direkt aufgeklappt erscheinen –
+  praktisch z. B., wenn die Karte in einem Popup mit viel Platz geöffnet wird.
+  Standard bleibt eingeklappt; das Auf-/Zuklappen in der Oberfläche funktioniert
+  weiterhin.
 - **1.3.1**: Verbesserungen an der „Einstellungen"-Kategorie (Zahnrad):
   **(1)** Die **Icon-Farbe des „Einstellungen"-Tabs** ist jetzt eigenständig
   einstellbar (grafischer Farb-Editor → „Symbol Kategorie 'Einstellungen'").
@@ -1544,27 +1582,52 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.3.1) |
+| Datei | SHA256 (Version 1.5.0) |
 | --- | --- |
 | `__init__.py` | `f513ee0ff2c3847a19067db6abf93f83f0876ed61427058789516d6d96309f74` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
 | `call_log.py` | `06375eae8516c56b35582eb2b12f7ae09910fc908458d7a90912a45edc19c9d5` |
 | `config_flow.py` | `7fbbbb916a16a78a10623d599aa24d91f9b1953cee3f134a83ca66c9ef44d4a5` |
-| `const.py` | `32956d9a63be71721d0fef11b125045476ebda97b5a8d94083f796e6b14396d0` |
+| `const.py` | `fabd26bf5006abe497fbe3fa72068e49b9b4bbc8630442103e4ffd78f81a2d4f` |
 | `http.py` | `4d98f8fb1236eb7960d0d3470f0eef1a0e3a45e48e713fe121faa1481a6b70df` |
-| `sensor.py` | `3f0263111a76a1d3efe09689d3f3273840e98f6bcff9adf1d7ac0a15d13de5e4` |
+| `sensor.py` | `cc3f0159027a4451783964082d2bb055eb86c2fc96999070e72f8fc5c1c7b080` |
 | `settings_data.py` | `165f75b122a28ab27bca5a512ecb58160f68224a0c41b0ff3aa907da7fdd7310` |
 | `spam.py` | `026ae8bc8890be324f074d17f5fce1269d87edbb420566bdfc1aae18cf3eea11` |
 | `switch.py` | `7cdbb0e5d3c5d1c8fa3cc5cad1cba6fa1f666b6c7eb1e034fbed40861b0e73c2` |
 | `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
 | `voicemail.py` | `564dc067bc31355e96e5521884969f228cf27bba73cae7bfb1b6d8ac9633a7f0` |
 | `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
-| `www/fritzbox-anrufe-card.js` | `bfd5b44c3e6c98a1afb0aff0790861d61d8fd257b55b95b405b3bbc261d0aeea` |
-| `manifest.json` | `1df9e8e412330a7573a37ff3e1fb86b96ff45261e1e6926cbeff453b8da929a9` |
+| `www/fritzbox-anrufe-card.js` | `281d165e79f3d0687652de3c6803f62d24ffbb2b7d4dc22d29a656d5887ec276` |
+| `manifest.json` | `217662408e49119fb794715383e8bc2f950388e8e0d8a7e3ec8ddd65a8ac229b` |
 | `strings.json` | `4551203e08227b717fd22491f8770c285d637f292e4e90c48733beb038dd4a45` |
 | `translations/de.json` | `a90ed9d1f4582b5d4a4431b379cebb9a979461acb825d58632fc533f66e1bb18` |
 | `translations/en.json` | `4551203e08227b717fd22491f8770c285d637f292e4e90c48733beb038dd4a45` |
+| `translations/nl.json` | `b88d204c505ab0f7f02bd8050c41942717bcad209f6b8d5ebc6e7c009d3eb6eb` |
 | `icons.json` | `ef4a351842f873eecfae2af949615a1888f4923f96d942a9251326d94f1bdc2b` |
+
+Der Ordner `custom_components/fritzbox_anrufe/brand/` enthält die Logo-/
+Icon-Dateien (`icon.png`, `icon@2x.png`, `logo.png`, `logo@2x.png`); diese
+Bilddateien sind nicht Teil der Prüfsummen-Tabelle.
+
+## Logo/Icon
+
+Die Integration bringt ihr Symbol **inline** mit – im Ordner
+`custom_components/fritzbox_anrufe/brand/` (`icon.png` 256×256, `icon@2x.png`
+512×512, dazu `logo.png`/`logo@2x.png`). Seit **Home Assistant 2026.3** wird
+genau dieser Inline-Mechanismus unterstützt: Das Logo erscheint dadurch
+automatisch unter **„Geräte & Dienste"** – ganz ohne zusätzlichen Schritt.
+
+Hinweise:
+
+- Ein Pull Request an das zentrale Repo `home-assistant/brands` ist **nicht mehr
+  nötig und nicht mehr vorgesehen** – solche PRs werden für Custom-Integrationen
+  inzwischen automatisch geschlossen (mit Verweis auf den Inline-Mechanismus).
+- In **HACS** wird das Icon aktuell evtl. **noch nicht** angezeigt („Icon nicht
+  verfügbar"). Ursache ist ein bekannter **HACS-Frontend-Bug** (HACS fragt noch
+  die alte öffentliche Brands-CDN ab statt den neuen lokalen Proxy) – siehe
+  [hacs/integration #5223](https://github.com/hacs/integration/issues/5223). Das
+  ist **HACS-seitig** und wird mit einem HACS-Update behoben; an der Integration
+  selbst ist dafür nichts zu tun.
 
 ## Fehlerbehebung
 
