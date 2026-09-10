@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): e300cf2647384df71d52666c7fba57d2f24e1714fa0b4dbe6e1ae44ddde36e3f
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 281d165e79f3d0687652de3c6803f62d24ffbb2b7d4dc22d29a656d5887ec276
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -628,6 +628,19 @@ const CONFIG_DEFAULTS = {
   // solange dieser aus ist, bleibt auch die Reihenfolge/Filterung exakt wie
   // zuvor (siehe FritzboxAnrufeCard._visibleCalls()).
   show_filter_bar: false,
+  // Dauerhafte Vorauswahl für die Filter-/Sortierleiste (seit v1.5.0). Anders
+  // als die reine Laufzeit-Auswahl in der Leiste bleiben diese Werte über
+  // Reloads/Tab-Wechsel erhalten (siehe setConfig()). default_own_number:
+  // nur Anrufe dieser eigenen Rufnummer zeigen (leer = alle). default_sort:
+  // eine der SORT_OPTIONS (date_desc/date_asc/duration_desc/duration_asc/
+  // name_asc/name_desc), sonst Fallback auf DEFAULT_SORT.
+  default_own_number: "",
+  default_sort: DEFAULT_SORT,
+  // Zoomfaktor der Karte (seit v1.5.0) - skaliert den gesamten Karteninhalt
+  // per CSS `zoom`, praktisch für kleine Schrift auf einem iPad-Wandpanel.
+  // 1 = normal; bleibt über Tab-Wechsel erhalten (im Gegensatz zu einem per
+  // UIX/card_mod gesetzten Zoom). Siehe _render()/_cardZoom().
+  zoom: 1,
   // Papierkorb-Button je Anrufbeantworter-Nachricht (seit v1.0.5b3,
   // EXPERIMENTELL, siehe Moduldoku oben) - standardmäßig aus: Löschen ist
   // unwiderruflich (die FRITZ!Box selbst hat keinen Papierkorb dafür), das
@@ -657,6 +670,15 @@ const CONFIG_DEFAULTS = {
   entity_voicemail_3: "",
   entity_voicemail_4: "",
   entity_voicemail_5: "",
+  // Eigene Anzeigenamen je Anrufbeantworter (seit v1.5.0) - leer = Standard
+  // „Anrufbeantworter"/„Anrufbeantworter N". Wirken überall, wo ein AB benannt
+  // wird: Ein/Aus-Schalter, Nachrichten-Abschnitte/-Akkordeon, Live-Regler und
+  // die Einstellungen-Liste (siehe _tamName()).
+  name_voicemail_1: "",
+  name_voicemail_2: "",
+  name_voicemail_3: "",
+  name_voicemail_4: "",
+  name_voicemail_5: "",
   // "merged" (Standard, nur bei GENAU zwei konfigurierten Anrufbeantwortern
   // wählbar) mischt beide Nachrichtenlisten chronologisch mit "AB 1"/"AB
   // 2"-Badge, "separate" zeigt getrennte Abschnitte untereinander,
@@ -1439,8 +1461,15 @@ class FritzboxAnrufeCard extends HTMLElement {
     }
     this._config = withDefaults(config);
     this._activeFilter = this._defaultFilter();
-    this._filterOwnNumber = "";
-    this._sortBy = DEFAULT_SORT;
+    // Filter-/Sortier-Grundzustand aus der Konfiguration (seit v1.5.0:
+    // default_own_number/default_sort) - so bleibt eine dauerhaft gewünschte
+    // Vorauswahl über Reloads/Tab-Wechsel erhalten. Ein manuelles Umstellen in
+    // der Filterleiste überschreibt dies nur zur Laufzeit (bis zum nächsten
+    // Reload / zur nächsten Config-Änderung), exakt wie bisher.
+    this._filterOwnNumber = this._config.default_own_number || "";
+    this._sortBy = SORT_OPTIONS.some((o) => o.value === this._config.default_sort)
+      ? this._config.default_sort
+      : DEFAULT_SORT;
     this._confirmDeleteMessageId = null;
     this._pendingDeletedMessageIds = new Set();
     this._tamAccordionOpen = {};
@@ -2085,6 +2114,24 @@ class FritzboxAnrufeCard extends HTMLElement {
     `;
   }
 
+  // Anzeigename eines Anrufbeantworter-Slots (seit v1.5.0). Ein im Editor
+  // gesetzter eigener Name (name_voicemail_N) hat Vorrang, sonst der Standard
+  // „Anrufbeantworter"/„Anrufbeantworter N". Wird überall verwendet, wo ein AB
+  // benannt wird: Ein/Aus-Schalter, Nachrichten-Abschnitte/-Akkordeon,
+  // Live-Regler und die Einstellungen-Liste.
+  _tamName(n) {
+    return this._tamCustom(n) || (n === 1 ? "Anrufbeantworter" : `Anrufbeantworter ${n}`);
+  }
+
+  // Nur der eigene Name (getrimmt) oder "" - für Stellen, die einen anderen
+  // Standard als _tamName() brauchen (z. B. die Nachrichten-Abschnitte, die
+  // ohne eigenen Namen weiterhin die durchnummerierte Form „Anrufbeantworter N"
+  // zeigen - auch für Slot 1).
+  _tamCustom(n) {
+    const custom = this._config && this._config[`name_voicemail_${n}`];
+    return typeof custom === "string" && custom.trim() ? custom.trim() : "";
+  }
+
   // Konfigurierte Anrufbeantworter-Slots (1..5): ein Slot zählt, sobald für ihn
   // ein Anrufbeantworter-Sensor ODER ein Ein/Aus-Schalter konfiguriert ist.
   // Liefert je Slot Nummer, Anzeigename und (falls vorhanden) Schalter-Entity.
@@ -2096,7 +2143,7 @@ class FritzboxAnrufeCard extends HTMLElement {
       if (entityId || switchEntityId) {
         slots.push({
           n,
-          name: n === 1 ? "Anrufbeantworter" : `Anrufbeantworter ${n}`,
+          name: this._tamName(n),
           switchEntity: switchEntityId || "",
         });
       }
@@ -2243,7 +2290,7 @@ class FritzboxAnrufeCard extends HTMLElement {
     if (!this._config.show_tam_switch) return "";
     const rows = [];
     if (this._config.entity_tam_switch) {
-      rows.push(this._renderTamSwitchRow(this._config.entity_tam_switch, "Anrufbeantworter"));
+      rows.push(this._renderTamSwitchRow(this._config.entity_tam_switch, this._tamName(1)));
     }
     // Slot 2-5 (seit v1.2.0 verallgemeinert von zuvor nur Slot 2): der
     // Schalter eines Slots wirkt nur zusammen mit einem gesetzten
@@ -2253,7 +2300,7 @@ class FritzboxAnrufeCard extends HTMLElement {
       const entityId = this._config[this._tamEntityKey(n)];
       const switchEntityId = this._config[this._tamSwitchKey(n)];
       if (entityId && switchEntityId) {
-        rows.push(this._renderTamSwitchRow(switchEntityId, `Anrufbeantworter ${n}`));
+        rows.push(this._renderTamSwitchRow(switchEntityId, this._tamName(n)));
       }
     }
     if (!rows.length) return "";
@@ -2326,6 +2373,11 @@ class FritzboxAnrufeCard extends HTMLElement {
     const chips = configuredSlots
       .map(({ n }) => {
         const checked = this._tamPickerVisible[n] !== false;
+        // Kompakte Chips: bei eigenem Namen (seit v1.5.0) diesen zeigen, sonst
+        // die knappe Kurzform „AB n".
+        const custom = this._config[`name_voicemail_${n}`];
+        const chipLabel =
+          typeof custom === "string" && custom.trim() ? custom.trim() : `AB ${n}`;
         return `
           <label class="voicemail-tam-picker-chip${checked ? " checked" : ""}">
             <input
@@ -2334,7 +2386,7 @@ class FritzboxAnrufeCard extends HTMLElement {
               data-tam="${n}"
               ${checked ? "checked" : ""}
             />
-            <span>AB ${n}</span>
+            <span>${escapeHtml(chipLabel)}</span>
           </label>
         `;
       })
@@ -2399,7 +2451,7 @@ class FritzboxAnrufeCard extends HTMLElement {
         const messages = this._prepareVoicemails(this._voicemailsForSlot(n));
         return `
           <div class="voicemail-section">
-            <div class="voicemail-section-title">Anrufbeantworter ${n}</div>
+            <div class="voicemail-section-title">${escapeHtml(this._tamCustom(n) || `Anrufbeantworter ${n}`)}</div>
             ${renderVoicemailRows(messages, rowOpts)}
           </div>
         `;
@@ -2467,7 +2519,7 @@ class FritzboxAnrufeCard extends HTMLElement {
         <details class="voicemail-accordion-section" data-tam="${n}" ${open ? "open" : ""}>
           <summary class="voicemail-accordion-summary">
             <ha-icon class="voicemail-accordion-chevron" icon="mdi:chevron-down"></ha-icon>
-            <span class="voicemail-accordion-title">Anrufbeantworter ${n}</span>
+            <span class="voicemail-accordion-title">${escapeHtml(this._tamCustom(n) || `Anrufbeantworter ${n}`)}</span>
             ${hasNew ? '<span class="voicemail-badge">neu</span>' : ""}
             <span class="voicemail-accordion-count">${messages.length}</span>
           </summary>
@@ -2558,6 +2610,14 @@ class FritzboxAnrufeCard extends HTMLElement {
     }
   }
 
+  // Bereinigter Zoomfaktor (seit v1.5.0) als String für CSS `zoom`. Ungültige
+  // oder fehlende Werte ergeben "1"; sinnvoll begrenzt auf 0,5-3.
+  _cardZoom() {
+    const z = Number(this._config && this._config.zoom);
+    if (!Number.isFinite(z) || z <= 0) return "1";
+    return String(Math.min(Math.max(z, 0.5), 3));
+  }
+
   _render() {
     if (!this._config || !this._hass) return;
 
@@ -2595,6 +2655,12 @@ class FritzboxAnrufeCard extends HTMLElement {
       this.shadowRoot.appendChild(this._contentEl);
     }
     this._styleEl.textContent = this._styles();
+
+    // Zoomfaktor (seit v1.5.0) - per CSS `zoom` auf dem persistenten
+    // Inhalts-Container. Da dieser Knoten über Tab-/Filterwechsel hinweg
+    // erhalten bleibt (nur sein innerHTML wird aktualisiert), geht der Zoom -
+    // anders als bei einem per UIX/card_mod gesetzten Wert - NICHT verloren.
+    this._contentEl.style.zoom = this._cardZoom();
 
     // Überschrift optional (seit v1.3.0b0, show_title). Ohne header-Attribut
     // rendert ha-card keine Kopfzeile.
@@ -2964,8 +3030,14 @@ const EDITOR_LABELS = {
   entity_tam_switch_3: "Schalter: Dritter Anrufbeantworter Ein/Aus (optional)",
   entity_tam_switch_4: "Schalter: Vierter Anrufbeantworter Ein/Aus (optional)",
   entity_tam_switch_5: "Schalter: Fünfter Anrufbeantworter Ein/Aus (optional)",
+  name_voicemail_1: "Name: Anrufbeantworter 1 (optional)",
+  name_voicemail_2: "Name: Anrufbeantworter 2 (optional)",
+  name_voicemail_3: "Name: Anrufbeantworter 3 (optional)",
+  name_voicemail_4: "Name: Anrufbeantworter 4 (optional)",
+  name_voicemail_5: "Name: Anrufbeantworter 5 (optional)",
   show_tam_switch: "Anrufbeantworter-Ein/Aus-Schalter auf der Karte anzeigen",
   max_rows: "Max. Zeilen",
+  zoom: "Zoomfaktor der Karte (z. B. für iPad-Wandpanel)",
   show_alle: "Kategorie 'Gesamt' (Alle) anzeigen",
   show_eingehend: "Kategorie 'Angenommen' anzeigen",
   show_ausgehend: "Kategorie 'Ausgehend' anzeigen",
@@ -2988,6 +3060,8 @@ const EDITOR_LABELS = {
   show_processing_ausgehend: "Weiterverarbeitung bei 'Ausgehend' anzeigen",
   show_processing_verpasst: "Weiterverarbeitung bei 'Verpasst' anzeigen",
   show_filter_bar: "Filter-/Sortierleiste auf der Karte anzeigen",
+  default_own_number: "Standard-Filter: nur diese eigene Rufnummer (leer = alle)",
+  default_sort: "Standard-Sortierung",
   show_delete_button: "Papierkorb-Button zum Löschen von Anrufbeantworter-Nachrichten anzeigen",
   hide_spam: "Als Spam erkannte Anrufe/Nachrichten ausblenden",
   // Farben (seit v1.0.4, seit v1.0.4b1 nicht mehr über <ha-form> gerendert)
@@ -3085,6 +3159,14 @@ const EDITOR_SCHEMA = [
           { name: "entity_tam_switch_3", selector: { entity: { domain: "switch" } } },
           { name: "entity_tam_switch_4", selector: { entity: { domain: "switch" } } },
           { name: "entity_tam_switch_5", selector: { entity: { domain: "switch" } } },
+          // Eigene Anzeigenamen je Anrufbeantworter (seit v1.5.0) - leer =
+          // Standardname. Wirken bei Ein/Aus-Schaltern, Nachrichten-Abschnitten
+          // und in der Einstellungen-Liste.
+          { name: "name_voicemail_1", selector: { text: {} } },
+          { name: "name_voicemail_2", selector: { text: {} } },
+          { name: "name_voicemail_3", selector: { text: {} } },
+          { name: "name_voicemail_4", selector: { text: {} } },
+          { name: "name_voicemail_5", selector: { text: {} } },
         ],
       },
       // Der Einstellungen-Sensor (sensor.fritzbox_anrufe_einstellungen) wird
@@ -3155,6 +3237,9 @@ const EDITOR_SCHEMA = [
       // braucht, kann max_rows weiterhin über den YAML-Editor der Karte auf
       // einen beliebigen Wert setzen.
       { name: "max_rows", selector: { number: { min: 1, max: 15, step: 1, mode: "slider" } } },
+      // Zoomfaktor der Karte (seit v1.5.0) - praktisch für kleine Schrift auf
+      // einem iPad-Wandpanel; bleibt über Tab-Wechsel erhalten.
+      { name: "zoom", selector: { number: { min: 0.5, max: 3, step: 0.1, mode: "slider" } } },
       { name: "show_name", selector: { boolean: {} } },
       { name: "show_number", selector: { boolean: {} } },
       { name: "show_own_number", selector: { boolean: {} } },
@@ -3163,6 +3248,19 @@ const EDITOR_SCHEMA = [
       { name: "show_date", selector: { boolean: {} } },
       { name: "show_vip", selector: { boolean: {} } },
       { name: "show_filter_bar", selector: { boolean: {} } },
+      // Dauerhafte Vorauswahl der Filter-/Sortierleiste (seit v1.5.0) - wirkt
+      // auch ohne sichtbare Leiste. default_own_number: nur Anrufe dieser
+      // eigenen Rufnummer (leer = alle). default_sort: Sortier-Grundeinstellung.
+      { name: "default_own_number", selector: { text: {} } },
+      {
+        name: "default_sort",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+          },
+        },
+      },
       { name: "show_delete_button", selector: { boolean: {} } },
       { name: "hide_spam", selector: { boolean: {} } },
       // Seit v1.1.0, EXPERIMENTELL - siehe CONFIG_DEFAULTS/_renderTamSwitches().

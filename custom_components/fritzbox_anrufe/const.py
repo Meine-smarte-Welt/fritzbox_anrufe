@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 32956d9a63be71721d0fef11b125045476ebda97b5a8d94083f796e6b14396d0
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): fabd26bf5006abe497fbe3fa72068e49b9b4bbc8630442103e4ffd78f81a2d4f
 """Constants for the AVM Fritz!Box call monitor integration."""
 
 from collections.abc import Mapping
@@ -198,6 +198,18 @@ DEFAULT_AUTO_MARK_READ = False
 # Vorlage auf neu hinzugekommene Einträge vergleichen zu müssen - siehe
 # README.
 EVENT_NEW_VOICEMAIL_MESSAGE = f"{DOMAIN}_new_voicemail_message"
+
+# Event (seit v1.5.0): gefeuert vom Live-Callmonitor (FritzBoxCallSensor, siehe
+# sensor.py), sobald ein EINGEHENDER Anruf klingelte (RINGING), aber NIE
+# angenommen wurde (kein TALKING/CONNECT), bevor er endete - also ein
+# verpasster Anruf. Analog zu EVENT_NEW_VOICEMAIL_MESSAGE direkt als
+# Automations-Auslöser nutzbar (z. B. für eine Notification), ohne die
+# Zustandswechsel des Live-Sensors ("ringing" -> "idle") selbst per
+# Automation auswerten zu müssen. Wird in Echtzeit ausgelöst (nicht erst beim
+# nächsten Anruflisten-Poll). Anrufe, die tatsächlich am Anrufbeantworter
+# angenommen wurden und dabei ein CONNECT auslösen, feuern dieses Event
+# bewusst NICHT (dort greift ggf. EVENT_NEW_VOICEMAIL_MESSAGE) - siehe README.
+EVENT_MISSED_CALL = f"{DOMAIN}_missed_call"
 
 # --- Spam-Erkennung (seit v1.0.6b1) -------------------------------------
 # Die FRITZ!Box liefert über TR-064 KEIN natives Spam-/KI-Erkennungsfeld -

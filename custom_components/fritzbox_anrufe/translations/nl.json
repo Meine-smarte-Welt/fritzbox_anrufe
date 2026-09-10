@@ -1,0 +1,269 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Apparaat is al geconfigureerd",
+      "insufficient_permissions": "De gebruiker heeft onvoldoende rechten voor toegang tot de FRITZ!Box-instellingen en telefoonboeken.",
+      "no_devices_found": "Geen apparaten in het netwerk gevonden",
+      "reauth_successful": "Herauthenticatie is gelukt"
+    },
+    "error": {
+      "insufficient_permissions": "De gebruiker heeft onvoldoende rechten voor toegang tot de FRITZ!Box-instellingen en telefoonboeken.",
+      "invalid_auth": "Authenticatie mislukt",
+      "unknown": "Onverwachte fout"
+    },
+    "flow_title": "{name}",
+    "step": {
+      "phonebook": {
+        "data": {
+          "phonebook": "Telefoonboek"
+        }
+      },
+      "history": {
+        "title": "Historiediepte van de oproeplijsten",
+        "description": "Bepaal voor elk van de drie oproeplijst-sensoren of deze op aantal oproepen of op aantal dagen wordt begrensd. Dit kan later altijd worden gewijzigd onder Instellingen -> Apparaten & diensten -> FRITZ!Box Anrufe -> Configureren.",
+        "data": {
+          "call_log_limit_type_eingehend": "Aangenomen oproepen: modus",
+          "call_log_count_eingehend": "Aangenomen oproepen: aantal (indien 'Aantal oproepen' gekozen)",
+          "call_log_days_eingehend": "Aangenomen oproepen: aantal dagen (indien 'Aantal dagen' gekozen)",
+          "call_log_limit_type_ausgehend": "Uitgaande oproepen: modus",
+          "call_log_count_ausgehend": "Uitgaande oproepen: aantal (indien 'Aantal oproepen' gekozen)",
+          "call_log_days_ausgehend": "Uitgaande oproepen: aantal dagen (indien 'Aantal dagen' gekozen)",
+          "call_log_limit_type_verpasst": "Gemiste oproepen: modus",
+          "call_log_count_verpasst": "Gemiste oproepen: aantal (indien 'Aantal oproepen' gekozen)",
+          "call_log_days_verpasst": "Gemiste oproepen: aantal dagen (indien 'Aantal dagen' gekozen)"
+        }
+      },
+      "reauth_confirm": {
+        "data": {
+          "password": "Wachtwoord",
+          "username": "Gebruikersnaam"
+        }
+      },
+      "user": {
+        "data": {
+          "host": "Host",
+          "password": "Wachtwoord",
+          "port": "Poort",
+          "username": "Gebruikersnaam"
+        },
+        "data_description": {
+          "host": "De hostnaam of het IP-adres van je FRITZ!Box."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "fritzbox_anrufe_live": {
+        "name": "Oproepmonitor {phonebook_name}",
+        "state": {
+          "dialing": "Kiezen",
+          "idle": "Inactief",
+          "ringing": "Gaat over",
+          "talking": "Gesprek bezig"
+        },
+        "state_attributes": {
+          "accepted": {
+            "name": "Aangenomen"
+          },
+          "closed": {
+            "name": "Beëindigd"
+          },
+          "device": {
+            "name": "Apparaat"
+          },
+          "duration": {
+            "name": "Duur"
+          },
+          "from": {
+            "name": "Nummer beller"
+          },
+          "from_name": {
+            "name": "Naam beller"
+          },
+          "initiated": {
+            "name": "Gestart"
+          },
+          "prefixes": {
+            "name": "Voorvoegsels"
+          },
+          "to": {
+            "name": "Gebeld nummer"
+          },
+          "to_name": {
+            "name": "Naam gebelde"
+          },
+          "type": {
+            "name": "Type",
+            "state": {
+              "incoming": "Inkomend",
+              "outgoing": "Uitgaand"
+            }
+          },
+          "vip": {
+            "name": "Belangrijk"
+          },
+          "with": {
+            "name": "Met nummer"
+          },
+          "with_name": {
+            "name": "Met naam"
+          }
+        }
+      },
+      "fritzbox_anrufe_eingehend": {
+        "name": "Aangenomen oproepen {phonebook_name}",
+        "state_attributes": {
+          "calls": {
+            "name": "Oproepen"
+          }
+        }
+      },
+      "fritzbox_anrufe_ausgehend": {
+        "name": "Uitgaande oproepen {phonebook_name}",
+        "state_attributes": {
+          "calls": {
+            "name": "Oproepen"
+          }
+        }
+      },
+      "fritzbox_anrufe_verpasst": {
+        "name": "Gemiste oproepen {phonebook_name}",
+        "state_attributes": {
+          "calls": {
+            "name": "Oproepen"
+          }
+        }
+      },
+      "fritzbox_anrufe_anrufbeantworter": {
+        "name": "Antwoordapparaat {phonebook_name}",
+        "state_attributes": {
+          "messages": {
+            "name": "Berichten"
+          }
+        }
+      },
+      "fritzbox_anrufe_anrufbeantworter_2": {
+        "name": "Antwoordapparaat 2 {phonebook_name}",
+        "state_attributes": {
+          "messages": {
+            "name": "Berichten"
+          }
+        }
+      },
+      "fritzbox_anrufe_anrufbeantworter_3": {
+        "name": "Antwoordapparaat 3 {phonebook_name}",
+        "state_attributes": {
+          "messages": {
+            "name": "Berichten"
+          }
+        }
+      },
+      "fritzbox_anrufe_anrufbeantworter_4": {
+        "name": "Antwoordapparaat 4 {phonebook_name}",
+        "state_attributes": {
+          "messages": {
+            "name": "Berichten"
+          }
+        }
+      },
+      "fritzbox_anrufe_anrufbeantworter_5": {
+        "name": "Antwoordapparaat 5 {phonebook_name}",
+        "state_attributes": {
+          "messages": {
+            "name": "Berichten"
+          }
+        }
+      },
+      "fritzbox_anrufe_einstellungen": {
+        "name": "Instellingen {phonebook_name}"
+      }
+    },
+    "switch": {
+      "fritzbox_anrufe_anrufbeantworter_schalter": {
+        "name": "Antwoordapparaat aan/uit {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufbeantworter_2_schalter": {
+        "name": "Antwoordapparaat 2 aan/uit {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufbeantworter_3_schalter": {
+        "name": "Antwoordapparaat 3 aan/uit {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufbeantworter_4_schalter": {
+        "name": "Antwoordapparaat 4 aan/uit {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufbeantworter_5_schalter": {
+        "name": "Antwoordapparaat 5 aan/uit {phonebook_name}"
+      }
+    }
+  },
+  "selector": {
+    "call_log_limit_type": {
+      "options": {
+        "count": "Aantal oproepen",
+        "days": "Aantal dagen"
+      }
+    }
+  },
+  "options": {
+    "error": {
+      "malformed_prefixes": "Voorvoegsels zijn onjuist opgemaakt, controleer het formaat."
+    },
+    "step": {
+      "init": {
+        "title": "FRITZ!Box Anrufe configureren",
+        "menu_options": {
+          "general_settings": "Basisinstellingen",
+          "manage_tams": "Antwoordapparaten beheren"
+        }
+      },
+      "general_settings": {
+        "title": "Basisinstellingen",
+        "data": {
+          "prefixes": "Voorvoegsels (kommagescheiden lijst)",
+          "call_log_limit_type_eingehend": "Aangenomen oproepen: modus",
+          "call_log_count_eingehend": "Aangenomen oproepen: aantal (indien 'Aantal oproepen' gekozen)",
+          "call_log_days_eingehend": "Aangenomen oproepen: aantal dagen (indien 'Aantal dagen' gekozen)",
+          "call_log_limit_type_ausgehend": "Uitgaande oproepen: modus",
+          "call_log_count_ausgehend": "Uitgaande oproepen: aantal (indien 'Aantal oproepen' gekozen)",
+          "call_log_days_ausgehend": "Uitgaande oproepen: aantal dagen (indien 'Aantal dagen' gekozen)",
+          "call_log_limit_type_verpasst": "Gemiste oproepen: modus",
+          "call_log_count_verpasst": "Gemiste oproepen: aantal (indien 'Aantal oproepen' gekozen)",
+          "call_log_days_verpasst": "Gemiste oproepen: aantal dagen (indien 'Aantal dagen' gekozen)",
+          "auto_mark_read": "Na afspelen automatisch als gelezen markeren",
+          "spam_numbers": "Spamnummers/-netnummers (kommagescheiden lijst)",
+          "spam_name_prefixes": "Spam-naammarkeringen (kommagescheiden lijst)"
+        },
+        "data_description": {
+          "call_log_limit_type_eingehend": "Bepaalt of de sensor fritzbox_anrufe_eingehend (Aangenomen oproepen) op aantal of op periode wordt begrensd.",
+          "call_log_limit_type_ausgehend": "Bepaalt of de sensor fritzbox_anrufe_ausgehend op aantal of op periode wordt begrensd.",
+          "call_log_limit_type_verpasst": "Bepaalt of de sensor fritzbox_anrufe_verpasst op aantal of op periode wordt begrensd.",
+          "auto_mark_read": "Indien ingeschakeld wordt bij het afspelen van een antwoordapparaat-bericht via deze integratie (dashboardkaart of service) de 'Nieuw'-markering ook direct op de FRITZ!Box verwijderd - net als bij echte FRITZ!Box-hardware/-apps. Standaard uit, omdat dit een door alle apparaten/apps gedeelde status op de box wijzigt (bijv. ook het aantal ongelezen berichten in FRITZ!App Fon), niet alleen dit dashboard. Experimenteel, zie README.",
+          "spam_numbers": "Een oproep of een antwoordapparaat-bericht wordt als spam gemarkeerd wanneer het nummer met een van deze items als voorvoegsel overeenkomt, OF wanneer de FRITZ!Box de oproep al zelf heeft geblokkeerd. De FRITZ!Box heeft geen ingebouwde, automatische spamherkenning - deze lijst beheer je zelf. Laat leeg om alleen op de eigen blokkeerlijst van de FRITZ!Box te vertrouwen.",
+          "spam_name_prefixes": "Markeert een oproep of een antwoordapparaat-bericht bovendien als spam wanneer de (telefoonboek-)naam met een van deze markeringen begint - voor externe blockers zoals de PhoneBlock-USB-stick, die nummers zelf blokkeren en de naam bijv. \"SPAM:\" laten voorafgaan, zonder dat de FRITZ!Box de oproep afwijst of het nummer in je spamlijst staat. Kommagescheiden, hoofdletterongevoelig, vergelijking aan het begin van de naam. Laat leeg om uit te schakelen. Tip: om deze items ook te verbergen, activeer je daarnaast \"Spam verbergen\" op de dashboardkaart."
+        }
+      },
+      "manage_tams": {
+        "title": "Antwoordapparaten beheren",
+        "description": "Momenteel geconfigureerd: {count} van maximaal 5 antwoordapparaten. Het eerste antwoordapparaat is op echte hardware bevestigd; elk volgende (antwoordapparaat 2 en hoger) is experimenteel - zie README.",
+        "menu_options": {
+          "add_tam": "Nog een antwoordapparaat toevoegen",
+          "remove_tam": "Antwoordapparaat verwijderen",
+          "tams_done": "Klaar"
+        }
+      }
+    }
+  },
+  "services": {
+    "delete_voicemail_message": {
+      "name": "Antwoordapparaat-bericht verwijderen",
+      "description": "Verwijdert een antwoordapparaat-bericht onherroepelijk van de FRITZ!Box. Er is geen undo - de FRITZ!Box zelf heeft geen prullenbak voor deze berichten.",
+      "fields": {
+        "message_id": {
+          "name": "Bericht-ID",
+          "description": "De ID van het bericht, te vinden in het 'messages'-attribuut van de fritzbox_anrufe-antwoordapparaat-sensor."
+        }
+      }
+    }
+  }
+}

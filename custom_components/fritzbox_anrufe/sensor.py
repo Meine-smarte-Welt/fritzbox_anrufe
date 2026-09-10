@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 3f0263111a76a1d3efe09689d3f3273840e98f6bcff9adf1d7ac0a15d13de5e4
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): cc3f0159027a4451783964082d2bb055eb86c2fc96999070e72f8fc5c1c7b080
 """Sensor to monitor incoming/outgoing phone calls on a Fritz!Box router."""
 
 from collections.abc import Mapping
@@ -38,6 +38,7 @@ from .const import (
     CONF_PHONEBOOK,
     CONF_PREFIXES,
     DOMAIN,
+    EVENT_MISSED_CALL,
     POST_CALL_REFRESH_DELAY_SECONDS,
     SERIAL_NUMBER,
     SETTINGS_SENSOR_KEY,
@@ -107,6 +108,7 @@ async def async_setup_entry(
         device_info=device_info,
         call_log_coordinator=call_log_coordinator,
         tam_coordinator=tam_coordinator,
+        config_entry_id=config_entry.entry_id,
     )
 
     call_list_sensors = [
@@ -198,12 +200,16 @@ class FritzBoxCallSensor(SensorEntity):
         device_info: DeviceInfo,
         call_log_coordinator: FritzCallLogCoordinator,
         tam_coordinator: FritzTamCoordinator | None,
+        config_entry_id: str | None = None,
     ) -> None:
         """Initialize the sensor."""
         self._fritzbox_phonebook = fritzbox_phonebook
         self._prefixes = prefixes
         self._host = host
         self._port = port
+        # Nur für das EVENT_MISSED_CALL-Event (seit v1.5.0) - identifiziert die
+        # FRITZ!Box/den Config-Entry im Event-Payload (analog zum Voicemail-Event).
+        self._config_entry_id = config_entry_id
         self._monitor: FritzBoxCallMonitor | None = None
         self._attributes: dict[str, str | list[str] | bool] = {}
         # Used by _schedule_post_call_refresh() (since v1.0.3, see its
@@ -335,6 +341,37 @@ class FritzBoxCallSensor(SensorEntity):
         # muss es hier für diese synthetischen Einträge ebenfalls existieren.
         call.spam = False
         self._call_log_coordinator.add_synthetic_outgoing_call(call)
+
+    def record_missed_call(self, info: Mapping[str, str | bool]) -> None:
+        """Fire EVENT_MISSED_CALL for an incoming call that was never answered.
+
+        Called by FritzBoxCallMonitor._parse() (same background thread as
+        set_state()/record_failed_outgoing_call()) when a DISCONNECT arrives
+        for a ConnectionID that reached RINGING but never CONNECT/TALKING -
+        i.e. a missed incoming call (nobody picked up, rejected, or it ended
+        before pickup). Analog zum Anrufbeantworter-Event
+        (EVENT_NEW_VOICEMAIL_MESSAGE) direkt als Automations-Auslöser nutzbar.
+
+        Wird über ``loop.call_soon_threadsafe`` an den Event-Loop übergeben -
+        exakt derselbe Thread-Übergabe-Mechanismus wie
+        :meth:`_schedule_post_call_refresh` (der Callmonitor läuft in einem
+        eigenen Hintergrund-Thread, ``bus.async_fire`` muss aber im Loop
+        laufen).
+        """
+        if self.hass is None:
+            return
+        data = {
+            "entry_id": self._config_entry_id,
+            "number": info.get("number") or None,
+            "name": info.get("name") or None,
+            "own_number": info.get("own_number") or None,
+            "device": info.get("device") or None,
+            "date": info.get("date") or None,
+            "vip": bool(info.get("vip", False)),
+        }
+        self.hass.loop.call_soon_threadsafe(
+            self.hass.bus.async_fire, EVENT_MISSED_CALL, data
+        )
 
     def set_attributes(self, attributes: Mapping[str, str | bool]) -> None:
         """Set the state attributes."""
@@ -642,6 +679,11 @@ class FritzBoxCallMonitor:
         # normally) or consumed on DISCONNECT with no prior CONNECT (see
         # _parse below and FritzBoxCallSensor.record_failed_outgoing_call).
         self._pending_outgoing: dict[str, dict[str, str]] = {}
+        # Eingehende Anrufe, die gerade klingeln, gekeyt nach ConnectionID -
+        # gesetzt bei RING, entfernt bei CONNECT (angenommen) und bei
+        # DISCONNECT ausgewertet: ist beim DISCONNECT noch ein Eintrag da, wurde
+        # nie angenommen = verpasster Anruf -> EVENT_MISSED_CALL (seit v1.5.0).
+        self._pending_incoming: dict[str, dict[str, str | bool]] = {}
 
     def connect(self) -> None:
         """Connect to the Fritz!Box."""
@@ -707,6 +749,16 @@ class FritzBoxCallMonitor:
                 "vip": contact.vip,
             }
             self._sensor.set_attributes(att)
+            # Diesen eingehenden Anruf vormerken - beim DISCONNECT ohne
+            # vorheriges CONNECT wird daraus ein „verpasster Anruf" (seit v1.5.0).
+            self._pending_incoming[connection_id] = {
+                "number": line[3],
+                "own_number": line[4],
+                "device": line[5],
+                "date": isotime,
+                "name": contact.name,
+                "vip": contact.vip,
+            }
         elif line[1] == FritzState.CALL:
             self._sensor.set_state(CallState.DIALING)
             # Remember this dial attempt until we know whether it succeeds
@@ -736,6 +788,8 @@ class FritzBoxCallMonitor:
             # here succeeded, the FRITZ!Box's own call list will log it
             # normally, so nothing further to track for it.
             self._pending_outgoing.pop(connection_id, None)
+            # Der Anruf wurde angenommen - also kein verpasster Anruf mehr.
+            self._pending_incoming.pop(connection_id, None)
             contact = self._sensor.number_to_contact(line[4])
             att = {
                 "with": line[4],
@@ -755,6 +809,11 @@ class FritzBoxCallMonitor:
                 # FritzBoxCallSensor.record_failed_outgoing_call for why
                 # this needs to be synthesized here at all.
                 self._sensor.record_failed_outgoing_call(pending)
+            # Eingehender Anruf, der klingelte, aber nie angenommen wurde
+            # (kein CONNECT) = verpasster Anruf -> Event (seit v1.5.0).
+            missed = self._pending_incoming.pop(connection_id, None)
+            if missed is not None:
+                self._sensor.record_missed_call(missed)
             att = {"duration": line[3], "closed": isotime}
             self._sensor.set_attributes(att)
         self._sensor.schedule_update_ha_state()
