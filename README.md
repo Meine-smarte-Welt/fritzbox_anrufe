@@ -1,3 +1,5 @@
+🇩🇪 Deutsch · [🇬🇧 English](README.en.md) · [🇳🇱 Nederlands](README.nl.md)
+
 # FRITZ!Box Anrufe
 
 Home-Assistant-Integration für den Anrufmonitor und die Anruflisten (eingehend,
@@ -17,6 +19,7 @@ mitgelieferte Dashboard-Karte.
 - [Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111)
 - [Anrufbeantworter Ein/Aus-Schalter](#anrufbeantworter-einaus-schalter-seit-version-110-experimentell)
 - [Einstellungen (Optionen)](#einstellungen-optionen)
+- [Neu in 1.6.0](#neu-in-version-160)
 - [Dashboard-Karte](#dashboard-karte)
 - [Icon](#icon)
 - [Bekannte Einschränkungen](#bekannte-einschränkungen)
@@ -81,6 +84,11 @@ mitgelieferte Dashboard-Karte.
   Auf der Dashboard-Karte optional anzeigbar (`show_tam_switch`, Editor-
   Bereich "Darstellung"), direkt vor der Nachrichten-Auflistung im
   Anrufbeantworter-Tab.
+- **Neu in Version 1.6.0** (Details: [Neu in Version 1.6.0](#neu-in-version-160)):
+  interne und externe Rufnummern im Einstellungen-Tab, Weckruf anzeigen,
+  ein-/ausschalten und (experimentell) ändern, Rufumleitungen anzeigen und
+  ein-/ausschalten, Anrufstatistik (Sensor und Statistik-Tab), Versionsanzeige
+  mit Update-Hinweis und Karte/Texte in Deutsch, Englisch und Niederländisch.
 - Alternative: einfache YAML-Tabellenkarte auf Basis von `flex-table-card`
   (siehe [`examples/dashboard_flex_table.yaml`](examples/dashboard_flex_table.yaml)).
 
@@ -524,6 +532,82 @@ Die frühere Option "Zweiten Anrufbeantworter aktivieren"
 Anzahl-Auswahl unter "Anrufbeantworter verwalten" ersetzt (bestehende
 Installationen werden automatisch migriert, siehe
 [Mehrere Anrufbeantworter](#mehrere-anrufbeantworter-bis-zu-5-seit-version-111)).
+
+## Neu in Version 1.6.0
+
+**Teststand vorab, ehrlich:** Alles unten ist gegen eine *simulierte*
+FRITZ!Box getestet (19 automatische Tests) und die Karte mit Testdaten im
+Browser geprüft. **Nicht an echter FRITZ!Box-Hardware geprüft** - die
+Funktionen sind deshalb ausdrücklich als „ungeprüft an echter Hardware“ zu
+verstehen. Rückmeldungen sind willkommen.
+
+### Rufnummern (extern und intern)
+
+Im Einstellungen-Tab der Karte (Akkordeon „Rufnummern“, abschaltbar mit
+`show_settings_numbers`) stehen die **externen Rufnummern** der Box (per
+TR-064 `GetNumbers`) und die **internen Nummern** je Gerät.
+Interne Nummern von IP-Telefonen und Apps (620-629) kommen per TR-064, die
+von analogen und DECT-Telefonen weiterhin aus der Web-Oberfläche der Box
+(`data.lua`) und sind mit „ungeprüft“ markiert. Fehlt eine Nummer, zeigt die
+Karte „–“ statt zu raten. Ob FHEM interne Nummern zeigt, ließ sich nicht
+belegen; die Umsetzung stützt sich auf die AVM-Dokumentation.
+
+### Weckruf
+
+Akkordeon „Weckruf“ (`show_settings_alarms`): Anzeige von Uhrzeit,
+Wochentagen, Name und Status. **Ein-/Ausschalten** läuft über die
+dokumentierte TR-064-Schnittstelle (`SetAlarmClockEnable`). AVM bietet
+**keine** TR-064-Aktion für Uhrzeit und Wochentage; „Weckruf anlegen/ändern“
+(die Box hat feste Plätze, meist 3) geht deshalb **experimentell** über die
+Web-Oberfläche. Die Integration liest das Ergebnis zurück und meldet einen
+Fehler, wenn die Box den Wert nicht übernommen hat. Schreiben nur für
+Administratoren.
+
+### Rufumleitung
+
+Akkordeon „Rufumleitung“ (`show_settings_deflections`): bestehende Umleitungen
+werden angezeigt und lassen sich ein-/ausschalten (Zwei-Klick-Bestätigung,
+nur Administratoren, mit Zurücklesen). **Neue Umleitungen anlegen und die
+Zielnummer ändern ist bewusst nicht umgesetzt:** AVM bietet dafür keine
+Schnittstelle, und geratene Formularfelder könnten falsche Umleitungen
+anlegen. Das geht weiter in der FRITZ!Box unter Telefonie → Rufbehandlung.
+
+### Anrufstatistik
+
+Zwei neue Sensoren: `sensor.fritzbox_anrufe_anrufstatistik` (Zustand: Anzahl
+gespeicherter Nachrichten; Attribute: gesamt, neu, heute, letzte 7/30 Tage,
+letzter Anruf, Verlauf der letzten 14 Tage, Verteilung nach Stunde, Liste)
+und `sensor.fritzbox_anrufe_letzter_ab_anruf` (Zeitstempel der letzten
+Nachricht). Gezählt wird, was die Box aktuell auf dem Anrufbeantworter
+speichert - nicht alle Anrufe. In der Karte gibt es dafür den Tab
+„Statistik“ (`show_statistik`, Standard aus).
+
+### Version und Update-Hinweis
+
+Die Version steht an drei Stellen: Karte → Zahnrad → „App-Version“, oben im
+Karten-Editor und im Optionen-Dialog der Integration. Die Integration fragt
+beim Start und danach alle 12 Stunden die GitHub-Releases ab; bei einer neueren
+Version erscheint ein orangefarbener Hinweis. Ist GitHub nicht erreichbar,
+läuft alles normal weiter.
+
+### Services (nur Administratoren)
+
+| Service | Zweck |
+| --- | --- |
+| `fritzbox_anrufe.set_alarm_clock_enabled` | Weckruf ein-/ausschalten (`index`, `enabled`) |
+| `fritzbox_anrufe.set_alarm_clock` | Uhrzeit/Wochentage/Name/Status setzen (experimentell) |
+| `fritzbox_anrufe.set_deflection_enabled` | Umleitung ein-/ausschalten (`deflection_id`, `enabled`) |
+| `fritzbox_anrufe.check_for_update` | GitHub-Versionsprüfung sofort ausführen |
+
+Bei mehreren FRITZ!Boxen optional `entry_id` angeben.
+
+### Neue Karten-Schlüssel
+
+`show_statistik` (Standard `false`), `show_settings_numbers`,
+`show_settings_alarms`, `show_settings_deflections` (Standard `true`),
+`entity_stats`, `entry_id`, `color_icon_statistik`. Die **neuen** Karten-Texte
+gibt es in Deutsch, Englisch und Niederländisch (nach `hass.language`); ältere
+Texte (Anrufliste, Anrufbeantworter, Telefoniegeräte) sind noch deutsch.
 
 ## Dashboard-Karte
 
@@ -1022,6 +1106,19 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Bekannte Einschränkungen
 
+- **Neu in 1.6.0, nicht an echter Hardware geprüft:** Rufnummern, Weckruf,
+  Rufumleitung, Statistik und Versionsprüfung wurden nur gegen eine
+  simulierte FRITZ!Box getestet. Weckruf-Uhrzeit/-Wochentage schreiben über die
+  Web-Oberfläche der Box (kein dokumentierter Weg, Formularfelder nicht
+  belegt); die Integration prüft per Zurücklesen und meldet Abweichungen.
+- Rufumleitungen lassen sich nicht anlegen und ihre Zielnummer nicht ändern
+  (keine Schnittstelle bei AVM); nur Anzeigen und Ein-/Ausschalten.
+- Interne Nummern analoger/DECT-Telefone stammen aus der Web-Oberfläche und
+  können je nach FRITZ!OS fehlen; per TR-064 liefert die Box nur IP-Telefone
+  und Apps.
+- Die Statistik zählt nur Anrufbeantworter-Nachrichten.
+- Ältere Karten-Texte sind noch nicht übersetzt (nur Deutsch).
+
 - Die FRITZ!Box/`fritzconnection`-API erlaubt nur EINEN gemeinsamen
   Anzahl-*oder*-Tage-Parameter für den kombinierten Anrufabruf (alle Typen
   gemischt), keinen getrennten Parameter je Anruftyp. Um trotzdem
@@ -1206,6 +1303,14 @@ die dortigen Maintainer den Fehler beheben.
   Bitte mit dem Ergebnis eines eigenen Tests als GitHub-Issue melden.
 
 ## Versionshistorie
+
+- **1.6.0**: Interne und externe Rufnummern im Einstellungen-Tab; Weckruf
+  anzeigen, ein-/ausschalten und experimentell ändern; Rufumleitungen
+  anzeigen und ein-/ausschalten; Anrufstatistik (zwei Sensoren, Statistik-Tab);
+  Versionsanzeige mit GitHub-Update-Hinweis (Karte, Editor, Optionen);
+  vier neue Admin-Services; neue Karten-Texte in Deutsch/Englisch/
+  Niederländisch; neue README `README.en.md` und `README.nl.md`. Nicht an
+  echter Hardware geprüft, siehe [Neu in Version 1.6.0](#neu-in-version-160).
 
 - **1.5.0**: Vier Neuerungen:
   **(1) Zoomfaktor der Karte** (`zoom`, Standard 1): skaliert den gesamten
@@ -1582,28 +1687,33 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.5.0) |
+| Datei | SHA256 (Version 1.6.0) |
 | --- | --- |
-| `__init__.py` | `f513ee0ff2c3847a19067db6abf93f83f0876ed61427058789516d6d96309f74` |
+| `__init__.py` | `208eb4a9910087daf8a2dc7001bc38ce84a76d83d12ef5a7713c117cb6e0c8b2` |
+| `alarm.py` | `83388a40874baafbe11646aabcbc2916eb6f539a6e34b38c347f649bb2cda01a` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
 | `call_log.py` | `06375eae8516c56b35582eb2b12f7ae09910fc908458d7a90912a45edc19c9d5` |
-| `config_flow.py` | `7fbbbb916a16a78a10623d599aa24d91f9b1953cee3f134a83ca66c9ef44d4a5` |
-| `const.py` | `fabd26bf5006abe497fbe3fa72068e49b9b4bbc8630442103e4ffd78f81a2d4f` |
+| `call_stats.py` | `1f22199430beba85d4856f64da1c092ebe3b27b800d1b5bc47e9d0ac6a41476b` |
+| `config_flow.py` | `05f952f04180995f565d3efd765ee2781948e11b725bc620427d319b820879d4` |
+| `const.py` | `cef8a0326ca6dcf343b8ec1eabc020dc8317e716f2acbeed76c70c805b557cbb` |
+| `deflection.py` | `3949dfa6993bc5a6d43c17c635784b19c96d5414c70e44088813be37e5d55e98` |
 | `http.py` | `4d98f8fb1236eb7960d0d3470f0eef1a0e3a45e48e713fe121faa1481a6b70df` |
-| `sensor.py` | `cc3f0159027a4451783964082d2bb055eb86c2fc96999070e72f8fc5c1c7b080` |
-| `settings_data.py` | `165f75b122a28ab27bca5a512ecb58160f68224a0c41b0ff3aa907da7fdd7310` |
+| `sensor.py` | `77de2f6e7e1a085ae3ef12232faefefbfae8e8ab9c14ff13e03ae491d42f11d2` |
+| `settings_data.py` | `28bd262ad9c688caec2d99866c36e0b4cd49bc3d0b7fd54571f3eabd317387a8` |
 | `spam.py` | `026ae8bc8890be324f074d17f5fce1269d87edbb420566bdfc1aae18cf3eea11` |
 | `switch.py` | `7cdbb0e5d3c5d1c8fa3cc5cad1cba6fa1f666b6c7eb1e034fbed40861b0e73c2` |
 | `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
+| `telephony.py` | `8c1faec0cb58d198a68d133689b564516ca95680b71869af927d4730ee92762a` |
+| `update_check.py` | `119559a29413fd478bb94053336f6e90e150a3c2737d2966371b7800e4e508c6` |
 | `voicemail.py` | `564dc067bc31355e96e5521884969f228cf27bba73cae7bfb1b6d8ac9633a7f0` |
-| `services.yaml` | `9745c630a06b64f58563bf7abca6dbd5607d6b2c8c16b0d47490edf393b4372b` |
-| `www/fritzbox-anrufe-card.js` | `281d165e79f3d0687652de3c6803f62d24ffbb2b7d4dc22d29a656d5887ec276` |
-| `manifest.json` | `217662408e49119fb794715383e8bc2f950388e8e0d8a7e3ec8ddd65a8ac229b` |
-| `strings.json` | `4551203e08227b717fd22491f8770c285d637f292e4e90c48733beb038dd4a45` |
-| `translations/de.json` | `a90ed9d1f4582b5d4a4431b379cebb9a979461acb825d58632fc533f66e1bb18` |
-| `translations/en.json` | `4551203e08227b717fd22491f8770c285d637f292e4e90c48733beb038dd4a45` |
-| `translations/nl.json` | `b88d204c505ab0f7f02bd8050c41942717bcad209f6b8d5ebc6e7c009d3eb6eb` |
-| `icons.json` | `ef4a351842f873eecfae2af949615a1888f4923f96d942a9251326d94f1bdc2b` |
+| `services.yaml` | `2f3c794bf601f4e765950e72a1f261c8819c7384187280a4b04c57706026c941` |
+| `www/fritzbox-anrufe-card.js` | `0f09b0cefd3c83f0bbe38cdf09aefb687d56b21ba1e942c29260a1bf415b2861` |
+| `manifest.json` | `b3f4ed0a2a922bdcc2c67699116f1261aba317d463b0011fe9d1f902005223a3` |
+| `strings.json` | `2aaa2e8a4a8f6c71f438bfef33fa1b93252cf4bf7b692f72a274c1a8f112d407` |
+| `translations/de.json` | `4bd7cf62ba3a6216754fb28e5653440970ced12cf1e169f0c5962091fb763b64` |
+| `translations/en.json` | `2aaa2e8a4a8f6c71f438bfef33fa1b93252cf4bf7b692f72a274c1a8f112d407` |
+| `translations/nl.json` | `c4c1a621e53677648e1c433300b1784db8e286a1a5a939ed95acf186f845b426` |
+| `icons.json` | `8b2283029eee6310b46153248f2261bbf5cf1f42a84f56e2da8544fbc743515d` |
 
 Der Ordner `custom_components/fritzbox_anrufe/brand/` enthält die Logo-/
 Icon-Dateien (`icon.png`, `icon@2x.png`, `logo.png`, `logo@2x.png`); diese

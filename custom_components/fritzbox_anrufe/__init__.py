@@ -1,9 +1,11 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): f513ee0ff2c3847a19067db6abf93f83f0876ed61427058789516d6d96309f74
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 208eb4a9910087daf8a2dc7001bc38ce84a76d83d12ef5a7713c117cb6e0c8b2
 """The fritzbox_anrufe integration."""
 
 from dataclasses import dataclass, field
 import logging
 from pathlib import Path
+
+import voluptuous as vol
 
 from fritzconnection.core.exceptions import FritzConnectionException, FritzSecurityError
 from fritzconnection.lib.fritzcall import FritzCall
@@ -14,18 +16,30 @@ from homeassistant.components.lovelace.const import LOVELACE_DATA
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers import entity_registry as er
+from homeassistant.core import ServiceCall
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ConfigEntryNotReady,
+    HomeAssistantError,
+    ServiceValidationError,
+)
+from homeassistant.helpers import config_validation as cv, entity_registry as er
+from homeassistant.helpers.service import async_register_admin_service
 from homeassistant.loader import async_get_integration
 
+from .alarm import AlarmError
 from .base import FritzBoxPhonebook
+from .deflection import DeflectionError
 from .call_log import FritzCallLogCoordinator
 from .settings_data import FritzSettingsCoordinator
+from .update_check import UpdateChecker
 from .const import (
     CALL_TYPE_INCOMING,
+    CALL_TYPE_LAST_VOICEMAIL,
     CALL_TYPE_LIVE,
     CALL_TYPE_MISSED,
     CALL_TYPE_OUTGOING,
+    CALL_TYPE_STATS,
     CALL_TYPES_VOICEMAIL,
     CONF_PHONEBOOK,
     CONF_PREFIXES,
@@ -33,6 +47,10 @@ from .const import (
     DOMAIN,
     PLATFORMS,
     SERIAL_NUMBER,
+    SERVICE_CHECK_FOR_UPDATE,
+    SERVICE_SET_ALARM_CLOCK,
+    SERVICE_SET_ALARM_CLOCK_ENABLED,
+    SERVICE_SET_DEFLECTION_ENABLED,
     SETTINGS_SENSOR_KEY,
     SWITCH_TRANSLATION_KEYS_VOICEMAIL,
     TAM_MEDIA_URL_BASES,
@@ -264,6 +282,9 @@ def _async_reserve_entity_ids(
         reservations[f"{unique_id}-{call_type}"] = f"{DOMAIN}_{call_type}"
     # Einstellungen-Sensor (EXPERIMENTELL, seit v1.3.0b0).
     reservations[f"{unique_id}-{SETTINGS_SENSOR_KEY}"] = f"{DOMAIN}_{SETTINGS_SENSOR_KEY}"
+    # Anrufstatistik (seit v1.6.0).
+    reservations[f"{unique_id}-{CALL_TYPE_STATS}"] = f"{DOMAIN}_{CALL_TYPE_STATS}"
+    reservations[f"{unique_id}-{CALL_TYPE_LAST_VOICEMAIL}"] = f"{DOMAIN}_{CALL_TYPE_LAST_VOICEMAIL}"
     for sensor_unique_id, suggested_object_id in reservations.items():
         registry.async_get_or_create(
             "sensor",
@@ -295,6 +316,130 @@ def _async_reserve_entity_ids(
         )
 
 
+# --- Services (seit v1.6.0), nur für Administratoren ----------------------
+_SERVICES_REGISTERED_KEY = f"{DOMAIN}_services_registered"
+_ATTR_ENTRY_ID = "entry_id"
+_ATTR_INDEX = "index"
+_ATTR_ENABLED = "enabled"
+_ATTR_DEFLECTION_ID = "deflection_id"
+_WEEKDAY_CHOICES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+def _loaded_entries(hass: HomeAssistant) -> list[ConfigEntry]:
+    return [
+        entry
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if getattr(entry, "runtime_data", None) is not None
+    ]
+
+
+def _resolve_runtime(hass: HomeAssistant, call: ServiceCall) -> "FritzBoxRuntimeData":
+    """Passenden FRITZ!Box-Eintrag finden (``entry_id`` ist nur bei mehreren nötig)."""
+    entries = _loaded_entries(hass)
+    entry_id = call.data.get(_ATTR_ENTRY_ID)
+    if entry_id:
+        entries = [entry for entry in entries if entry.entry_id == entry_id]
+    if not entries:
+        raise ServiceValidationError("Kein passender FRITZ!Box-Anrufe-Eintrag gefunden.")
+    if len(entries) > 1:
+        raise ServiceValidationError(
+            "Mehrere FRITZ!Box-Einträge vorhanden - bitte entry_id angeben."
+        )
+    return entries[0].runtime_data
+
+
+def _settings(runtime: "FritzBoxRuntimeData") -> FritzSettingsCoordinator:
+    if runtime.settings_coordinator is None:
+        raise HomeAssistantError("Der Einstellungen-Coordinator ist nicht verfügbar.")
+    return runtime.settings_coordinator
+
+
+def _async_register_services(hass: HomeAssistant) -> None:
+    """Weckruf-, Rufumleitungs- und Update-Services registrieren (einmalig)."""
+    if hass.data.get(_SERVICES_REGISTERED_KEY):
+        return
+    hass.data[_SERVICES_REGISTERED_KEY] = True
+
+    async def _alarm_enabled(call: ServiceCall) -> None:
+        settings = _settings(_resolve_runtime(hass, call))
+        try:
+            await settings.async_set_alarm_enabled(call.data[_ATTR_INDEX], call.data[_ATTR_ENABLED])
+        except AlarmError as ex:
+            raise HomeAssistantError(str(ex)) from ex
+
+    async def _alarm_clock(call: ServiceCall) -> None:
+        settings = _settings(_resolve_runtime(hass, call))
+        try:
+            await settings.async_set_alarm_clock(
+                index=call.data[_ATTR_INDEX],
+                time=call.data.get("time"),
+                weekdays=call.data.get("weekdays"),
+                name=call.data.get("name"),
+                enabled=call.data.get(_ATTR_ENABLED),
+            )
+        except AlarmError as ex:
+            raise HomeAssistantError(str(ex)) from ex
+
+    async def _deflection_enabled(call: ServiceCall) -> None:
+        settings = _settings(_resolve_runtime(hass, call))
+        try:
+            await settings.async_set_deflection_enabled(
+                call.data[_ATTR_DEFLECTION_ID], call.data[_ATTR_ENABLED]
+            )
+        except DeflectionError as ex:
+            raise HomeAssistantError(str(ex)) from ex
+
+    async def _check_update(call: ServiceCall) -> None:
+        runtime = _resolve_runtime(hass, call)
+        if runtime.update_checker is not None:
+            await runtime.update_checker.async_info(force=True)
+        if runtime.settings_coordinator is not None:
+            await runtime.settings_coordinator.async_request_refresh()
+
+    entry_id = {vol.Optional(_ATTR_ENTRY_ID): cv.string}
+    async_register_admin_service(
+        hass,
+        DOMAIN,
+        SERVICE_SET_ALARM_CLOCK_ENABLED,
+        _alarm_enabled,
+        vol.Schema(
+            {**entry_id, vol.Required(_ATTR_INDEX): vol.Coerce(int), vol.Required(_ATTR_ENABLED): cv.boolean}
+        ),
+    )
+    async_register_admin_service(
+        hass,
+        DOMAIN,
+        SERVICE_SET_ALARM_CLOCK,
+        _alarm_clock,
+        vol.Schema(
+            {
+                **entry_id,
+                vol.Required(_ATTR_INDEX): vol.Coerce(int),
+                vol.Optional("time"): cv.string,
+                vol.Optional("weekdays"): vol.All(cv.ensure_list, [vol.In(_WEEKDAY_CHOICES)]),
+                vol.Optional("name"): cv.string,
+                vol.Optional(_ATTR_ENABLED): cv.boolean,
+            }
+        ),
+    )
+    async_register_admin_service(
+        hass,
+        DOMAIN,
+        SERVICE_SET_DEFLECTION_ENABLED,
+        _deflection_enabled,
+        vol.Schema(
+            {
+                **entry_id,
+                vol.Required(_ATTR_DEFLECTION_ID): vol.Coerce(int),
+                vol.Required(_ATTR_ENABLED): cv.boolean,
+            }
+        ),
+    )
+    async_register_admin_service(
+        hass, DOMAIN, SERVICE_CHECK_FOR_UPDATE, _check_update, vol.Schema({**entry_id})
+    )
+
+
 @dataclass
 class FritzBoxRuntimeData:
     """Runtime data shared between the live call-monitor sensor, the
@@ -316,6 +461,8 @@ class FritzBoxRuntimeData:
     # v1.3.0b0) - Telefonie-/DECT-Geräte + Telefonbuch (lesend). Optional; kann
     # None sein, falls die Erstellung fehlschlägt.
     settings_coordinator: FritzSettingsCoordinator | None = None
+    # Versionsprüfung gegen GitHub (seit v1.6.0), geteilt mit dem Settings-Coordinator.
+    update_checker: UpdateChecker | None = None
 
 
 type FritzBoxCallMonitorConfigEntry = ConfigEntry[FritzBoxRuntimeData]
@@ -413,7 +560,10 @@ async def async_setup_entry(
     # nicht blockieren: async_refresh() (nicht async_config_entry_first_refresh),
     # bei fehlender Berechtigung/nicht unterstützter Aktion bleibt der zugehörige
     # Sensor schlicht "nicht verfügbar".
-    settings_coordinator = FritzSettingsCoordinator(hass, config_entry, fritzbox_phonebook)
+    update_checker = UpdateChecker(hass)
+    settings_coordinator = FritzSettingsCoordinator(
+        hass, config_entry, fritzbox_phonebook, update_checker=update_checker
+    )
     await settings_coordinator.async_refresh()
 
     unique_id = f"{config_entry.data[SERIAL_NUMBER]}-{config_entry.data[CONF_PHONEBOOK]}"
@@ -424,8 +574,10 @@ async def async_setup_entry(
         call_log_coordinator=call_log_coordinator,
         tam_coordinators=tam_coordinators,
         settings_coordinator=settings_coordinator,
+        update_checker=update_checker,
     )
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
+    _async_register_services(hass)
 
     return True
 

@@ -177,6 +177,53 @@
       },
       "fritzbox_anrufe_einstellungen": {
         "name": "Instellingen {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufstatistik": {
+        "name": "Oproepstatistiek {phonebook_name}",
+        "state_attributes": {
+          "total": {
+            "name": "Totaal"
+          },
+          "new": {
+            "name": "Nieuw"
+          },
+          "today": {
+            "name": "Vandaag"
+          },
+          "last_7_days": {
+            "name": "Laatste 7 dagen"
+          },
+          "last_30_days": {
+            "name": "Laatste 30 dagen"
+          },
+          "last_call": {
+            "name": "Laatste oproep"
+          },
+          "last_call_date": {
+            "name": "Datum laatste oproep"
+          },
+          "last_call_time": {
+            "name": "Tijd laatste oproep"
+          },
+          "last_call_number": {
+            "name": "Nummer laatste oproep"
+          },
+          "last_call_name": {
+            "name": "Naam laatste oproep"
+          },
+          "by_day": {
+            "name": "Oproepen per dag"
+          },
+          "by_hour": {
+            "name": "Oproepen per uur"
+          },
+          "calls": {
+            "name": "Oproepen"
+          }
+        }
+      },
+      "fritzbox_anrufe_letzter_ab_anruf": {
+        "name": "Laatste antwoordapparaat-oproep {phonebook_name}"
       }
     },
     "switch": {
@@ -215,7 +262,8 @@
         "menu_options": {
           "general_settings": "Basisinstellingen",
           "manage_tams": "Antwoordapparaten beheren"
-        }
+        },
+        "description": "Geïnstalleerde versie: {version}\n{update_info}"
       },
       "general_settings": {
         "title": "Basisinstellingen",
@@ -241,7 +289,8 @@
           "auto_mark_read": "Indien ingeschakeld wordt bij het afspelen van een antwoordapparaat-bericht via deze integratie (dashboardkaart of service) de 'Nieuw'-markering ook direct op de FRITZ!Box verwijderd - net als bij echte FRITZ!Box-hardware/-apps. Standaard uit, omdat dit een door alle apparaten/apps gedeelde status op de box wijzigt (bijv. ook het aantal ongelezen berichten in FRITZ!App Fon), niet alleen dit dashboard. Experimenteel, zie README.",
           "spam_numbers": "Een oproep of een antwoordapparaat-bericht wordt als spam gemarkeerd wanneer het nummer met een van deze items als voorvoegsel overeenkomt, OF wanneer de FRITZ!Box de oproep al zelf heeft geblokkeerd. De FRITZ!Box heeft geen ingebouwde, automatische spamherkenning - deze lijst beheer je zelf. Laat leeg om alleen op de eigen blokkeerlijst van de FRITZ!Box te vertrouwen.",
           "spam_name_prefixes": "Markeert een oproep of een antwoordapparaat-bericht bovendien als spam wanneer de (telefoonboek-)naam met een van deze markeringen begint - voor externe blockers zoals de PhoneBlock-USB-stick, die nummers zelf blokkeren en de naam bijv. \"SPAM:\" laten voorafgaan, zonder dat de FRITZ!Box de oproep afwijst of het nummer in je spamlijst staat. Kommagescheiden, hoofdletterongevoelig, vergelijking aan het begin van de naam. Laat leeg om uit te schakelen. Tip: om deze items ook te verbergen, activeer je daarnaast \"Spam verbergen\" op de dashboardkaart."
-        }
+        },
+        "description": "Geïnstalleerde versie: {version}\n{update_info}"
       },
       "manage_tams": {
         "title": "Antwoordapparaten beheren",
@@ -262,6 +311,82 @@
         "message_id": {
           "name": "Bericht-ID",
           "description": "De ID van het bericht, te vinden in het 'messages'-attribuut van de fritzbox_anrufe-antwoordapparaat-sensor."
+        }
+      }
+    },
+    "set_alarm_clock_enabled": {
+      "name": "Wekservice in-/uitschakelen",
+      "description": "Schakelt een wekservice van de FRITZ!Box in of uit (TR-064). Alleen voor beheerders.",
+      "fields": {
+        "entry_id": {
+          "name": "Invoer",
+          "description": "Alleen nodig bij meerdere FRITZ!Box-invoeren."
+        },
+        "index": {
+          "name": "Wekservice",
+          "description": "Nummer van de wekservice, zoals in het attribuut 'alarms' van de instellingensensor."
+        },
+        "enabled": {
+          "name": "Actief",
+          "description": "Wekservice in- of uitschakelen."
+        }
+      }
+    },
+    "set_alarm_clock": {
+      "name": "Wekservice instellen (experimenteel)",
+      "description": "Stelt tijd, weekdagen en/of naam van een wekservice in via de FRITZ!Box-webinterface en controleert het resultaat door terug te lezen. Niet bevestigd op echte hardware. Alleen voor beheerders.",
+      "fields": {
+        "entry_id": {
+          "name": "Invoer",
+          "description": "Alleen nodig bij meerdere FRITZ!Box-invoeren."
+        },
+        "index": {
+          "name": "Wekservice",
+          "description": "Nummer van de wekservice, zoals in het attribuut 'alarms'."
+        },
+        "time": {
+          "name": "Tijd",
+          "description": "Wektijd (UU:MM)."
+        },
+        "weekdays": {
+          "name": "Weekdagen",
+          "description": "Dagen waarop de wekservice overgaat."
+        },
+        "name": {
+          "name": "Naam",
+          "description": "Naam van de wekservice."
+        },
+        "enabled": {
+          "name": "Actief",
+          "description": "Wekservice bovendien in- of uitschakelen."
+        }
+      }
+    },
+    "set_deflection_enabled": {
+      "name": "Oproepdoorschakeling in-/uitschakelen",
+      "description": "Schakelt een bestaande oproepdoorschakeling van de FRITZ!Box in of uit (TR-064). Aanmaken en doelnummer wijzigen is niet mogelijk. Alleen voor beheerders.",
+      "fields": {
+        "entry_id": {
+          "name": "Invoer",
+          "description": "Alleen nodig bij meerdere FRITZ!Box-invoeren."
+        },
+        "deflection_id": {
+          "name": "Regel",
+          "description": "Nummer van de regel, zoals in het attribuut 'deflections'."
+        },
+        "enabled": {
+          "name": "Actief",
+          "description": "Regel in- of uitschakelen."
+        }
+      }
+    },
+    "check_for_update": {
+      "name": "Op update controleren",
+      "description": "Vraagt GitHub meteen naar een nieuwe versie van de integratie. Alleen voor beheerders.",
+      "fields": {
+        "entry_id": {
+          "name": "Invoer",
+          "description": "Alleen nodig bij meerdere FRITZ!Box-invoeren."
         }
       }
     }

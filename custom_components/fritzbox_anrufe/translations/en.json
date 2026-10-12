@@ -177,6 +177,53 @@
       },
       "fritzbox_anrufe_einstellungen": {
         "name": "Settings {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufstatistik": {
+        "name": "Call statistics {phonebook_name}",
+        "state_attributes": {
+          "total": {
+            "name": "Total"
+          },
+          "new": {
+            "name": "New"
+          },
+          "today": {
+            "name": "Today"
+          },
+          "last_7_days": {
+            "name": "Last 7 days"
+          },
+          "last_30_days": {
+            "name": "Last 30 days"
+          },
+          "last_call": {
+            "name": "Last call"
+          },
+          "last_call_date": {
+            "name": "Last call date"
+          },
+          "last_call_time": {
+            "name": "Last call time"
+          },
+          "last_call_number": {
+            "name": "Last call number"
+          },
+          "last_call_name": {
+            "name": "Last call name"
+          },
+          "by_day": {
+            "name": "Calls per day"
+          },
+          "by_hour": {
+            "name": "Calls per hour"
+          },
+          "calls": {
+            "name": "Calls"
+          }
+        }
+      },
+      "fritzbox_anrufe_letzter_ab_anruf": {
+        "name": "Last answering-machine call {phonebook_name}"
       }
     },
     "switch": {
@@ -215,7 +262,8 @@
         "menu_options": {
           "general_settings": "General settings",
           "manage_tams": "Manage answering machines"
-        }
+        },
+        "description": "Installed version: {version}\n{update_info}"
       },
       "general_settings": {
         "title": "General settings",
@@ -241,7 +289,8 @@
           "auto_mark_read": "When enabled, playing an answering-machine message through this integration (dashboard card or service) also clears its 'new' flag directly on the FRITZ!Box itself - matching real FRITZ!Box hardware/apps. Off by default, since this changes state shared by every device/app (e.g. also the unread count in FRITZ!App Fon), not just this dashboard. Experimental, see README.",
           "spam_numbers": "A call or answering-machine message is flagged as spam if its number matches one of these entries as a prefix, OR if the FRITZ!Box itself already blocked the call. The FRITZ!Box has no native, automatic spam detection - this list is maintained by you. Leave empty to rely only on the FRITZ!Box's own block list.",
           "spam_name_prefixes": "Additionally flags a call or answering-machine message as spam if its (phonebook) name begins with one of these markers - for external blockers such as the PhoneBlock USB stick, which block numbers themselves and prepend e.g. \"SPAM:\" to the name without the FRITZ!Box rejecting the call or the number being in your spam list. Comma-separated, case-insensitive, matched at the start of the name. Leave empty to disable. Tip: to actually hide these entries, also enable \"Hide spam\" on the dashboard card."
-        }
+        },
+        "description": "Installed version: {version}\n{update_info}"
       },
       "manage_tams": {
         "title": "Manage answering machines",
@@ -262,6 +311,82 @@
         "message_id": {
           "name": "Message ID",
           "description": "The message's id, as found in the fritzbox_anrufe answering-machine sensor's 'messages' attribute."
+        }
+      }
+    },
+    "set_alarm_clock_enabled": {
+      "name": "Switch wake-up call on/off",
+      "description": "Switches a FRITZ!Box wake-up call on or off (TR-064). Administrators only.",
+      "fields": {
+        "entry_id": {
+          "name": "Entry",
+          "description": "Only needed with several FRITZ!Box entries."
+        },
+        "index": {
+          "name": "Wake-up call",
+          "description": "Number of the wake-up call, as shown in the 'alarms' attribute of the settings sensor."
+        },
+        "enabled": {
+          "name": "Active",
+          "description": "Switch the wake-up call on or off."
+        }
+      }
+    },
+    "set_alarm_clock": {
+      "name": "Set up wake-up call (experimental)",
+      "description": "Sets time, weekdays and/or name of a wake-up call through the FRITZ!Box web interface and verifies the result by reading it back. Not confirmed on real hardware. Administrators only.",
+      "fields": {
+        "entry_id": {
+          "name": "Entry",
+          "description": "Only needed with several FRITZ!Box entries."
+        },
+        "index": {
+          "name": "Wake-up call",
+          "description": "Number of the wake-up call, as shown in the 'alarms' attribute."
+        },
+        "time": {
+          "name": "Time",
+          "description": "Wake-up time (HH:MM)."
+        },
+        "weekdays": {
+          "name": "Weekdays",
+          "description": "Days on which the wake-up call rings."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name of the wake-up call."
+        },
+        "enabled": {
+          "name": "Active",
+          "description": "Additionally switch the wake-up call on or off."
+        }
+      }
+    },
+    "set_deflection_enabled": {
+      "name": "Switch call forwarding on/off",
+      "description": "Switches an existing FRITZ!Box call forwarding rule on or off (TR-064). Creating rules and changing the target number is not possible. Administrators only.",
+      "fields": {
+        "entry_id": {
+          "name": "Entry",
+          "description": "Only needed with several FRITZ!Box entries."
+        },
+        "deflection_id": {
+          "name": "Rule",
+          "description": "Number of the rule, as shown in the 'deflections' attribute."
+        },
+        "enabled": {
+          "name": "Active",
+          "description": "Switch the rule on or off."
+        }
+      }
+    },
+    "check_for_update": {
+      "name": "Check for update",
+      "description": "Asks GitHub right away for a new version of the integration. Administrators only.",
+      "fields": {
+        "entry_id": {
+          "name": "Entry",
+          "description": "Only needed with several FRITZ!Box entries."
         }
       }
     }

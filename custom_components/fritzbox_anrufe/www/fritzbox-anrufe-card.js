@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 281d165e79f3d0687652de3c6803f62d24ffbb2b7d4dc22d29a656d5887ec276
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 0f09b0cefd3c83f0bbe38cdf09aefb687d56b21ba1e942c29260a1bf415b2861
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -345,7 +345,9 @@ const FILTER_VOICEMAIL = "anrufbeantworter";
 const FILTER_SETTINGS = "einstellungen";
 // "anrufbeantworter" is a tab like any other (5th icon in the header row),
 // not a section rendered underneath the call list - see _renderMainContent().
-const FILTER_ORDER = ["alle", "eingehend", "ausgehend", "verpasst", FILTER_VOICEMAIL, FILTER_SETTINGS];
+// Statistik-Tab (neu in v1.6.0): eigene Ansicht, Standard AUS (show_statistik).
+const FILTER_STATS = "statistik";
+const FILTER_ORDER = ["alle", "eingehend", "ausgehend", "verpasst", FILTER_VOICEMAIL, FILTER_STATS, FILTER_SETTINGS];
 
 const FILTER_META = {
   alle: { icon: "mdi:phone-log", label: "Alle" },
@@ -355,6 +357,7 @@ const FILTER_META = {
   ausgehend: { icon: "mdi:phone-outgoing", label: "Ausgehend" },
   verpasst: { icon: "mdi:phone-missed", label: "Verpasst" },
   anrufbeantworter: { icon: "mdi:voicemail", label: "Anrufbeantworter" },
+  statistik: { icon: "mdi:chart-bar", label: "Statistik" },
   einstellungen: { icon: "mdi:cog", label: "Einstellungen" },
 };
 
@@ -552,6 +555,7 @@ const CATEGORY_ICON_COLOR_KEYS = {
   verpasst: "color_icon_verpasst",
   anrufbeantworter: "color_icon_anrufbeantworter",
   // Einstellungen-Tab (Zahnrad) - eigene Icon-Farbe (seit v1.3.1).
+  statistik: "color_icon_statistik",
   einstellungen: "color_icon_einstellungen",
 };
 
@@ -592,6 +596,14 @@ const CONFIG_DEFAULTS = {
   // Anschluss/ausgehende/ankommende/interne Nummer je Gerät, Detail-Popup,
   // Anrufbeantworter-Schalter), siehe _renderSettings()/_visibleFilterTypes().
   show_einstellungen: false,
+  // Neu in v1.6.0: Statistik-Tab (Standard AUS), Bereiche im Einstellungen-Tab
+  // (Standard AN, einzeln abschaltbar) und optionale Zuordnung.
+  show_statistik: false,
+  show_settings_numbers: true,
+  show_settings_alarms: true,
+  show_settings_deflections: true,
+  entity_stats: "",
+  entry_id: "",
   // Rückwärtskompatibel: ein explizit gesetzter Einstellungen-Sensor wird
   // weiterhin bevorzugt (siehe _settingsEntityId()); ein Editor-Picker dafür
   // existiert seit v1.3.0b2 aber nicht mehr - der Sensor wird automatisch
@@ -741,6 +753,7 @@ const CONFIG_DEFAULTS = {
   color_icon_anrufbeantworter: "",
   // Einstellungen-Tab-Icon-Farbe (seit v1.3.1).
   color_icon_einstellungen: "",
+  color_icon_statistik: "",
   // Telefonbuch in der Einstellungen-Kategorie optional anzeigen (seit v1.3.1,
   // als scrollbares Accordion). Standard AUS.
   show_settings_phonebook: false,
@@ -767,6 +780,256 @@ function escapeHtml(value) {
       }[c])
   );
 }
+
+// --- Mehrsprachigkeit der NEUEN Texte (seit v1.6.0) --------------------------
+// Deutsch, Englisch, Niederländisch; Sprache aus hass.language, Rückfall Englisch,
+// dann der Schlüsselname. Platzhalter {n} usw. Hinweis: Texte, die bereits vor
+// v1.6.0 existierten (Anrufliste, Anrufbeantworter, Telefoniegeräte), sind noch
+// deutsch hartkodiert und werden schrittweise umgestellt - siehe README
+// "Bekannte Einschränkungen".
+const CARD_VERSION = "1.6.0";
+
+const I18N = {
+  de: {
+    tab_stats: "Statistik",
+    stats_total: "Gesamt",
+    stats_new: "Neu",
+    stats_today: "Heute",
+    stats_7: "7 Tage",
+    stats_30: "30 Tage",
+    stats_last: "Letzter Anruf",
+    stats_per_day: "Anrufe pro Tag (letzte 14 Tage)",
+    stats_calls: "Anrufe mit Datum und Uhrzeit",
+    stats_empty: "Noch keine Anrufbeantworter-Anrufe gespeichert.",
+    stats_no_sensor: "Kein Statistik-Sensor gefunden (sensor.fritzbox_anrufe_anrufstatistik). Er wird von der Integration ab Version 1.6.0 angelegt.",
+    stats_unavailable: "Der Statistik-Sensor ist nicht verfügbar.",
+    stats_slot: "AB {n}",
+    stats_unknown_caller: "Unbekannt",
+    stats_note: "Gezählt wird, was die FRITZ!Box aktuell auf dem Anrufbeantworter speichert.",
+    acc_version: "App-Version",
+    ver_integration: "Integration",
+    ver_card: "Karte",
+    ver_latest: "Neueste Version",
+    ver_checked: "Zuletzt geprüft",
+    ver_check_now: "Jetzt prüfen",
+    ver_view_release: "Release ansehen",
+    ver_update_hint: "Aktualisiere über HACS und starte Home Assistant neu. Danach Browser neu laden (Strg+F5).",
+    ver_mismatch: "Karte und Integration haben unterschiedliche Versionen (Browser-Cache?). Browser neu laden (Strg+F5).",
+    ver_check_failed: "Prüfung nicht möglich",
+    ver_up_to_date: "aktuell",
+    ver_unknown: "unbekannt",
+    acc_numbers: "Rufnummern",
+    numbers_external: "Externe Rufnummern",
+    numbers_internal: "Interne Nummern und Zuordnung",
+    numbers_none: "Keine Rufnummern von der FRITZ!Box gelesen.",
+    numbers_no_internal: "Keine internen Nummern gelesen.",
+    numbers_out: "ausgehend",
+    numbers_in: "ankommend",
+    numbers_unverified: "ungeprüft",
+    numbers_note: "Interne Nummern von IP-Telefonen/Apps kommen per TR-064. Bei analogen und DECT-Telefonen stammen sie aus der Web-Oberfläche der FRITZ!Box (nicht an echter Hardware bestätigt) und fehlen, wenn die Box sie nicht liefert.",
+    acc_alarms: "Weckruf",
+    alarm_none: "Die FRITZ!Box meldet keine Weckrufe.",
+    alarm_on: "an",
+    alarm_off: "aus",
+    alarm_edit: "Bearbeiten",
+    alarm_cancel: "Abbrechen",
+    alarm_save: "Speichern",
+    alarm_time: "Uhrzeit",
+    alarm_days: "Wochentage",
+    alarm_name: "Name",
+    alarm_nothing: "Nichts geändert.",
+    alarm_saved: "Weckruf gespeichert und von der FRITZ!Box bestätigt.",
+    alarm_toggled: "Weckruf geschaltet.",
+    alarm_note: "Ein-/Ausschalten nutzt die dokumentierte TR-064-Schnittstelle. Uhrzeit, Wochentage und Name gehen über die Web-Oberfläche der FRITZ!Box (experimentell, nicht an echter Hardware bestätigt); das Ergebnis wird zurückgelesen und bei Abweichung als Fehler gemeldet.",
+    day_mon: "Mo",
+    day_tue: "Di",
+    day_wed: "Mi",
+    day_thu: "Do",
+    day_fri: "Fr",
+    day_sat: "Sa",
+    day_sun: "So",
+    acc_deflections: "Rufumleitung",
+    defl_none: "Die FRITZ!Box meldet keine Rufumleitungen.",
+    defl_confirm_on: "Wirklich einschalten?",
+    defl_confirm_off: "Wirklich ausschalten?",
+    defl_toggled: "Rufumleitung geschaltet.",
+    defl_type_all: "Alle Anrufe",
+    defl_type_number: "Anrufe von {n}",
+    defl_type_pb: "Anrufe aus dem Telefonbuch",
+    defl_type_vip: "Anrufe von VIPs",
+    defl_to: "an {n}",
+    defl_mode_immediately: "sofort",
+    defl_mode_busy: "bei Besetzt",
+    defl_mode_off: "aus",
+    defl_note: "Bestehende Umleitungen lassen sich ein-/ausschalten. Anlegen und Zielnummer ändern geht nur in der FRITZ!Box selbst (Telefonie → Rufbehandlung), weil die Schnittstelle das nicht anbietet.",
+    toast_error: "Fehlgeschlagen: {msg}",
+    toast_update_checked: "Versionsprüfung abgeschlossen.",
+  },
+  en: {
+    tab_stats: "Statistics",
+    stats_total: "Total",
+    stats_new: "New",
+    stats_today: "Today",
+    stats_7: "7 days",
+    stats_30: "30 days",
+    stats_last: "Last call",
+    stats_per_day: "Calls per day (last 14 days)",
+    stats_calls: "Calls with date and time",
+    stats_empty: "No answering-machine calls stored yet.",
+    stats_no_sensor: "No statistics sensor found (sensor.fritzbox_anrufe_anrufstatistik). The integration creates it from version 1.6.0.",
+    stats_unavailable: "The statistics sensor is unavailable.",
+    stats_slot: "TAM {n}",
+    stats_unknown_caller: "Unknown",
+    stats_note: "Counts what the FRITZ!Box currently stores on the answering machine.",
+    acc_version: "App version",
+    ver_integration: "Integration",
+    ver_card: "Card",
+    ver_latest: "Latest version",
+    ver_checked: "Last checked",
+    ver_check_now: "Check now",
+    ver_view_release: "View release",
+    ver_update_hint: "Update via HACS and restart Home Assistant. Then reload the browser (Ctrl+F5).",
+    ver_mismatch: "Card and integration have different versions (browser cache?). Reload the browser (Ctrl+F5).",
+    ver_check_failed: "Check not possible",
+    ver_up_to_date: "up to date",
+    ver_unknown: "unknown",
+    acc_numbers: "Phone numbers",
+    numbers_external: "External phone numbers",
+    numbers_internal: "Internal numbers and assignment",
+    numbers_none: "No phone numbers read from the FRITZ!Box.",
+    numbers_no_internal: "No internal numbers read.",
+    numbers_out: "outgoing",
+    numbers_in: "incoming",
+    numbers_unverified: "unverified",
+    numbers_note: "Internal numbers of IP phones/apps come via TR-064. For analog and DECT phones they come from the FRITZ!Box web interface (not confirmed on real hardware) and are missing if the box does not provide them.",
+    acc_alarms: "Wake-up call",
+    alarm_none: "The FRITZ!Box reports no wake-up calls.",
+    alarm_on: "on",
+    alarm_off: "off",
+    alarm_edit: "Edit",
+    alarm_cancel: "Cancel",
+    alarm_save: "Save",
+    alarm_time: "Time",
+    alarm_days: "Weekdays",
+    alarm_name: "Name",
+    alarm_nothing: "Nothing changed.",
+    alarm_saved: "Wake-up call saved and confirmed by the FRITZ!Box.",
+    alarm_toggled: "Wake-up call switched.",
+    alarm_note: "Switching on/off uses the documented TR-064 interface. Time, weekdays and name go through the FRITZ!Box web interface (experimental, not confirmed on real hardware); the result is read back and reported as an error if it differs.",
+    day_mon: "Mon",
+    day_tue: "Tue",
+    day_wed: "Wed",
+    day_thu: "Thu",
+    day_fri: "Fri",
+    day_sat: "Sat",
+    day_sun: "Sun",
+    acc_deflections: "Call forwarding",
+    defl_none: "The FRITZ!Box reports no call forwarding rules.",
+    defl_confirm_on: "Really switch on?",
+    defl_confirm_off: "Really switch off?",
+    defl_toggled: "Call forwarding switched.",
+    defl_type_all: "All calls",
+    defl_type_number: "Calls from {n}",
+    defl_type_pb: "Calls from the phonebook",
+    defl_type_vip: "Calls from VIPs",
+    defl_to: "to {n}",
+    defl_mode_immediately: "immediately",
+    defl_mode_busy: "when busy",
+    defl_mode_off: "off",
+    defl_note: "Existing rules can be switched on/off. Creating rules and changing the target number is only possible in the FRITZ!Box itself (Telephony → Call handling), because the interface does not offer it.",
+    toast_error: "Failed: {msg}",
+    toast_update_checked: "Version check finished.",
+  },
+  nl: {
+    tab_stats: "Statistiek",
+    stats_total: "Totaal",
+    stats_new: "Nieuw",
+    stats_today: "Vandaag",
+    stats_7: "7 dagen",
+    stats_30: "30 dagen",
+    stats_last: "Laatste oproep",
+    stats_per_day: "Oproepen per dag (laatste 14 dagen)",
+    stats_calls: "Oproepen met datum en tijd",
+    stats_empty: "Nog geen antwoordapparaat-oproepen opgeslagen.",
+    stats_no_sensor: "Geen statistieksensor gevonden (sensor.fritzbox_anrufe_anrufstatistik). De integratie maakt hem aan vanaf versie 1.6.0.",
+    stats_unavailable: "De statistieksensor is niet beschikbaar.",
+    stats_slot: "AA {n}",
+    stats_unknown_caller: "Onbekend",
+    stats_note: "Geteld wordt wat de FRITZ!Box momenteel op het antwoordapparaat bewaart.",
+    acc_version: "App-versie",
+    ver_integration: "Integratie",
+    ver_card: "Kaart",
+    ver_latest: "Nieuwste versie",
+    ver_checked: "Laatst gecontroleerd",
+    ver_check_now: "Nu controleren",
+    ver_view_release: "Release bekijken",
+    ver_update_hint: "Update via HACS en herstart Home Assistant. Laad daarna de browser opnieuw (Ctrl+F5).",
+    ver_mismatch: "Kaart en integratie hebben verschillende versies (browsercache?). Laad de browser opnieuw (Ctrl+F5).",
+    ver_check_failed: "Controle niet mogelijk",
+    ver_up_to_date: "actueel",
+    ver_unknown: "onbekend",
+    acc_numbers: "Telefoonnummers",
+    numbers_external: "Externe telefoonnummers",
+    numbers_internal: "Interne nummers en toewijzing",
+    numbers_none: "Geen telefoonnummers van de FRITZ!Box gelezen.",
+    numbers_no_internal: "Geen interne nummers gelezen.",
+    numbers_out: "uitgaand",
+    numbers_in: "inkomend",
+    numbers_unverified: "niet gecontroleerd",
+    numbers_note: "Interne nummers van IP-telefoons/apps komen via TR-064. Bij analoge en DECT-telefoons komen ze uit de webinterface van de FRITZ!Box (niet bevestigd op echte hardware) en ontbreken als de box ze niet levert.",
+    acc_alarms: "Wekservice",
+    alarm_none: "De FRITZ!Box meldt geen wekservices.",
+    alarm_on: "aan",
+    alarm_off: "uit",
+    alarm_edit: "Bewerken",
+    alarm_cancel: "Annuleren",
+    alarm_save: "Opslaan",
+    alarm_time: "Tijd",
+    alarm_days: "Weekdagen",
+    alarm_name: "Naam",
+    alarm_nothing: "Niets gewijzigd.",
+    alarm_saved: "Wekservice opgeslagen en door de FRITZ!Box bevestigd.",
+    alarm_toggled: "Wekservice geschakeld.",
+    alarm_note: "In-/uitschakelen gebruikt de gedocumenteerde TR-064-interface. Tijd, weekdagen en naam lopen via de webinterface van de FRITZ!Box (experimenteel, niet bevestigd op echte hardware); het resultaat wordt teruggelezen en bij afwijking als fout gemeld.",
+    day_mon: "Ma",
+    day_tue: "Di",
+    day_wed: "Wo",
+    day_thu: "Do",
+    day_fri: "Vr",
+    day_sat: "Za",
+    day_sun: "Zo",
+    acc_deflections: "Oproepdoorschakeling",
+    defl_none: "De FRITZ!Box meldt geen doorschakelregels.",
+    defl_confirm_on: "Echt inschakelen?",
+    defl_confirm_off: "Echt uitschakelen?",
+    defl_toggled: "Oproepdoorschakeling geschakeld.",
+    defl_type_all: "Alle oproepen",
+    defl_type_number: "Oproepen van {n}",
+    defl_type_pb: "Oproepen uit het telefoonboek",
+    defl_type_vip: "Oproepen van VIP's",
+    defl_to: "naar {n}",
+    defl_mode_immediately: "direct",
+    defl_mode_busy: "bij bezet",
+    defl_mode_off: "uit",
+    defl_note: "Bestaande regels kunnen in-/uitgeschakeld worden. Aanmaken en doelnummer wijzigen kan alleen in de FRITZ!Box zelf (Telefonie → Oproepafhandeling), omdat de interface dat niet aanbiedt.",
+    toast_error: "Mislukt: {msg}",
+    toast_update_checked: "Versiecontrole afgerond.",
+  },
+};
+
+function translate(lang, key, vars) {
+  const base = String(lang || "en").split("-")[0];
+  const table = I18N[base] || I18N.en;
+  let text = table[key] !== undefined ? table[key] : I18N.en[key] !== undefined ? I18N.en[key] : key;
+  if (vars) {
+    Object.keys(vars).forEach((name) => {
+      text = text.split(`{${name}}`).join(String(vars[name]));
+    });
+  }
+  return text;
+}
+
+
 
 function formatDateTime(iso) {
   if (!iso) return "";
@@ -1051,6 +1314,81 @@ const TABS_CONTAINER_QUERY_STYLES = `
     .tab span { display: none; }
     .tab ha-icon { --mdc-icon-size: 22px; }
   }
+`;
+
+const V160_STYLES = `
+  /* --- Neu in v1.6.0: Akkordeon-Varianten, Zeilen, Statistik, Weckruf, Toast --- */
+  .settings-accordion + .settings-accordion { margin-top: 8px; }
+  .settings-section + .settings-accordion { margin-top: 8px; }
+  .settings-accordion.update { border-color: var(--warning-color, #ff9800); }
+  .settings-accordion.danger { border-color: var(--error-color, #db4437); }
+  .settings-accordion-summary .grow { flex: 1; min-width: 0; }
+  .settings-accordion-summary .meta { color: var(--secondary-text-color, #727272); font-weight: 400; font-size: 0.9em; }
+  .settings-line {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    padding: 6px 0; border-top: 1px solid var(--divider-color, #e0e0e0);
+  }
+  .settings-line:first-child { border-top: none; }
+  .settings-line .label { color: var(--secondary-text-color, #727272); min-width: 0; }
+  .settings-line .label small { display: block; font-size: 0.82em; }
+  .settings-line .value { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+  .settings-line .ok { color: var(--fba-color-success, var(--success-color, #43a047)); font-weight: 400; }
+  .settings-line .bad { color: var(--fba-color-error, var(--error-color, #db4437)); }
+  .settings-line .tag {
+    font-style: normal; font-weight: 400; font-size: 0.75em; padding: 1px 6px; border-radius: 8px;
+    border: 1px solid var(--warning-color, #ff9800); color: var(--warning-color, #ff9800);
+  }
+  .settings-note.warn {
+    color: var(--warning-color, #ff9800); border-left: 3px solid var(--warning-color, #ff9800); padding-left: 8px;
+  }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    padding: 8px 12px; border-radius: 6px; cursor: pointer; text-decoration: none; font: inherit;
+    border: 1px solid var(--divider-color, #e0e0e0); background: transparent; color: var(--primary-text-color);
+  }
+  .btn.small { padding: 4px 10px; font-size: 0.9em; }
+  .btn.primary { background: var(--primary-color, #03a9f4); border-color: var(--primary-color, #03a9f4); color: var(--text-primary-color, #fff); }
+  .btn.danger { background: var(--error-color, #db4437); border-color: var(--error-color, #db4437); color: #fff; }
+  .btn[disabled] { opacity: 0.5; cursor: default; }
+  .alarm-item { padding: 8px 0; border-top: 1px solid var(--divider-color, #e0e0e0); }
+  .alarm-item:first-child { border-top: none; }
+  .alarm-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .alarm-head .grow { flex: 1; }
+  .alarm-time { font-size: 1.2em; font-weight: 600; }
+  .alarm-name { color: var(--secondary-text-color, #727272); }
+  .alarm-item.enabled ha-icon { color: var(--fba-color-success, var(--success-color, #43a047)); }
+  .alarm-days { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .day-chip { font-size: 0.75em; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--divider-color, #e0e0e0); color: var(--secondary-text-color, #727272); }
+  .day-chip.on { border-color: var(--primary-color, #03a9f4); color: var(--primary-color, #03a9f4); }
+  .alarm-form { margin-top: 8px; padding: 8px; border: 1px dashed var(--divider-color, #e0e0e0); border-radius: 8px; display: grid; gap: 8px; }
+  .alarm-field { display: grid; gap: 4px; }
+  .alarm-field > span { font-size: 0.85em; color: var(--secondary-text-color, #727272); }
+  .alarm-field input[type="time"], .alarm-field input[type="text"] {
+    padding: 6px 8px; border-radius: 6px; border: 1px solid var(--divider-color, #e0e0e0);
+    background: var(--card-background-color, #fff); color: var(--primary-text-color); font: inherit;
+  }
+  .alarm-day-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+  .day-pick { display: inline-flex; align-items: center; gap: 2px; font-size: 0.9em; }
+  .stat-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 8px; margin-bottom: 8px; }
+  .stat-chip { display: flex; flex-direction: column; align-items: center; padding: 8px 4px; border: 1px solid var(--divider-color, #e0e0e0); border-radius: 8px; }
+  .stat-value { font-size: 1.4em; font-weight: 600; }
+  .stat-label { font-size: 0.8em; color: var(--secondary-text-color, #727272); }
+  .stat-last { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; }
+  .stat-bars { display: flex; align-items: flex-end; gap: 3px; height: 72px; margin-bottom: 8px; }
+  .stat-bar { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; font-size: 0.65em; color: var(--secondary-text-color, #727272); }
+  .stat-bar-fill { width: 100%; min-height: 2px; border-radius: 3px 3px 0 0; background: var(--fba-color-playback, var(--primary-color, #03a9f4)); }
+  .stat-call.unread { border-left: 3px solid var(--fba-color-playback, var(--primary-color, #03a9f4)); }
+  .stat-call small { color: var(--secondary-text-color, #727272); }
+  .fba-toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 10;
+    max-width: 90vw; padding: 10px 16px; border-radius: 8px; opacity: 0; pointer-events: none;
+    background: var(--primary-text-color, #212121); color: var(--card-background-color, #fff);
+    transition: opacity 0.2s ease;
+  }
+  .fba-toast.show { opacity: 1; }
+  .fba-toast.error { background: var(--error-color, #db4437); color: #fff; }
+
 `;
 
 const VOICEMAIL_ROWS_STYLES = `
@@ -1444,6 +1782,11 @@ class FritzboxAnrufeCard extends HTMLElement {
     // Einstellungen-Tab (seit v1.3.1) - reiner UI-Laufzeitstatus.
     // Grundzustand wird in setConfig aus settings_phonebook_open gesetzt.
     this._settingsPhonebookOpen = false;
+    // v1.6.0: Zustand der neuen Akkordeons, Weckruf-Bearbeitung, Umleitungs-Bestätigung.
+    this._accOpen = {};
+    this._alarmEdit = null;
+    this._alarmDraft = null;
+    this._deflConfirm = null;
     this._hass = null;
     this._config = null;
     this._objectUrls = [];
@@ -1502,6 +1845,8 @@ class FritzboxAnrufeCard extends HTMLElement {
     if (signature === this._lastSignature && this.shadowRoot.firstChild) {
       return;
     }
+    // v1.6.0: nicht neu zeichnen, solange ein Weckruf bearbeitet wird (Eingaben gingen verloren).
+    if (this._isEditingAlarm()) return;
     // Bugfix (seit v1.0.5b4, `auto_mark_read`): der Options-Flow-Schalter
     // löst NACH JEDER Wiedergabe absichtlich eine Coordinator-Aktualisierung
     // aus, um den "Neu"-Status zeitnah zu löschen (siehe voicemail.py:
@@ -1634,6 +1979,8 @@ class FritzboxAnrufeCard extends HTMLElement {
     return FILTER_ORDER.filter((type) => {
       if (this._config[`show_${type}`] === false) return false;
       if (type === FILTER_VOICEMAIL && !this._config.entity_voicemail) return false;
+      // Statistik nur, wenn ausdrücklich eingeschaltet (Standard AUS).
+      if (type === FILTER_STATS && this._config.show_statistik !== true) return false;
       // Einstellungen-Tab: seit v1.3.0b1 sichtbar, sobald die Kategorie
       // aktiviert ist (show_einstellungen). Der zugehörige Sensor wird - falls
       // nicht explizit gesetzt - automatisch gefunden (_settingsEntityId());
@@ -1702,6 +2049,8 @@ class FritzboxAnrufeCard extends HTMLElement {
       // der Zahnrad-Tab neu rendert, sobald seine Geräte-/Telefonbuchdaten
       // eintreffen.
       this._settingsEntityId(),
+      // v1.6.0: Statistik-Sensor.
+      this._statsEntityId(),
     ].filter(Boolean);
     const statePart = ids
       .map((id) => {
@@ -1957,7 +2306,8 @@ class FritzboxAnrufeCard extends HTMLElement {
       <div class="tabs" role="tablist">
         ${visible
           .map((type) => {
-            const meta = FILTER_META[type];
+            const meta = { ...FILTER_META[type] };
+            if (type === FILTER_STATS) meta.label = this._t("tab_stats");
             const active = type === this._activeFilter ? "active" : "";
             // Optionale, pro Kategorie feste Icon-Farbe (seit v1.0.4b1) -
             // per Inline-Style, damit sie (falls gesetzt) die geerbte
@@ -1992,10 +2342,507 @@ class FritzboxAnrufeCard extends HTMLElement {
     if (this._activeFilter === FILTER_VOICEMAIL) {
       return this._renderVoicemailRows();
     }
+    if (this._activeFilter === FILTER_STATS) {
+      return this._renderStats();
+    }
     if (this._activeFilter === FILTER_SETTINGS) {
       return this._renderSettings();
     }
     return this._renderRows();
+  }
+
+  // ======================================================================
+  // Neu in v1.6.0: Statistik-Tab, Version, Rufnummern, Weckruf, Rufumleitung
+  // ======================================================================
+
+  _t(key, vars) {
+    return translate(this._hass && this._hass.language, key, vars);
+  }
+
+  // Statistik-Sensor automatisch finden (wie _settingsEntityId()).
+  _statsEntityId() {
+    if (this._config && this._config.entity_stats) return this._config.entity_stats;
+    if (!this._hass || !this._hass.states) return "";
+    return (
+      Object.keys(this._hass.states).find(
+        (id) => id.startsWith("sensor.") && id.includes("anrufstatistik")
+      ) || ""
+    );
+  }
+
+  _localeFor() {
+    const lang = (this._hass && this._hass.language) || "en";
+    return lang;
+  }
+
+  _formatDateTime(iso) {
+    if (!iso) return "–";
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "–";
+    try {
+      return date.toLocaleString(this._localeFor());
+    } catch (err) {
+      return date.toISOString();
+    }
+  }
+
+  // Wiederverwendbares Akkordeon (Design-Master Abschnitt 5): natives <details>,
+  // Zustand in this._accOpen (übersteht jedes Neuzeichnen, ohne dass der
+  // toggle-Handler neu zeichnet).
+  _accordion(key, icon, title, meta, bodyHtml, variant, defaultOpen) {
+    const stored = this._accOpen[key];
+    const open = (stored === undefined ? defaultOpen === true : stored) ? " open" : "";
+    return `
+      <details class="settings-accordion ${variant || ""}" data-k="${escapeHtml(key)}"${open}>
+        <summary class="settings-accordion-summary">
+          <ha-icon icon="${escapeHtml(icon)}"></ha-icon>
+          <span class="grow">${escapeHtml(title)}</span>
+          ${meta ? `<span class="meta">${escapeHtml(meta)}</span>` : ""}
+        </summary>
+        <div class="settings-accordion-body">${bodyHtml}</div>
+      </details>
+    `;
+  }
+
+  _line(label, valueHtml) {
+    return `<div class="settings-line"><span class="label">${escapeHtml(label)}</span><span class="value">${valueHtml}</span></div>`;
+  }
+
+  // --- Statistik-Tab ----------------------------------------------------
+  _renderStats() {
+    const entityId = this._statsEntityId();
+    if (!entityId) {
+      return `<div class="settings-view"><div class="empty">${escapeHtml(this._t("stats_no_sensor"))}</div></div>`;
+    }
+    const stateObj = this._entityState(entityId);
+    if (!stateObj || stateObj.state === "unavailable") {
+      return `<div class="settings-view"><div class="empty">${escapeHtml(this._t("stats_unavailable"))}</div></div>`;
+    }
+    const a = stateObj.attributes || {};
+    const chip = (label, value) =>
+      `<div class="stat-chip"><span class="stat-value">${escapeHtml(value)}</span><span class="stat-label">${escapeHtml(label)}</span></div>`;
+    const chips = [
+      chip(this._t("stats_total"), a.total ?? 0),
+      chip(this._t("stats_new"), a.new ?? 0),
+      chip(this._t("stats_today"), a.today ?? 0),
+      chip(this._t("stats_7"), a.last_7_days ?? 0),
+      chip(this._t("stats_30"), a.last_30_days ?? 0),
+    ].join("");
+
+    const calls = Array.isArray(a.calls) ? a.calls : [];
+    if (!calls.length && !(a.total > 0)) {
+      return `<div class="stats-view"><div class="stat-chips">${chips}</div><div class="empty">${escapeHtml(this._t("stats_empty"))}</div></div>`;
+    }
+
+    let lastHtml = "";
+    if (a.last_call) {
+      const who = a.last_call_name || a.last_call_number || this._t("stats_unknown_caller");
+      lastHtml = `<div class="stat-last"><ha-icon icon="mdi:voicemail"></ha-icon><span>${escapeHtml(
+        this._t("stats_last")
+      )}: <strong>${escapeHtml(a.last_call_date)} ${escapeHtml(a.last_call_time)}</strong> · ${escapeHtml(who)}</span></div>`;
+    }
+
+    const byDay = Array.isArray(a.by_day) ? a.by_day : [];
+    const max = Math.max(1, ...byDay.map((d) => Number(d.count) || 0));
+    const bars = byDay
+      .map((d) => {
+        const count = Number(d.count) || 0;
+        const height = Math.round((count / max) * 100);
+        const day = String(d.date || "").slice(8, 10) + "." + String(d.date || "").slice(5, 7) + ".";
+        return `<div class="stat-bar" title="${escapeHtml(day)}: ${count}"><div class="stat-bar-fill" style="height:${height}%"></div><span>${escapeHtml(
+          String(d.date || "").slice(8, 10)
+        )}</span></div>`;
+      })
+      .join("");
+
+    const maxRows = Number(this._config.max_rows) || 10;
+    const multiSlot = new Set(calls.map((c) => c.slot)).size > 1;
+    const rows = calls
+      .slice(0, maxRows)
+      .map((c) => {
+        const who = c.name || c.number || this._t("stats_unknown_caller");
+        return `<div class="settings-row stat-call${c.new ? " unread" : ""}">
+          <ha-icon class="settings-row-icon" icon="${c.new ? "mdi:voicemail" : "mdi:phone-missed"}"></ha-icon>
+          <span class="settings-row-name">${escapeHtml(who)}${c.name && c.number ? `<small> ${escapeHtml(c.number)}</small>` : ""}</span>
+          <span class="settings-row-meta">${escapeHtml(c.date)} ${escapeHtml(c.time)}${
+            multiSlot && c.slot ? ` · ${escapeHtml(this._t("stats_slot", { n: c.slot }))}` : ""
+          }</span>
+        </div>`;
+      })
+      .join("");
+
+    return `
+      <div class="stats-view">
+        <div class="stat-chips">${chips}</div>
+        ${lastHtml}
+        <div class="settings-section-title">${escapeHtml(this._t("stats_per_day"))}</div>
+        <div class="stat-bars">${bars}</div>
+        <div class="settings-section-title">${escapeHtml(this._t("stats_calls"))}</div>
+        <div class="settings-list">${rows}</div>
+        <div class="settings-note">${escapeHtml(this._t("stats_note"))}</div>
+      </div>
+    `;
+  }
+
+  // --- Einstellungen: Zusatzbereiche ------------------------------------
+  _renderSettingsExtras(attrs) {
+    const cfg = this._config;
+    return [
+      this._renderSettingsVersion(attrs.app || {}),
+      cfg.show_settings_numbers !== false ? this._renderSettingsNumbers(attrs) : "",
+      cfg.show_settings_alarms !== false ? this._renderSettingsAlarms(attrs) : "",
+      cfg.show_settings_deflections !== false ? this._renderSettingsDeflections(attrs) : "",
+    ].join("");
+  }
+
+  _renderSettingsVersion(app) {
+    const integration = app.version || "";
+    const mismatch = Boolean(integration) && integration !== CARD_VERSION;
+    const update = app.update_available === true;
+    const failed = app.check_failed === true;
+    let latest;
+    if (app.latest_version) {
+      latest = escapeHtml(app.latest_version);
+      if (!update) latest += ` <span class="ok">(${escapeHtml(this._t("ver_up_to_date"))})</span>`;
+    } else if (failed) {
+      latest = `<span class="bad">${escapeHtml(this._t("ver_check_failed"))}</span>`;
+    } else {
+      latest = escapeHtml(this._t("ver_unknown"));
+    }
+    const url = typeof app.release_url === "string" && app.release_url.startsWith("https://github.com/")
+      ? app.release_url
+      : "https://github.com/Meine-smarte-Welt/fritzbox_anrufe/releases";
+    const hints = [];
+    if (update) hints.push(this._t("ver_update_hint"));
+    if (mismatch) hints.push(this._t("ver_mismatch"));
+    const body = `
+      ${this._line(this._t("ver_integration"), escapeHtml(integration || this._t("ver_unknown")))}
+      ${this._line(this._t("ver_card"), escapeHtml(CARD_VERSION))}
+      ${this._line(this._t("ver_latest"), latest)}
+      ${this._line(this._t("ver_checked"), escapeHtml(this._formatDateTime(app.checked_at)))}
+      ${hints.map((h) => `<div class="settings-note warn">${escapeHtml(h)}</div>`).join("")}
+      <div class="btn-row">
+        <button class="btn small" data-action="check-update">${escapeHtml(this._t("ver_check_now"))}</button>
+        <a class="btn small" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(this._t("ver_view_release"))}</a>
+      </div>
+    `;
+    return this._accordion(
+      "version",
+      "mdi:information-outline",
+      this._t("acc_version"),
+      `${CARD_VERSION}${update ? " ↑" : ""}`,
+      body,
+      update || mismatch ? "update" : "",
+      true
+    );
+  }
+
+  _renderSettingsNumbers(attrs) {
+    const types = { eVoIP: "Internet", eISDN: "ISDN", ePOTS: "Analog", eGSM: "Mobil", eAllCalls: "" };
+    const numbers = Array.isArray(attrs.numbers) ? attrs.numbers : [];
+    const externalRows = numbers
+      .map((n) => {
+        const label = [n.name, types[n.type] !== undefined ? types[n.type] : n.type].filter(Boolean).join(" · ");
+        return this._line(label || "–", `<strong>${escapeHtml(n.number)}</strong>`);
+      })
+      .join("");
+    const devices = (Array.isArray(attrs.devices) ? attrs.devices : []).filter(
+      (d) => d && !d.is_tam && (d.intern || d.outgoing || d.incoming)
+    );
+    const internalRows = devices
+      .map((d) => {
+        const bits = [];
+        if (d.outgoing) bits.push(`${this._t("numbers_out")}: ${d.outgoing}`);
+        if (d.incoming) bits.push(`${this._t("numbers_in")}: ${d.incoming}`);
+        const unverified = d.numbers_source === "data.lua";
+        return `<div class="settings-line number-line">
+          <span class="label">${escapeHtml(d.name || "")}${
+            bits.length ? `<small>${escapeHtml(bits.join(" · "))}</small>` : ""
+          }</span>
+          <span class="value">${d.intern ? `<strong>${escapeHtml(d.intern)}</strong>` : "–"}${
+            unverified ? ` <em class="tag">${escapeHtml(this._t("numbers_unverified"))}</em>` : ""
+          }</span>
+        </div>`;
+      })
+      .join("");
+    const body = `
+      <div class="settings-section-title">${escapeHtml(this._t("numbers_external"))}</div>
+      ${externalRows || `<div class="empty">${escapeHtml(this._t("numbers_none"))}</div>`}
+      <div class="settings-section-title">${escapeHtml(this._t("numbers_internal"))}</div>
+      ${internalRows || `<div class="empty">${escapeHtml(this._t("numbers_no_internal"))}</div>`}
+      <div class="settings-note">${escapeHtml(this._t("numbers_note"))}</div>
+    `;
+    return this._accordion("numbers", "mdi:dialpad", this._t("acc_numbers"), String(numbers.length || ""), body, "", false);
+  }
+
+  _renderSettingsAlarms(attrs) {
+    const alarms = Array.isArray(attrs.alarms) ? attrs.alarms : [];
+    const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+    const rows = alarms
+      .map((al) => {
+        const chips = days
+          .map((d) => `<span class="day-chip${(al.weekdays || []).includes(d) ? " on" : ""}">${escapeHtml(this._t("day_" + d))}</span>`)
+          .join("");
+        const editing = this._alarmEdit === al.index && this._alarmDraft;
+        return `
+          <div class="alarm-item${al.enabled ? " enabled" : ""}">
+            <div class="alarm-head">
+              <ha-icon icon="${al.enabled ? "mdi:alarm" : "mdi:alarm-off"}"></ha-icon>
+              <span class="alarm-time">${escapeHtml(al.time || "--:--")}</span>
+              <span class="alarm-name">${escapeHtml(al.name || "")}</span>
+              <span class="grow"></span>
+              <button class="btn small alarm-toggle" data-index="${al.index}" data-enabled="${al.enabled ? "1" : "0"}">${escapeHtml(
+                this._t(al.enabled ? "alarm_on" : "alarm_off")
+              )}</button>
+              <button class="btn small alarm-edit" data-index="${al.index}">${escapeHtml(this._t("alarm_edit"))}</button>
+            </div>
+            <div class="alarm-days">${chips}</div>
+            ${editing ? this._renderAlarmForm(al) : ""}
+          </div>`;
+      })
+      .join("");
+    const body = `
+      ${rows || `<div class="empty">${escapeHtml(this._t("alarm_none"))}</div>`}
+      <div class="settings-note">${escapeHtml(this._t("alarm_note"))}</div>
+    `;
+    return this._accordion("alarms", "mdi:alarm", this._t("acc_alarms"), String(alarms.length || ""), body, "", false);
+  }
+
+  _renderAlarmForm(al) {
+    const d = this._alarmDraft;
+    const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+    return `
+      <div class="alarm-form" data-index="${al.index}">
+        <label class="alarm-field"><span>${escapeHtml(this._t("alarm_time"))}</span>
+          <input type="time" class="alarm-input-time" value="${escapeHtml(d.time)}" /></label>
+        <label class="alarm-field"><span>${escapeHtml(this._t("alarm_name"))}</span>
+          <input type="text" maxlength="31" class="alarm-input-name" value="${escapeHtml(d.name)}" /></label>
+        <div class="alarm-field"><span>${escapeHtml(this._t("alarm_days"))}</span>
+          <div class="alarm-day-pick">${days
+            .map(
+              (day) =>
+                `<label class="day-pick"><input type="checkbox" class="alarm-input-day" data-day="${day}" ${
+                  d.weekdays.includes(day) ? "checked" : ""
+                } />${escapeHtml(this._t("day_" + day))}</label>`
+            )
+            .join("")}</div></div>
+        <div class="btn-row">
+          <button class="btn small primary alarm-save" data-index="${al.index}">${escapeHtml(this._t("alarm_save"))}</button>
+          <button class="btn small alarm-cancel">${escapeHtml(this._t("alarm_cancel"))}</button>
+        </div>
+      </div>`;
+  }
+
+  _deflectionLabel(df) {
+    const type = String(df.type || "");
+    if (type === "fromAll") return this._t("defl_type_all");
+    if (type === "fromNumber") return this._t("defl_type_number", { n: df.number || "?" });
+    if (type === "fromPB") return this._t("defl_type_pb");
+    if (type === "fromVIP") return this._t("defl_type_vip");
+    return type || "–";
+  }
+
+  _deflectionMode(df) {
+    const mode = String(df.mode || "");
+    if (mode === "eImmediately") return this._t("defl_mode_immediately");
+    if (mode === "eBusy") return this._t("defl_mode_busy");
+    if (mode === "eOff") return this._t("defl_mode_off");
+    return mode;
+  }
+
+  _renderSettingsDeflections(attrs) {
+    const list = Array.isArray(attrs.deflections) ? attrs.deflections : [];
+    const rows = list
+      .map((df) => {
+        const pending = this._deflConfirm === df.id;
+        const label = pending
+          ? this._t(df.enabled ? "defl_confirm_off" : "defl_confirm_on")
+          : this._t(df.enabled ? "alarm_on" : "alarm_off");
+        const detail = [
+          df.to_number ? this._t("defl_to", { n: df.to_number }) : "",
+          this._deflectionMode(df),
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        return `
+          <div class="alarm-item${df.enabled ? " enabled" : ""}">
+            <div class="alarm-head">
+              <ha-icon icon="mdi:phone-forward"></ha-icon>
+              <span class="alarm-name">${escapeHtml(this._deflectionLabel(df))}</span>
+              <span class="grow"></span>
+              <button class="btn small defl-toggle${pending ? " danger" : ""}" data-id="${df.id}" data-enabled="${df.enabled ? "1" : "0"}">${escapeHtml(label)}</button>
+            </div>
+            <div class="alarm-days"><span class="settings-row-meta">${escapeHtml(detail)}</span></div>
+          </div>`;
+      })
+      .join("");
+    const body = `
+      ${rows || `<div class="empty">${escapeHtml(this._t("defl_none"))}</div>`}
+      <div class="settings-note">${escapeHtml(this._t("defl_note"))}</div>
+    `;
+    return this._accordion("deflections", "mdi:phone-forward", this._t("acc_deflections"), String(list.length || ""), body, "", false);
+  }
+
+  // --- Rückmeldung (Toast) und Service-Aufrufe ---------------------------
+  _toast(message, isError) {
+    if (!this._toastEl || this._toastEl.parentNode !== this.shadowRoot) {
+      this._toastEl = document.createElement("div");
+      this._toastEl.className = "fba-toast";
+      this.shadowRoot.appendChild(this._toastEl);
+    }
+    this._toastEl.textContent = message;
+    this._toastEl.classList.toggle("error", Boolean(isError));
+    this._toastEl.classList.add("show");
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => {
+      if (this._toastEl) this._toastEl.classList.remove("show");
+    }, 5000);
+  }
+
+  // Schreibende Aktionen laufen über Services, die nur Administratoren
+  // ausführen dürfen (Backend prüft das; Fehler kommen als Toast zurück).
+  async _adminService(service, data, okKey) {
+    if (!this._hass) return false;
+    const payload = { ...data };
+    if (this._config.entry_id) payload.entry_id = this._config.entry_id;
+    try {
+      await this._hass.callService("fritzbox_anrufe", service, payload);
+      this._toast(this._t(okKey));
+      return true;
+    } catch (err) {
+      const msg = (err && (err.message || err.error || err.code)) || String(err);
+      this._toast(this._t("toast_error", { msg }), true);
+      return false;
+    }
+  }
+
+  _isEditingAlarm() {
+    if (this._alarmEdit === null || !this.shadowRoot) return false;
+    const active = this.shadowRoot.activeElement;
+    return Boolean(active && active.closest && active.closest(".alarm-form"));
+  }
+
+  _startAlarmEdit(index) {
+    const attrs = (this._entityState(this._settingsEntityId()) || {}).attributes || {};
+    const alarm = (attrs.alarms || []).find((a) => a.index === index);
+    if (!alarm) return;
+    this._alarmEdit = index;
+    this._alarmDraft = {
+      time: alarm.time || "",
+      name: alarm.name || "",
+      weekdays: Array.isArray(alarm.weekdays) ? alarm.weekdays.slice() : [],
+      original: { time: alarm.time || "", name: alarm.name || "", weekdays: (alarm.weekdays || []).slice() },
+    };
+  }
+
+  async _saveAlarm(index) {
+    const draft = this._alarmDraft;
+    if (!draft) return;
+    const data = { index };
+    const orig = draft.original;
+    if (draft.time && draft.time !== orig.time) data.time = draft.time;
+    if (draft.name !== orig.name) data.name = draft.name;
+    const sameDays = draft.weekdays.slice().sort().join() === orig.weekdays.slice().sort().join();
+    if (!sameDays) data.weekdays = draft.weekdays;
+    if (Object.keys(data).length === 1) {
+      this._toast(this._t("alarm_nothing"));
+      return;
+    }
+    const ok = await this._adminService("set_alarm_clock", data, "alarm_saved");
+    if (ok) {
+      this._alarmEdit = null;
+      this._alarmDraft = null;
+      this._lastSignature = null;
+      this._render();
+    }
+  }
+
+  _bindSettingsExtras() {
+    const root = this.shadowRoot;
+    // Zustand der Akkordeons merken (bewusst KEIN _render() im Handler).
+    root.querySelectorAll(".settings-accordion[data-k]").forEach((details) => {
+      details.addEventListener("toggle", () => {
+        this._accOpen[details.dataset.k] = details.open;
+      });
+    });
+    root.querySelectorAll("[data-action='check-update']").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        await this._adminService("check_for_update", {}, "toast_update_checked");
+        btn.disabled = false;
+      });
+    });
+    root.querySelectorAll(".alarm-toggle").forEach((btn) => {
+      btn.addEventListener("click", () =>
+        this._adminService(
+          "set_alarm_clock_enabled",
+          { index: Number(btn.dataset.index), enabled: btn.dataset.enabled !== "1" },
+          "alarm_toggled"
+        )
+      );
+    });
+    root.querySelectorAll(".alarm-edit").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const index = Number(btn.dataset.index);
+        if (this._alarmEdit === index) {
+          this._alarmEdit = null;
+          this._alarmDraft = null;
+        } else {
+          this._startAlarmEdit(index);
+        }
+        this._render();
+      });
+    });
+    root.querySelectorAll(".alarm-cancel").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._alarmEdit = null;
+        this._alarmDraft = null;
+        this._render();
+      });
+    });
+    root.querySelectorAll(".alarm-save").forEach((btn) => {
+      btn.addEventListener("click", () => this._saveAlarm(Number(btn.dataset.index)));
+    });
+    const timeInput = root.querySelector(".alarm-input-time");
+    if (timeInput) timeInput.addEventListener("input", () => { this._alarmDraft.time = timeInput.value; });
+    const nameInput = root.querySelector(".alarm-input-name");
+    if (nameInput) nameInput.addEventListener("input", () => { this._alarmDraft.name = nameInput.value; });
+    root.querySelectorAll(".alarm-input-day").forEach((box) => {
+      box.addEventListener("change", () => {
+        const set = new Set(this._alarmDraft.weekdays);
+        if (box.checked) set.add(box.dataset.day);
+        else set.delete(box.dataset.day);
+        this._alarmDraft.weekdays = Array.from(set);
+      });
+    });
+    // Zwei-Klick-Bestätigung für Rufumleitungen (Design-Master Regel 8): erster
+    // Klick fragt nach, zweiter schaltet; nach 5 s verfällt die Rückfrage.
+    root.querySelectorAll(".defl-toggle").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.dataset.id);
+        if (this._deflConfirm !== id) {
+          this._deflConfirm = id;
+          clearTimeout(this._deflTimer);
+          this._deflTimer = setTimeout(() => {
+            this._deflConfirm = null;
+            this._lastSignature = null;
+            this._render();
+          }, 5000);
+          this._lastSignature = null;
+          this._render();
+          return;
+        }
+        clearTimeout(this._deflTimer);
+        this._deflConfirm = null;
+        await this._adminService(
+          "set_deflection_enabled",
+          { deflection_id: id, enabled: btn.dataset.enabled !== "1" },
+          "defl_toggled"
+        );
+        this._lastSignature = null;
+        this._render();
+      });
+    });
   }
 
   // Einstellungen-Ansicht (Zahnrad-Tab, seit v1.3.0b0, EXPERIMENTELL) - eine
@@ -2077,6 +2924,7 @@ class FritzboxAnrufeCard extends HTMLElement {
       <div class="settings-view">
         <div class="settings-experimental">Experimentell – Anzeige, siehe README.</div>
         ${section("Telefoniegeräte", listHtml)}
+        ${this._renderSettingsExtras(attrs)}
         ${this._renderSettingsPhonebook(contacts)}
       </div>
     `;
@@ -2537,6 +3385,7 @@ class FritzboxAnrufeCard extends HTMLElement {
   // _availableOwnNumbers()); Sortierung gilt auf jedem Tab.
   _renderFilterBar() {
     if (!this._config.show_filter_bar) return "";
+    if (this._activeFilter === FILTER_STATS || this._activeFilter === FILTER_SETTINGS) return "";
     const isVoicemail = this._activeFilter === FILTER_VOICEMAIL;
     const ownNumbers = isVoicemail ? [] : this._availableOwnNumbers();
     return `
@@ -2744,6 +3593,8 @@ class FritzboxAnrufeCard extends HTMLElement {
         this._settingsPhonebookOpen = phonebookDetails.open;
       });
     }
+
+    this._bindSettingsExtras();
 
     // Live-AB-Regler (seit v1.2.0, siehe _renderTamPicker()) - anders als
     // der Akkordeon-Toggle oben MUSS dies einen echten Re-Render auslösen,
@@ -2986,6 +3837,7 @@ class FritzboxAnrufeCard extends HTMLElement {
       }
 
       ${VOICEMAIL_ROWS_STYLES}
+      ${V160_STYLES}
       ${PROCESSING_ROW_STYLES}
       ${TABS_CONTAINER_QUERY_STYLES}
 
@@ -3013,6 +3865,12 @@ const EDITOR_LABELS = {
   title: "Titel",
   show_title: "Überschrift (Titel) anzeigen",
   show_einstellungen: "Kategorie 'Einstellungen' anzeigen (experimentell)",
+  show_statistik: "Kategorie 'Statistik' anzeigen (neu in 1.6.0)",
+  show_settings_numbers: "Im 'Einstellungen'-Tab: interne/externe Rufnummern anzeigen",
+  show_settings_alarms: "Im 'Einstellungen'-Tab: Weckruf anzeigen/bearbeiten",
+  show_settings_deflections: "Im 'Einstellungen'-Tab: Rufumleitungen anzeigen/schalten",
+  entity_stats: "Sensor: Anrufstatistik (leer = automatisch)",
+  entry_id: "Integrations-Eintrag (nur bei mehreren FRITZ!Boxen, leer = automatisch)",
   show_settings_phonebook: "Im 'Einstellungen'-Tab das Telefonbuch anzeigen (experimentell)",
   settings_phonebook_open: "Telefonbuch gleich aufgeklappt anzeigen",
   entity_live: "Sensor: Live-Anrufmonitor (optional)",
@@ -3189,6 +4047,11 @@ const EDITOR_SCHEMA = [
       // Einstellungen-Kategorie (seit v1.3.0b0, Zahnrad-Tab) - Standard AUS,
       // siehe CONFIG_DEFAULTS/_visibleFilterTypes(). EXPERIMENTELL.
       { name: "show_einstellungen", selector: { boolean: {} } },
+      // Neu in v1.6.0: Statistik-Tab und Bereiche des Einstellungen-Tabs.
+      { name: "show_statistik", selector: { boolean: {} } },
+      { name: "show_settings_numbers", selector: { boolean: {} } },
+      { name: "show_settings_alarms", selector: { boolean: {} } },
+      { name: "show_settings_deflections", selector: { boolean: {} } },
       // Optionales Telefonbuch im Einstellungen-Tab (seit v1.3.1) - nur
       // wirksam bei aktiver Einstellungen-Kategorie.
       { name: "show_settings_phonebook", selector: { boolean: {} } },
@@ -3360,6 +4223,12 @@ const COLOR_EDITOR_FIELDS = [
   {
     key: "color_icon_anrufbeantworter",
     label: "Symbol Kategorie 'Anrufbeantworter'",
+    fallbackHex: "#727272",
+    note: CATEGORY_ICON_COLOR_NOTE,
+  },
+  {
+    key: "color_icon_statistik",
+    label: "Symbol Kategorie 'Statistik'",
     fallbackHex: "#727272",
     note: CATEGORY_ICON_COLOR_NOTE,
   },
@@ -3538,6 +4407,10 @@ class FritzboxAnrufeCardEditor extends HTMLElement {
     this._form.hass = this._hass;
     this._form.data = this._config;
 
+    // Version (neu in v1.6.0, ganz oben im Editor): Kartenversion immer, die
+    // Version der Integration, sobald der Einstellungen-Sensor sie liefert.
+    this._renderVersionInfo();
+
     // Farben-Sektion (seit v1.0.4b1) - siehe Moduldoku und
     // _buildColorSection() unten. Wie beim <ha-form> oben nur bei einer
     // ECHTEN externen Config-Änderung neu befüllen (setConfig()/erster
@@ -3549,6 +4422,31 @@ class FritzboxAnrufeCardEditor extends HTMLElement {
       this.appendChild(this._colorSection);
     }
     this._updateColorSection();
+  }
+
+  _renderVersionInfo() {
+    if (!this._versionEl) {
+      this._versionEl = document.createElement("div");
+      this._versionEl.className = "fba-version-info";
+      this._versionEl.style.cssText =
+        "padding:8px 12px;margin-bottom:8px;border-radius:8px;font-size:0.9em;" +
+        "background:var(--secondary-background-color,#f4f4f4);color:var(--primary-text-color)";
+      this.insertBefore(this._versionEl, this.firstChild);
+    }
+    const states = (this._hass && this._hass.states) || {};
+    const settingsId = Object.keys(states).find(
+      (id) => id.startsWith("sensor.") && id.includes("einstellungen") && (id.includes("fritzbox") || id.includes("anrufe"))
+    );
+    const app = settingsId && states[settingsId] && states[settingsId].attributes ? states[settingsId].attributes.app : null;
+    const lang = this._hass && this._hass.language;
+    let text = `${translate(lang, "ver_card")}: ${CARD_VERSION}`;
+    if (app && app.version) {
+      text += ` · ${translate(lang, "ver_integration")}: ${app.version}`;
+      if (app.update_available && app.latest_version) {
+        text += ` · ${`↑ ${translate(lang, "ver_latest")}: ${app.latest_version}`}`;
+      }
+    }
+    this._versionEl.textContent = text;
   }
 
   // Baut die "Farben"-Sektion einmalig als natives <details>-Akkordeon mit
@@ -3714,3 +4612,5 @@ window.customCards.push({
   description:
     "Zeigt eingehende, ausgehende und verpasste FRITZ!Box-Anrufe als filterbare Liste inkl. Live-Anzeige und Anrufbeantworter - jede Kategorie einzeln ein-/ausblendbar.",
 });
+
+console.info(`%c FRITZBOX-ANRUFE-CARD %c v${CARD_VERSION} `, "color:white;background:#0b7285;font-weight:bold", "color:#0b7285;background:white");

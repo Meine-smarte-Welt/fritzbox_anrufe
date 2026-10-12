@@ -177,6 +177,53 @@
       },
       "fritzbox_anrufe_einstellungen": {
         "name": "Einstellungen {phonebook_name}"
+      },
+      "fritzbox_anrufe_anrufstatistik": {
+        "name": "Anrufstatistik {phonebook_name}",
+        "state_attributes": {
+          "total": {
+            "name": "Gesamt"
+          },
+          "new": {
+            "name": "Neu"
+          },
+          "today": {
+            "name": "Heute"
+          },
+          "last_7_days": {
+            "name": "Letzte 7 Tage"
+          },
+          "last_30_days": {
+            "name": "Letzte 30 Tage"
+          },
+          "last_call": {
+            "name": "Letzter Anruf"
+          },
+          "last_call_date": {
+            "name": "Datum des letzten Anrufs"
+          },
+          "last_call_time": {
+            "name": "Uhrzeit des letzten Anrufs"
+          },
+          "last_call_number": {
+            "name": "Nummer des letzten Anrufs"
+          },
+          "last_call_name": {
+            "name": "Name des letzten Anrufs"
+          },
+          "by_day": {
+            "name": "Anrufe pro Tag"
+          },
+          "by_hour": {
+            "name": "Anrufe pro Stunde"
+          },
+          "calls": {
+            "name": "Anrufe"
+          }
+        }
+      },
+      "fritzbox_anrufe_letzter_ab_anruf": {
+        "name": "Letzter Anrufbeantworter-Anruf {phonebook_name}"
       }
     },
     "switch": {
@@ -215,7 +262,8 @@
         "menu_options": {
           "general_settings": "Grundeinstellungen",
           "manage_tams": "Anrufbeantworter verwalten"
-        }
+        },
+        "description": "Installierte Version: {version}\n{update_info}"
       },
       "general_settings": {
         "title": "Grundeinstellungen",
@@ -241,7 +289,8 @@
           "auto_mark_read": "Wenn aktiviert, wird beim Abspielen einer Anrufbeantworter-Nachricht über diese Integration (Dashboard-Karte oder Service) die 'Neu'-Markierung auch direkt auf der FRITZ!Box entfernt - wie bei echter FRITZ!Box-Hardware/-Apps. Standardmäßig aus, da dies einen von allen Geräten/Apps geteilten Zustand auf der Box ändert (z. B. auch die Anzahl ungelesener Nachrichten in FRITZ!App Fon), nicht nur dieses Dashboard. Experimentell, siehe README.",
           "spam_numbers": "Ein Anruf oder eine Anrufbeantworter-Nachricht wird als Spam markiert, wenn die Nummer mit einem dieser Einträge als Präfix übereinstimmt, ODER wenn die FRITZ!Box den Anruf bereits selbst blockiert hat. Die FRITZ!Box hat keine native, automatische Spam-Erkennung - diese Liste wird von dir gepflegt. Leer lassen, um dich nur auf die eigene Sperrliste der FRITZ!Box zu verlassen.",
           "spam_name_prefixes": "Markiert einen Anruf oder eine Anrufbeantworter-Nachricht zusätzlich als Spam, wenn der (Telefonbuch-)Name mit einem dieser Marker beginnt - für externe Blocker wie den PhoneBlock-USB-Stick, die Nummern selbst sperren und dem Namen z. B. \"SPAM:\" voranstellen, ohne dass die FRITZ!Box den Anruf ablehnt oder die Nummer in deiner Spam-Liste steht. Kommagetrennt, Groß-/Kleinschreibung egal, Abgleich am Namensanfang. Leer lassen zum Deaktivieren. Tipp: Um diese Einträge auch auszublenden, zusätzlich \"Spam ausblenden\" auf der Dashboard-Karte aktivieren."
-        }
+        },
+        "description": "Installierte Version: {version}\n{update_info}"
       },
       "manage_tams": {
         "title": "Anrufbeantworter verwalten",
@@ -262,6 +311,82 @@
         "message_id": {
           "name": "Nachrichten-ID",
           "description": "Die ID der Nachricht, zu finden im 'messages'-Attribut des fritzbox_anrufe-Anrufbeantworter-Sensors."
+        }
+      }
+    },
+    "set_alarm_clock_enabled": {
+      "name": "Weckruf ein-/ausschalten",
+      "description": "Schaltet einen Weckruf der FRITZ!Box ein oder aus (TR-064). Nur für Administratoren.",
+      "fields": {
+        "entry_id": {
+          "name": "Eintrag",
+          "description": "Nur bei mehreren FRITZ!Box-Einträgen nötig."
+        },
+        "index": {
+          "name": "Weckruf",
+          "description": "Nummer des Weckrufs, wie im Attribut 'alarms' des Einstellungen-Sensors angegeben."
+        },
+        "enabled": {
+          "name": "Aktiv",
+          "description": "Weckruf einschalten (an) oder ausschalten (aus)."
+        }
+      }
+    },
+    "set_alarm_clock": {
+      "name": "Weckruf einrichten (experimentell)",
+      "description": "Setzt Uhrzeit, Wochentage und/oder Name eines Weckrufs über die Oberfläche der FRITZ!Box und prüft das Ergebnis durch Zurücklesen. Nicht an echter Hardware bestätigt. Nur für Administratoren.",
+      "fields": {
+        "entry_id": {
+          "name": "Eintrag",
+          "description": "Nur bei mehreren FRITZ!Box-Einträgen nötig."
+        },
+        "index": {
+          "name": "Weckruf",
+          "description": "Nummer des Weckrufs, wie im Attribut 'alarms' angegeben."
+        },
+        "time": {
+          "name": "Uhrzeit",
+          "description": "Weckzeit (HH:MM)."
+        },
+        "weekdays": {
+          "name": "Wochentage",
+          "description": "Wochentage, an denen geweckt wird."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name des Weckrufs."
+        },
+        "enabled": {
+          "name": "Aktiv",
+          "description": "Weckruf zusätzlich ein- oder ausschalten."
+        }
+      }
+    },
+    "set_deflection_enabled": {
+      "name": "Rufumleitung ein-/ausschalten",
+      "description": "Schaltet eine bestehende Rufumleitung der FRITZ!Box ein oder aus (TR-064). Anlegen und Zielnummer ändern sind nicht möglich. Nur für Administratoren.",
+      "fields": {
+        "entry_id": {
+          "name": "Eintrag",
+          "description": "Nur bei mehreren FRITZ!Box-Einträgen nötig."
+        },
+        "deflection_id": {
+          "name": "Umleitung",
+          "description": "Nummer der Umleitung, wie im Attribut 'deflections' angegeben."
+        },
+        "enabled": {
+          "name": "Aktiv",
+          "description": "Umleitung einschalten (an) oder ausschalten (aus)."
+        }
+      }
+    },
+    "check_for_update": {
+      "name": "Auf neue Version prüfen",
+      "description": "Fragt GitHub sofort nach einer neuen Version der Integration. Nur für Administratoren.",
+      "fields": {
+        "entry_id": {
+          "name": "Eintrag",
+          "description": "Nur bei mehreren FRITZ!Box-Einträgen nötig."
         }
       }
     }

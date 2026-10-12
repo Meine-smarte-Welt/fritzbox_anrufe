@@ -35,6 +35,12 @@
       },
       "fritzbox_anrufe_einstellungen": {
         "default": "mdi:cog"
+      },
+      "fritzbox_anrufe_anrufstatistik": {
+        "default": "mdi:chart-box"
+      },
+      "fritzbox_anrufe_letzter_ab_anruf": {
+        "default": "mdi:voicemail"
       }
     },
     "switch": {
@@ -53,6 +59,20 @@
       "fritzbox_anrufe_anrufbeantworter_5_schalter": {
         "default": "mdi:answering-machine"
       }
+    }
+  },
+  "services": {
+    "set_alarm_clock_enabled": {
+      "service": "mdi:alarm"
+    },
+    "set_alarm_clock": {
+      "service": "mdi:alarm-plus"
+    },
+    "set_deflection_enabled": {
+      "service": "mdi:phone-forward"
+    },
+    "check_for_update": {
+      "service": "mdi:update"
     }
   }
 }

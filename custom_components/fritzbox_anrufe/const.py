@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): fabd26bf5006abe497fbe3fa72068e49b9b4bbc8630442103e4ffd78f81a2d4f
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): cef8a0326ca6dcf343b8ec1eabc020dc8317e716f2acbeed76c70c805b557cbb
 """Constants for the AVM Fritz!Box call monitor integration."""
 
 from collections.abc import Mapping
@@ -40,6 +40,13 @@ DEFAULT_PHONEBOOK = 0
 DEFAULT_NAME = "Phone"
 
 DOMAIN: Final = "fritzbox_anrufe"
+
+# Version dieser Integration (seit v1.6.0 hier zentral; manifest.json und
+# CARD_VERSION in der Karte werden beim Release identisch gesetzt) und
+# GitHub-Repository für die Versionsprüfung (update_check.py).
+VERSION: Final = "1.6.0"
+GITHUB_REPO: Final = "Meine-smarte-Welt/fritzbox_anrufe"
+GITHUB_RELEASES_URL: Final = f"https://github.com/{GITHUB_REPO}/releases"
 MANUFACTURER: Final = "FRITZ!"
 
 PLATFORMS = [Platform.SENSOR, Platform.SWITCH]
@@ -348,3 +355,21 @@ def migrated_tam_count(options: Mapping[str, Any]) -> int:
     if CONF_TAM_COUNT in options:
         return max(MIN_TAM_COUNT, min(MAX_TAM_COUNT, int(options[CONF_TAM_COUNT])))
     return 2 if options.get(CONF_SECOND_TAM, DEFAULT_SECOND_TAM) else 1
+
+# --- Neu in v1.6.0 ---------------------------------------------------------
+# Anrufstatistik des Anrufbeantworters (siehe call_stats.py/sensor.py): ein
+# Sensor mit Zähler + Attributen und ein Zeitstempel-Sensor für den letzten
+# Anruf. Die Suffixe dienen wie bei den anderen Sensoren als translation_key
+# UND als suggested_object_id.
+CALL_TYPE_STATS = "anrufstatistik"
+CALL_TYPE_LAST_VOICEMAIL = "letzter_ab_anruf"
+
+# Services (alle nur für Administratoren, siehe __init__.py). Weckruf: Ein/Aus
+# per TR-064 dokumentiert; Uhrzeit/Wochentage/Name über die Web-Oberfläche
+# EXPERIMENTELL und per Rücklesung geprüft (alarm.py). Rufumleitung: nur
+# Ein/Aus (deflection.py) - Anlegen/Zielnummer ändern ist bewusst nicht
+# umgesetzt.
+SERVICE_SET_ALARM_CLOCK_ENABLED = "set_alarm_clock_enabled"
+SERVICE_SET_ALARM_CLOCK = "set_alarm_clock"
+SERVICE_SET_DEFLECTION_ENABLED = "set_deflection_enabled"
+SERVICE_CHECK_FOR_UPDATE = "check_for_update"

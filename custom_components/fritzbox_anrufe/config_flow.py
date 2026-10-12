@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 7fbbbb916a16a78a10623d599aa24d91f9b1953cee3f134a83ca66c9ef44d4a5
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 05f952f04180995f565d3efd765ee2781948e11b725bc620427d319b820879d4
 """Config flow for fritzbox_anrufe."""
 
 from __future__ import annotations
@@ -51,6 +51,7 @@ from .const import (
     MIN_CALL_LOG_DAYS,
     MIN_TAM_COUNT,
     SERIAL_NUMBER,
+    VERSION,
     conf_call_log_count,
     conf_call_log_days,
     conf_call_log_limit_type,
@@ -441,6 +442,29 @@ class FritzBoxCallMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_abort(reason="reauth_successful")
 
 
+# Hinweistexte der Versionsanzeige im Optionen-Dialog (seit v1.6.0).
+_VERSION_TEXTS: dict[str, dict[str, str]] = {
+    "de": {
+        "new": "Neue Version {latest} verfügbar - über HACS aktualisieren und Home Assistant neu starten.",
+        "current": "Du hast die aktuelle Version.",
+        "failed": "Versionsprüfung nicht möglich (GitHub nicht erreichbar).",
+        "unknown": "Die Versionsprüfung läuft beim nächsten Aktualisieren.",
+    },
+    "en": {
+        "new": "New version {latest} available - update via HACS and restart Home Assistant.",
+        "current": "You are on the latest version.",
+        "failed": "Version check not possible (GitHub unreachable).",
+        "unknown": "The version check runs on the next refresh.",
+    },
+    "nl": {
+        "new": "Nieuwe versie {latest} beschikbaar - update via HACS en herstart Home Assistant.",
+        "current": "Je hebt de nieuwste versie.",
+        "failed": "Versiecontrole niet mogelijk (GitHub niet bereikbaar).",
+        "unknown": "De versiecontrole draait bij de volgende verversing.",
+    },
+}
+
+
 class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
     """Handle a fritzbox_anrufe options flow.
 
@@ -601,6 +625,26 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
         ] = vol.Any(None, _TolerantOptionalTextSelector())
         return vol.Schema(schema)
 
+    def _version_placeholders(self) -> dict[str, str]:
+        """``{version}``/``{update_info}`` für die Beschreibung (seit v1.6.0).
+
+        Die Hinweistexte folgen der Home-Assistant-Sprache (de/nl, sonst en).
+        """
+        runtime = getattr(self.config_entry, "runtime_data", None)
+        checker = getattr(runtime, "update_checker", None)
+        info = checker.info if checker is not None else {}
+        language = (self.hass.config.language or "en").split("-")[0]
+        texts = _VERSION_TEXTS.get(language, _VERSION_TEXTS["en"])
+        if info.get("update_available") and info.get("latest_version"):
+            update_info = texts["new"].format(latest=info["latest_version"])
+        elif info.get("check_failed") and info.get("checked_at"):
+            update_info = texts["failed"]
+        elif info.get("latest_version"):
+            update_info = texts["current"]
+        else:
+            update_info = texts["unknown"]
+        return {"version": VERSION, "update_info": update_info}
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -608,6 +652,7 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
         return self.async_show_menu(
             step_id="init",
             menu_options=["general_settings", "manage_tams"],
+            description_placeholders=self._version_placeholders(),
         )
 
     async def async_step_general_settings(
@@ -626,6 +671,7 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
                 step_id="general_settings",
                 data_schema=option_schema,
                 errors={},
+                description_placeholders=self._version_placeholders(),
             )
 
         prefixes: str | None = user_input.get(CONF_PREFIXES)
@@ -635,6 +681,7 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
                 step_id="general_settings",
                 data_schema=option_schema,
                 errors={"base": ConnectResult.MALFORMED_PREFIXES},
+                description_placeholders=self._version_placeholders(),
             )
 
         spam_numbers_input: str | None = user_input.get(CONF_SPAM_NUMBERS)

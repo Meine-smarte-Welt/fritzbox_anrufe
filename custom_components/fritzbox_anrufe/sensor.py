@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): cc3f0159027a4451783964082d2bb055eb86c2fc96999070e72f8fc5c1c7b080
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 77de2f6e7e1a085ae3ef12232faefefbfae8e8ab9c14ff13e03ae491d42f11d2
 """Sensor to monitor incoming/outgoing phone calls on a Fritz!Box router."""
 
 from collections.abc import Mapping
@@ -23,16 +23,20 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from . import FritzBoxCallMonitorConfigEntry, FritzBoxRuntimeData
 from .base import Contact, FritzBoxPhonebook, build_device_info
 from .call_log import FritzCallLogCoordinator
+from .call_stats import build_stats
 from .const import (
     ATTR_PREFIXES,
     CALL_MEDIA_URL_BASE,
     CALL_OUTCOME_NOT_CONNECTED,
+    CALL_TYPE_LAST_VOICEMAIL,
     CALL_TYPE_LIVE,
     CALL_TYPE_OUTGOING,
+    CALL_TYPE_STATS,
     CALL_TYPES,
     CALL_TYPES_VOICEMAIL,
     CONF_PHONEBOOK,
@@ -148,6 +152,27 @@ async def async_setup_entry(
                 media_url_base=TAM_MEDIA_URL_BASES[slot],
             )
         )
+
+    # Anrufstatistik (seit v1.6.0): Zähler + Zeitstempel des letzten Anrufs, aus
+    # den bereits geladenen Nachrichten ALLER konfigurierten Anrufbeantworter.
+    entities.append(
+        FritzBoxVoicemailStatsSensor(
+            coordinators=list(tam_coordinators),
+            unique_id=f"{unique_id}-{CALL_TYPE_STATS}",
+            phonebook_name=config_entry.title,
+            fritzbox_phonebook=fritzbox_phonebook,
+            device_info=device_info,
+        )
+    )
+    entities.append(
+        FritzBoxLastVoicemailSensor(
+            coordinators=list(tam_coordinators),
+            unique_id=f"{unique_id}-{CALL_TYPE_LAST_VOICEMAIL}",
+            phonebook_name=config_entry.title,
+            fritzbox_phonebook=fritzbox_phonebook,
+            device_info=device_info,
+        )
+    )
 
     # Einstellungen-Sensor (EXPERIMENTELL, seit v1.3.0b0) - Telefonie-/DECT-
     # Geräte + Telefonbuch (lesend). Nur, wenn der Coordinator erstellt werden
@@ -658,6 +683,145 @@ class FritzBoxSettingsSensor(CoordinatorEntity[FritzSettingsCoordinator], Sensor
             # Telefonbuch (nur lesend, seit v1.3.1 optional in der Karte anzeigbar).
             "contacts": data.get("contacts", []),
             "repeaters": data.get("repeaters", []),
+            # Neu in v1.6.0.
+            "clients": data.get("clients", []),
+            "alarms": data.get("alarms", []),
+            "deflections": data.get("deflections", []),
+            "app": data.get("app", {}),
+        }
+
+
+class _VoicemailAggregateBase(SensorEntity):
+    """Basis für Sensoren, die ALLE Anrufbeantworter-Coordinators zusammenfassen (v1.6.0)."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinators: list[FritzTamCoordinator],
+        unique_id: str,
+        phonebook_name: str,
+        fritzbox_phonebook: FritzBoxPhonebook,
+        device_info: DeviceInfo,
+        translation_key: str,
+    ) -> None:
+        self._coordinators = coordinators
+        self._fritzbox_phonebook = fritzbox_phonebook
+        self._attr_translation_key = translation_key
+        self._attr_translation_placeholders = {"phonebook_name": phonebook_name}
+        self._attr_unique_id = unique_id
+        self._attr_device_info = device_info
+
+    async def async_added_to_hass(self) -> None:
+        """Bei jeder Aktualisierung eines Anrufbeantworters neu berechnen."""
+        await super().async_added_to_hass()
+        for coordinator in self._coordinators:
+            self.async_on_remove(coordinator.async_add_listener(self.async_write_ha_state))
+
+    @property
+    @override
+    def available(self) -> bool:
+        return any(c.last_update_success for c in self._coordinators)
+
+    def _collected(self) -> list[dict[str, Any]]:
+        """Alle Nachrichten aller Anrufbeantworter als flache Dicts (mit Slot)."""
+        collected: list[dict[str, Any]] = []
+        for slot, coordinator in enumerate(self._coordinators, start=1):
+            for message in coordinator.data or []:
+                contact = (
+                    self._fritzbox_phonebook.get_contact(message.Number) if message.Number else None
+                )
+                duration = message.duration
+                collected.append(
+                    {
+                        "slot": slot,
+                        "date": message.date if isinstance(message.date, datetime) else None,
+                        "number": message.Number or None,
+                        "name": message.Name or (contact.name if contact else None),
+                        "duration": str(duration) if isinstance(duration, timedelta) else None,
+                        "new": bool(message.new),
+                    }
+                )
+        return collected
+
+
+class FritzBoxVoicemailStatsSensor(_VoicemailAggregateBase):
+    """Anrufstatistik: Anzahl der Anrufbeantworter-Anrufe mit Datum und Uhrzeit (v1.6.0).
+
+    Zustand = Gesamtzahl der gespeicherten Nachrichten; die Statistik (heute, 7/30
+    Tage, neu, letzter Anruf, Tageswerte, Liste mit Datum/Uhrzeit) steht in den
+    Attributen. Gezählt wird, was die FRITZ!Box aktuell speichert.
+    """
+
+    _attr_icon = "mdi:chart-box"
+    _attr_native_unit_of_measurement = "Anrufe"
+
+    def __init__(self, coordinators, unique_id, phonebook_name, fritzbox_phonebook, device_info) -> None:
+        super().__init__(
+            coordinators,
+            unique_id,
+            phonebook_name,
+            fritzbox_phonebook,
+            device_info,
+            f"{DOMAIN}_{CALL_TYPE_STATS}",
+        )
+
+    def _stats(self) -> dict[str, Any]:
+        now = dt_util.now().replace(tzinfo=None)
+        return build_stats(self._collected(), now)
+
+    @property
+    @override
+    def native_value(self) -> int:
+        return len(self._collected())
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return self._stats()
+
+
+class FritzBoxLastVoicemailSensor(_VoicemailAggregateBase):
+    """Zeitstempel des letzten Anrufs auf dem Anrufbeantworter (v1.6.0)."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_icon = "mdi:voicemail"
+
+    def __init__(self, coordinators, unique_id, phonebook_name, fritzbox_phonebook, device_info) -> None:
+        super().__init__(
+            coordinators,
+            unique_id,
+            phonebook_name,
+            fritzbox_phonebook,
+            device_info,
+            f"{DOMAIN}_{CALL_TYPE_LAST_VOICEMAIL}",
+        )
+
+    def _latest(self) -> dict[str, Any] | None:
+        dated = [c for c in self._collected() if c["date"] is not None]
+        return max(dated, key=lambda c: c["date"]) if dated else None
+
+    @property
+    @override
+    def native_value(self) -> datetime | None:
+        latest = self._latest()
+        if latest is None:
+            return None
+        # Die FRITZ!Box liefert Ortszeit ohne Zeitzone.
+        return latest["date"].replace(tzinfo=dt_util.get_default_time_zone())
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, Any]:
+        latest = self._latest()
+        if latest is None:
+            return {}
+        return {
+            "number": latest["number"],
+            "name": latest["name"],
+            "duration": latest["duration"],
+            "new": latest["new"],
+            "slot": latest["slot"],
         }
 
 

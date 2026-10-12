@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 165f75b122a28ab27bca5a512ecb58160f68224a0c41b0ff3aa907da7fdd7310
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 28bd262ad9c688caec2d99866c36e0b4cd49bc3d0b7fd54571f3eabd317387a8
 """Telefonie-/Gerätedaten für die Einstellungen-Kategorie.
 
 EXPERIMENTELL (seit v1.3.0b0) - siehe README. Diese Daten füttern den optionalen
@@ -61,7 +61,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .alarm import AlarmError, read_alarm_clocks, set_alarm_clock, set_alarm_enabled
 from .base import FritzBoxPhonebook
+from .deflection import DeflectionError, read_deflections, set_deflection_enabled
+from .telephony import read_clients, read_numbers
+from .update_check import UpdateChecker
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -361,11 +365,16 @@ def parse_fon_devices(payload: object) -> list[dict[str, object]]:
                 "name": name,
                 "type": raw_type,
                 "anschluss": _anschluss_for(raw_type, name),
-                # Seit v1.3.0 werden KEINE per-Gerät-Rufnummern mehr ausgegeben:
-                # Die ausgehende/ankommende/interne Nummern-Zuordnung liefert die
-                # FRITZ!Box nicht zuverlässig über TR-064/data.lua (auch die
-                # Referenz FRITZ-Portal bildet sie nicht ab) - daher entfernt.
-                # ``is_tam`` bleibt nur, um AB-Einträge aus dieser Web-Geräteliste
+                # Seit v1.6.0 wieder mit Rufnummern, aber als UNGEPRÜFT gekennzeichnet:
+                # Die Felder stammen aus dem (nicht bestätigten, FRITZ!OS-abhängigen)
+                # data.lua-JSON und sind leer, wenn die Box sie nicht liefert. Die
+                # zuverlässigeren TR-064-Daten (IP-Telefone/Apps) kommen aus
+                # ``clients`` und werden in _fetch() zusammengeführt.
+                "outgoing": _first(entry, _OUTGOING_KEYS),
+                "incoming": _first(entry, _INCOMING_KEYS),
+                "intern": _first(entry, _INTERN_KEYS),
+                "numbers_source": "data.lua",
+                # ``is_tam`` bleibt, um AB-Einträge aus dieser Web-Geräteliste
                 # zu erkennen; die eigentlichen Anrufbeantworter-Zeilen (inkl.
                 # Ein/Aus-Schalter) erzeugt die Karte aus ihrer eigenen
                 # Konfiguration (siehe _renderSettings()).
@@ -383,6 +392,7 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
         hass: HomeAssistant,
         config_entry: ConfigEntry,
         fritzbox_phonebook: FritzBoxPhonebook,
+        update_checker: UpdateChecker | None = None,
     ) -> None:
         """Initialize the settings coordinator."""
         super().__init__(
@@ -396,9 +406,15 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
         # Nur für den EXPERIMENTELLEN data.lua-Weg (Web-UI-sid + router_url),
         # exakt wie in voicemail.py für den Anrufbeantworter-Download.
         self._http = FritzHttp(fritzbox_phonebook.fph.fc)
+        self.update_checker = update_checker
 
     # --- TR-064-Geräte/-Nummern (blocking, executor) ------------------------
     def _fetch_numbers(self) -> list[dict[str, str]]:
+        # Seit v1.6.0 zuerst X_VoIP (laut AVM-Dokumentation Heimat von GetNumbers),
+        # dann der bisherige OnTel-Weg als Rückfall.
+        numbers = read_numbers(self._phonebook.fph.fc)
+        if numbers:
+            return numbers
         try:
             result = self._phonebook.fph.fc.call_action(_ONTEL_SERVICE, "GetNumbers")
         except (FritzConnectionException, RequestException, ValueError, KeyError) as ex:
@@ -541,34 +557,161 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
         contacts.sort(key=lambda c: str(c["name"]).lower())
         return contacts
 
+    def _fetch_clients(self) -> list[dict[str, str]]:
+        try:
+            return read_clients(self._phonebook.fph.fc)
+        except Exception as ex:  # noqa: BLE001 - Zusatzdaten dürfen nie das Setup stören
+            _LOGGER.debug("IP-Telefone (GetClients) nicht lesbar: %s", ex)
+            return []
+
+    def _fetch_alarms(self) -> list[dict[str, object]]:
+        try:
+            return read_alarm_clocks(self._phonebook.fph.fc)
+        except Exception as ex:  # noqa: BLE001
+            _LOGGER.debug("Weckruf nicht lesbar: %s", ex)
+            return []
+
+    def _fetch_deflections(self) -> list[dict[str, object]]:
+        try:
+            return read_deflections(self._phonebook.fph.fc)
+        except Exception as ex:  # noqa: BLE001
+            _LOGGER.debug("Rufumleitungen nicht lesbar: %s", ex)
+            return []
+
+    @staticmethod
+    def _merge_internal_numbers(
+        devices: list[dict[str, object]], clients: list[dict[str, str]]
+    ) -> list[dict[str, object]]:
+        """Interne/ausgehende/ankommende Nummern der IP-Telefone (TR-064) übernehmen.
+
+        Zuordnung über den Gerätenamen. TR-064 kennt nur IP-Telefone/Apps; für
+        andere Geräte bleiben die (ungeprüften) data.lua-Werte oder leer.
+        Nicht zuordenbare IP-Telefone werden als eigene Zeile ergänzt.
+        """
+        by_name = {c["name"].strip().lower(): c for c in clients if c.get("name")}
+        used: set[str] = set()
+        for device in devices:
+            client = by_name.get(str(device.get("name", "")).strip().lower())
+            if not client:
+                continue
+            used.add(str(client["name"]).strip().lower())
+            for key in ("intern", "outgoing", "incoming"):
+                if client.get(key):
+                    device[key] = client[key]
+                    device["numbers_source"] = "tr064"
+        for client in clients:
+            name = str(client.get("name", "")).strip()
+            if not name or name.lower() in used:
+                continue
+            devices.append(
+                {
+                    "name": name,
+                    "type": "ip",
+                    "anschluss": "IP-Telefon/App",
+                    "outgoing": client.get("outgoing", ""),
+                    "incoming": client.get("incoming", ""),
+                    "intern": client.get("intern", ""),
+                    "numbers_source": "tr064",
+                    "is_tam": False,
+                    "tam_index": 0,
+                }
+            )
+        return devices
+
     def _fetch(self) -> dict:
         numbers = self._fetch_numbers()
+        clients = self._fetch_clients()
         dect = self._fetch_dect_handsets()
         devices = self._fetch_fon_devices()
         used_fallback = False
         if not devices:
             devices = self._fallback_devices(dect, numbers)
             used_fallback = bool(devices)
+        devices = self._merge_internal_numbers(devices, clients)
         contacts = self._fetch_contacts()
+        alarms = self._fetch_alarms()
+        deflections = self._fetch_deflections()
         # Nur wenn ALLES leer ist, gilt die Aktualisierung als gescheitert.
-        if not numbers and not dect and not devices and not contacts:
+        if not (numbers or dect or devices or contacts or clients or alarms or deflections):
             raise UpdateFailed(
                 "Keine Telefonie-/Gerätedaten abrufbar"
                 " (Aktion nicht unterstützt oder fehlende Berechtigung)"
             )
         return {
             "numbers": numbers,
+            "clients": clients,
             "dect_handsets": dect,
             "devices": devices,
             # True, wenn die Gerätezeilen nur aus dem TR-064-Fallback stammen
-            # (also OHNE ausgehende/ankommende/interne Nummern) - die Karte
-            # zeigt dann einen entsprechenden Hinweis.
+            # (also OHNE data.lua-Zuordnung der Rufnummern) - die Karte zeigt
+            # dann einen entsprechenden Hinweis.
             "devices_fallback": used_fallback,
             # Telefonbuch (nur lesend, seit v1.3.1 optional in der Karte anzeigbar).
             "contacts": contacts,
             "repeaters": [],
+            # Neu in v1.6.0 (siehe alarm.py/deflection.py).
+            "alarms": alarms,
+            "deflections": deflections,
         }
 
+    # --- Schreibzugriffe (Executor); nur über Services für Administratoren ----
+    def _post_webui(self, form: dict[str, str]) -> bool:
+        """Formular an ``/cgi-bin/webcm`` senden (EXPERIMENTELL, siehe alarm.py)."""
+        try:
+            origin = self._http.router_url
+        except Exception as ex:  # noqa: BLE001
+            _LOGGER.debug("Weckruf: FRITZ!Box-Webadresse unklar (%s)", ex)
+            return False
+        session = self._phonebook.fph.fc.session
+        for sid in self._sid_candidates():
+            if not sid:
+                continue
+            try:
+                response = session.post(
+                    f"{origin}/cgi-bin/webcm", data={**form, "sid": sid}, timeout=15
+                )
+            except Exception as ex:  # noqa: BLE001
+                _LOGGER.debug("webcm fehlgeschlagen: %s", ex)
+                continue
+            if response.status_code == 200:
+                return True
+        return False
+
+    def _sync_set_alarm_enabled(self, index: int, enabled: bool) -> None:
+        set_alarm_enabled(self._phonebook.fph.fc, index, enabled)
+
+    def _sync_set_alarm_clock(self, **kwargs) -> dict:
+        return set_alarm_clock(self._phonebook.fph.fc, self._post_webui, **kwargs)
+
+    def _sync_set_deflection_enabled(self, deflection_id: int, enabled: bool) -> dict:
+        return set_deflection_enabled(self._phonebook.fph.fc, deflection_id, enabled)
+
+    async def async_set_alarm_enabled(self, index: int, enabled: bool) -> None:
+        """Weckruf ein-/ausschalten (TR-064, dokumentiert)."""
+        await self.hass.async_add_executor_job(self._sync_set_alarm_enabled, index, enabled)
+        await self.async_request_refresh()
+
+    async def async_set_alarm_clock(self, **kwargs) -> dict:
+        """Weckruf konfigurieren (EXPERIMENTELL, mit Rücklese-Prüfung)."""
+        try:
+            return await self.hass.async_add_executor_job(
+                lambda: self._sync_set_alarm_clock(**kwargs)
+            )
+        finally:
+            await self.async_request_refresh()
+
+    async def async_set_deflection_enabled(self, deflection_id: int, enabled: bool) -> dict:
+        """Rufumleitung ein-/ausschalten (TR-064, dokumentiert)."""
+        try:
+            return await self.hass.async_add_executor_job(
+                self._sync_set_deflection_enabled, deflection_id, enabled
+            )
+        finally:
+            await self.async_request_refresh()
+
     async def _async_update_data(self) -> dict:
-        """Fetch settings data (executor job)."""
-        return await self.hass.async_add_executor_job(self._fetch)
+        """Fetch settings data (executor job) plus the (cached) version info."""
+        data = await self.hass.async_add_executor_job(self._fetch)
+        if self.update_checker is not None:
+            data["app"] = await self.update_checker.async_info()
+        return data

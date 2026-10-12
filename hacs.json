@@ -1,4 +1,6 @@
 {
   "name": "Fritz!Box Anrufe",
-  "content_in_root": false
+  "content_in_root": false,
+  "render_readme": true,
+  "homeassistant": "2025.6.0"
 }
