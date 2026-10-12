@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 28bd262ad9c688caec2d99866c36e0b4cd49bc3d0b7fd54571f3eabd317387a8
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 325562d167a9724398986bf2663df20c07243558d4c43596639fe5c72e04964b
 """Telefonie-/Gerätedaten für die Einstellungen-Kategorie.
 
 EXPERIMENTELL (seit v1.3.0b0) - siehe README. Diese Daten füttern den optionalen
@@ -50,6 +50,7 @@ wenn ausnahmslos ALLES fehlschlägt, meldet der Coordinator ``UpdateFailed``.
 from __future__ import annotations
 
 from datetime import timedelta
+import json
 import logging
 from xml.etree import ElementTree
 
@@ -64,7 +65,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .alarm import AlarmError, read_alarm_clocks, set_alarm_clock, set_alarm_enabled
 from .base import FritzBoxPhonebook
 from .deflection import DeflectionError, read_deflections, set_deflection_enabled
-from .telephony import read_clients, read_numbers
+from .const import VERSION
+from .telephony import diagnostics as telephony_diagnostics, read_clients, read_numbers
 from .update_check import UpdateChecker
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,7 +77,7 @@ _ONTEL_SERVICE = "X_AVM-DE_OnTel:1"
 
 # Weboberflächen-Seite, die die Telefoniegeräte-Tabelle liefert. Reihenfolge =
 # Versuchsreihenfolge (verschiedene FRITZ!OS-Stände benennen sie leicht anders).
-_FON_DEVICE_PAGES = ("fondevices", "fonDevices", "dectRegDev")
+_FON_DEVICE_PAGES = ("telDev", "telDevices", "fondevices", "fonDevices", "dectRegDev")
 
 # Kandidaten-Schlüssel, unter denen die Geräteliste im data.lua-JSON stehen kann.
 _DEVICE_LIST_KEYS = ("fonDevices", "fondevices", "devices", "handsets", "mobiles", "rows")
@@ -280,6 +282,55 @@ def _is_telephony_entry(entry: dict) -> bool:
     return has_number
 
 
+def extract_embedded_devices(text: str) -> object:
+    """Geräteliste aus der HTML-Antwort der Seite ``telDev`` lesen (FRITZ!OS 8).
+
+    Die Box liefert dort kein JSON, sondern HTML mit eingebettetem Skript, in dem
+    ``fonDevices: [ {...}, ... ]`` steht (an echter Hardware beobachtet, FRITZ!OS
+    8.40). Die Liste wird per Klammerzählung (Zeichenketten beachtet) ausgeschnitten
+    und als JSON gelesen; sonst ``{}``.
+    """
+    marker = "fonDevices"
+    start = text.find(marker)
+    while start >= 0:
+        bracket = text.find("[", start)
+        colon = text.find(":", start)
+        if bracket > 0 and 0 < colon < bracket and not text[colon + 1 : bracket].strip():
+            depth = 0
+            in_string = False
+            escaped = False
+            for pos in range(bracket, len(text)):
+                char = text[pos]
+                if in_string:
+                    if escaped:
+                        escaped = False
+                    elif char == "\\":
+                        escaped = True
+                    elif char == '"':
+                        in_string = False
+                    continue
+                if char == '"':
+                    in_string = True
+                elif char == "[":
+                    depth += 1
+                elif char == "]":
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            return {"fonDevices": json.loads(text[bracket : pos + 1])}
+                        except ValueError:
+                            return {}
+            return {}
+        start = text.find(marker, start + len(marker))
+    return {}
+
+
+def format_intern(value: str) -> str:
+    """Interne Nummer so zeigen, wie die FRITZ!Box sie wählt: ``610`` → ``**610``."""
+    text = (value or "").strip()
+    return f"**{text}" if text.isdigit() else text
+
+
 def _find_device_lists(obj: object, depth: int = 0) -> list[list[dict]]:
     """Suche im JSON rekursiv nach Listen, die wie Gerätezeilen aussehen.
 
@@ -312,6 +363,7 @@ _TYPE_ANSCHLUSS = {
     "pots": "FON",
     "isdn": "S0",
     "app": "LAN/WLAN",
+    "ipphone": "LAN/WLAN",
     "iptv": "LAN/WLAN",
     "tam": "Anrufbeantworter",
 }
@@ -372,8 +424,10 @@ def parse_fon_devices(payload: object) -> list[dict[str, object]]:
                 # ``clients`` und werden in _fetch() zusammengeführt.
                 "outgoing": _first(entry, _OUTGOING_KEYS),
                 "incoming": _first(entry, _INCOMING_KEYS),
-                "intern": _first(entry, _INTERN_KEYS),
+                "intern": format_intern(_first(entry, _INTERN_KEYS)),
                 "numbers_source": "data.lua",
+                # FRITZ!Box „klingelt bei allen Nummern“ (Feld ``allin`` der Seite telDev).
+                "ring_all": entry.get("allin") is True or str(entry.get("allin")).lower() in ("1", "true"),
                 # ``is_tam`` bleibt, um AB-Einträge aus dieser Web-Geräteliste
                 # zu erkennen; die eigentlichen Anrufbeantworter-Zeilen (inkl.
                 # Ein/Aus-Schalter) erzeugt die Karte aus ihrer eigenen
@@ -470,7 +524,6 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
                             "page": page,
                             "lang": "de",
                             "xhr": "1",
-                            "xhrId": "all",
                         },
                         timeout=15,
                     )
@@ -480,12 +533,14 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
                 if response.status_code != 200:
                     continue
                 text = (response.text or "").strip()
-                if not text.startswith("{"):
-                    continue
-                try:
-                    payload = response.json()
-                except ValueError:
-                    continue
+                if text.startswith("{"):
+                    try:
+                        payload = response.json()
+                    except ValueError:
+                        continue
+                else:
+                    # FRITZ!OS 8: Seite ``telDev`` liefert HTML mit eingebetteter Liste.
+                    payload = extract_embedded_devices(text)
                 rows = parse_fon_devices(payload)
                 if rows:
                     return rows
@@ -561,7 +616,7 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
         try:
             return read_clients(self._phonebook.fph.fc)
         except Exception as ex:  # noqa: BLE001 - Zusatzdaten dürfen nie das Setup stören
-            _LOGGER.debug("IP-Telefone (GetClients) nicht lesbar: %s", ex)
+            _LOGGER.warning("IP-Telefone (GetClients) nicht lesbar: %s", ex)
             return []
 
     def _fetch_alarms(self) -> list[dict[str, object]]:
@@ -575,7 +630,7 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
         try:
             return read_deflections(self._phonebook.fph.fc)
         except Exception as ex:  # noqa: BLE001
-            _LOGGER.debug("Rufumleitungen nicht lesbar: %s", ex)
+            _LOGGER.warning("Rufumleitungen nicht lesbar (Service collect_diagnostics liefert Details): %s", ex)
             return []
 
     @staticmethod
@@ -597,7 +652,7 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
             used.add(str(client["name"]).strip().lower())
             for key in ("intern", "outgoing", "incoming"):
                 if client.get(key):
-                    device[key] = client[key]
+                    device[key] = format_intern(client[key]) if key == "intern" else client[key]
                     device["numbers_source"] = "tr064"
         for client in clients:
             name = str(client.get("name", "")).strip()
@@ -610,7 +665,7 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
                     "anschluss": "IP-Telefon/App",
                     "outgoing": client.get("outgoing", ""),
                     "incoming": client.get("incoming", ""),
-                    "intern": client.get("intern", ""),
+                    "intern": format_intern(client.get("intern", "")),
                     "numbers_source": "tr064",
                     "is_tam": False,
                     "tam_index": 0,
@@ -655,6 +710,42 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
         }
 
     # --- Schreibzugriffe (Executor); nur über Services für Administratoren ----
+    def _sync_diagnostics(self) -> dict:
+        """Rohdaten für Fehlermeldungen: TR-064 und die Web-Oberflächen-Seiten.
+
+        Nur lesend. Die Sitzungs-ID wird nie ausgegeben. Seiten ``telDevices``
+        (Telefoniegeräte) und ``callHan`` (Rufbehandlung) werden gekürzt.
+        """
+        data: dict = {"version": VERSION, "tr064": telephony_diagnostics(self._phonebook.fph.fc), "webui": {}}
+        try:
+            origin = self._http.router_url
+        except Exception as ex:  # noqa: BLE001
+            data["webui"]["error"] = f"Webadresse unklar: {ex}"
+            return data
+        session = self._phonebook.fph.fc.session
+        sids = [sid for sid in self._sid_candidates() if sid]
+        if not sids:
+            data["webui"]["error"] = "keine Web-Anmeldung möglich"
+            return data
+        for page in ("telDev", "callRedi", "telDevices", "callHan"):
+            for sid in sids:
+                try:
+                    response = session.post(
+                        f"{origin}/data.lua",
+                        data={"sid": sid, "page": page, "lang": "de", "xhr": "1", "xhrId": "all"},
+                        timeout=15,
+                    )
+                except Exception as ex:  # noqa: BLE001
+                    data["webui"][page] = f"Fehler: {ex!r}"
+                    continue
+                text = (response.text or "").replace(sid, "<sid>")
+                data["webui"][page] = {"status": response.status_code, "length": len(text), "text": text[:8000]}
+                break
+        return data
+
+    async def async_collect_diagnostics(self) -> dict:
+        return await self.hass.async_add_executor_job(self._sync_diagnostics)
+
     def _post_webui(self, form: dict[str, str]) -> bool:
         """Formular an ``/cgi-bin/webcm`` senden (EXPERIMENTELL, siehe alarm.py)."""
         try:

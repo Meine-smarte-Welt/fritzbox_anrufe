@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 2f3c794bf601f4e765950e72a1f261c8819c7384187280a4b04c57706026c941
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): bc3fca98612f5cb52069de8274a0725cda09e9f34e6f80cc81214e2af23d137d
 delete_voicemail_message:
   target:
     entity:
@@ -99,6 +99,14 @@ set_deflection_enabled:
         boolean:
 
 check_for_update:
+  fields:
+    entry_id:
+      required: false
+      example: "01J..."
+      selector:
+        text:
+
+collect_diagnostics:
   fields:
     entry_id:
       required: false

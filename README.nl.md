@@ -38,11 +38,11 @@ wekker, doorschakeling en gespreksstatistiek.
 
 ## Nieuw in 1.6.0
 
-**Teststatus, eerlijk:** alles hieronder is getest tegen een *gesimuleerde* FRITZ!Box (19 automatische tests) en de kaart is in een browser met testdata gecontroleerd. **Het is niet getest op echte FRITZ!Box-hardware.**
+**Teststatus, eerlijk:** alles hieronder is getest tegen een *gesimuleerde* FRITZ!Box (23 automatische tests) en de kaart is in een browser met testdata gecontroleerd. **Het is niet getest op echte FRITZ!Box-hardware.**
 
 | Functie | Wat het doet |
 | --- | --- |
-| Telefoonnummers | Tabblad Instellingen → "Nummers": externe nummers (TR-064 `GetNumbers`) en interne nummers per apparaat. IP-telefoons/apps komen via TR-064; analoge/DECT-nummers komen nog uit de webinterface van de box en zijn gemarkeerd als "niet geverifieerd". Ontbrekende waarden tonen "–". Of FHEM interne nummers toont kon ik niet bevestigen; de implementatie volgt de AVM-documentatie. |
+| Telefoonnummers | Tik op een telefoonapparaat op het tabblad Instellingen voor een pop-up met aansluiting, uitgaand, inkomend en intern nummer ("alle" = gaat over op alle nummers). Tabblad Instellingen → "Nummers": externe nummers (TR-064 `GetNumbers`) en interne nummers per apparaat. IP-telefoons/apps komen via TR-064; analoge/DECT-nummers komen nog uit de webinterface van de box en zijn gemarkeerd als "niet geverifieerd". Ontbrekende waarden tonen "–". Of FHEM interne nummers toont kon ik niet bevestigen; de implementatie volgt de AVM-documentatie. |
 | Wekker | Toont tijd, weekdagen, naam en status. **Aan/uit zetten** gebruikt de gedocumenteerde TR-064-aanroep. AVM heeft **geen** TR-064-aanroep voor tijd/weekdagen, dus een wekker *wijzigen* (de box heeft vaste plaatsen, meestal 3) is **experimenteel** via de webinterface; het resultaat wordt teruggelezen en een afwijking wordt als fout gemeld. |
 | Doorschakeling | Toont bestaande regels en schakelt ze aan/uit (bevestiging met twee klikken, alleen beheerder, terugleescontrole). **Regels aanmaken en het doelnummer wijzigen is bewust niet geïmplementeerd** – AVM biedt geen interface en geraden formuliervelden kunnen verkeerde regels aanmaken. Gebruik *Telefonie → Oproepbehandeling* op de box. |
 | Gespreksstatistiek | `sensor.fritzbox_anrufe_anrufstatistik` (totaal, nieuw, vandaag, laatste 7/30 dagen, laatste gesprek, laatste 14 dagen, per uur, lijst) en `sensor.fritzbox_anrufe_letzter_ab_anruf` (tijdstempel). Telt wat de box nu op het antwoordapparaat bewaart – niet alle gesprekken. Kaarttabblad "Statistiek" (`show_statistik`, standaard uit). |
@@ -56,8 +56,13 @@ wekker, doorschakeling en gespreksstatistiek.
 | `fritzbox_anrufe.set_alarm_clock` | Tijd / weekdagen / naam / status instellen (experimenteel) |
 | `fritzbox_anrufe.set_deflection_enabled` | Doorschakelregel aan/uit (`deflection_id`, `enabled`) |
 | `fritzbox_anrufe.check_for_update` | GitHub-versiecontrole direct uitvoeren |
+| `fritzbox_anrufe.collect_diagnostics` | Ruwe antwoorden van de box (alleen lezen) voor foutmeldingen; geeft een antwoord terug |
 
 Bij meerdere FRITZ!Boxen geef je ook `entry_id` mee.
+
+### Diagnose bij verkeerde nummers of doorschakeling
+
+Als interne nummers of doorschakelregels ontbreken of niet kloppen, voer je *Ontwikkelaarstools → Acties → `fritzbox_anrufe.collect_diagnostics`* uit. Het antwoord bevat de ruwe antwoorden van de box (TR-064 en de webpagina's `telDevices` en `callHan`, ingekort, zonder sessie-id). Voeg het toe aan een GitHub-issue; het bevat je telefoonnummers, controleer en anonimiseer het dus eerst. Leesfouten staan ook als waarschuwing in het logboek.
 
 ### Kaartsleutels
 
@@ -71,6 +76,8 @@ entity_verpasst: sensor.fritzbox_anrufe_verpasst
 show_einstellungen: true
 show_statistik: true
 ```
+
+**Correctie:** op FRITZ!OS 8 geeft de pagina `telDev` (niet `telDevices`) HTML met een ingebedde apparatenlijst in plaats van JSON; dit wordt nu gelezen. De structuur is bekeken op een echte FRITZ!Box 5690 Pro (FRITZ!OS 8.40) en de parser ertegen getest; een volledige run in Home Assistant volgt nog. Interne nummers worden getoond zoals ze op de box gekozen worden (`**610`). Is er geen doorschakelregel op de box (pagina `callRedi`, lege regellijst), dan blijft de lijst leeg; de integratie kan geen regels aanmaken.
 
 ## Bekende beperkingen
 
@@ -93,28 +100,28 @@ Elk `.py`-, `.js`- en `.yaml`-bestand begint met een SHA256-commentaar over de i
 
 | Bestand | SHA256 (versie 1.6.0) |
 | --- | --- |
-| `__init__.py` | `208eb4a9910087daf8a2dc7001bc38ce84a76d83d12ef5a7713c117cb6e0c8b2` |
+| `__init__.py` | `175083c221ce117dc56b1ec81787715434ce8752d3294719b0e2d855c0a60238` |
 | `alarm.py` | `83388a40874baafbe11646aabcbc2916eb6f539a6e34b38c347f649bb2cda01a` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
 | `call_log.py` | `06375eae8516c56b35582eb2b12f7ae09910fc908458d7a90912a45edc19c9d5` |
 | `call_stats.py` | `1f22199430beba85d4856f64da1c092ebe3b27b800d1b5bc47e9d0ac6a41476b` |
 | `config_flow.py` | `05f952f04180995f565d3efd765ee2781948e11b725bc620427d319b820879d4` |
-| `const.py` | `cef8a0326ca6dcf343b8ec1eabc020dc8317e716f2acbeed76c70c805b557cbb` |
+| `const.py` | `ff1101d0673cf8387356d4bf4a074653868eba56437da13b9824456217416ee7` |
 | `deflection.py` | `3949dfa6993bc5a6d43c17c635784b19c96d5414c70e44088813be37e5d55e98` |
 | `http.py` | `4d98f8fb1236eb7960d0d3470f0eef1a0e3a45e48e713fe121faa1481a6b70df` |
 | `sensor.py` | `77de2f6e7e1a085ae3ef12232faefefbfae8e8ab9c14ff13e03ae491d42f11d2` |
-| `settings_data.py` | `28bd262ad9c688caec2d99866c36e0b4cd49bc3d0b7fd54571f3eabd317387a8` |
+| `settings_data.py` | `325562d167a9724398986bf2663df20c07243558d4c43596639fe5c72e04964b` |
 | `spam.py` | `026ae8bc8890be324f074d17f5fce1269d87edbb420566bdfc1aae18cf3eea11` |
 | `switch.py` | `7cdbb0e5d3c5d1c8fa3cc5cad1cba6fa1f666b6c7eb1e034fbed40861b0e73c2` |
 | `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
-| `telephony.py` | `8c1faec0cb58d198a68d133689b564516ca95680b71869af927d4730ee92762a` |
+| `telephony.py` | `7796cf8c1d6642229f2a42894bd81911236f10b0e30ff34f7ae2e5681606e9ed` |
 | `update_check.py` | `119559a29413fd478bb94053336f6e90e150a3c2737d2966371b7800e4e508c6` |
 | `voicemail.py` | `564dc067bc31355e96e5521884969f228cf27bba73cae7bfb1b6d8ac9633a7f0` |
-| `services.yaml` | `2f3c794bf601f4e765950e72a1f261c8819c7384187280a4b04c57706026c941` |
-| `www/fritzbox-anrufe-card.js` | `0f09b0cefd3c83f0bbe38cdf09aefb687d56b21ba1e942c29260a1bf415b2861` |
+| `services.yaml` | `bc3fca98612f5cb52069de8274a0725cda09e9f34e6f80cc81214e2af23d137d` |
+| `www/fritzbox-anrufe-card.js` | `8918777168de0ab3564673d7e4cb4287328ee812cf569e6e85ba756ce2a6b692` |
 | `manifest.json` | `b3f4ed0a2a922bdcc2c67699116f1261aba317d463b0011fe9d1f902005223a3` |
-| `strings.json` | `2aaa2e8a4a8f6c71f438bfef33fa1b93252cf4bf7b692f72a274c1a8f112d407` |
-| `translations/de.json` | `4bd7cf62ba3a6216754fb28e5653440970ced12cf1e169f0c5962091fb763b64` |
-| `translations/en.json` | `2aaa2e8a4a8f6c71f438bfef33fa1b93252cf4bf7b692f72a274c1a8f112d407` |
-| `translations/nl.json` | `c4c1a621e53677648e1c433300b1784db8e286a1a5a939ed95acf186f845b426` |
-| `icons.json` | `8b2283029eee6310b46153248f2261bbf5cf1f42a84f56e2da8544fbc743515d` |
+| `strings.json` | `6ef41cb18f96fce6e893cd5142d86f2524d057fdd49123c03125655c1257bd87` |
+| `translations/de.json` | `f68566f21ee5369ab18f14dacd27136b987e22b42ea5d869156b521727379408` |
+| `translations/en.json` | `6ef41cb18f96fce6e893cd5142d86f2524d057fdd49123c03125655c1257bd87` |
+| `translations/nl.json` | `ae7fab14c49f67277199e43ef32c48816777991ac6de61b99cab40cecb2df64c` |
+| `icons.json` | `b1c68f3fb98e25154fec7bb8840dcedeb47832a969eb93c5fe22c8f588931ca3` |

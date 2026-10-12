@@ -389,6 +389,16 @@
           "description": "Alleen nodig bij meerdere FRITZ!Box-invoeren."
         }
       }
+    },
+    "collect_diagnostics": {
+      "name": "Diagnose verzamelen",
+      "description": "Leest (alleen lezen) de ruwe antwoorden van de FRITZ!Box over telefoons, doorschakeling en wekker uit en geeft ze terug als antwoord. Voor foutmeldingen. Alleen voor beheerders.",
+      "fields": {
+        "entry_id": {
+          "name": "Invoer",
+          "description": "Alleen nodig bij meerdere FRITZ!Box-invoeren."
+        }
+      }
     }
   }
 }

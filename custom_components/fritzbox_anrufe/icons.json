@@ -73,6 +73,9 @@
     },
     "check_for_update": {
       "service": "mdi:update"
+    },
+    "collect_diagnostics": {
+      "service": "mdi:clipboard-text-search-outline"
     }
   }
 }

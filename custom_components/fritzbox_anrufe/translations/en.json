@@ -389,6 +389,16 @@
           "description": "Only needed with several FRITZ!Box entries."
         }
       }
+    },
+    "collect_diagnostics": {
+      "name": "Collect diagnostics",
+      "description": "Reads (read-only) the raw answers of the FRITZ!Box about phones, call forwarding and alarm clocks and returns them as a response. For bug reports. Administrators only.",
+      "fields": {
+        "entry_id": {
+          "name": "Entry",
+          "description": "Only needed with several FRITZ!Box entries."
+        }
+      }
     }
   }
 }

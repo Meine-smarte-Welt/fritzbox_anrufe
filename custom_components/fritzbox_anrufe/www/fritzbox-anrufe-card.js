@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 0f09b0cefd3c83f0bbe38cdf09aefb687d56b21ba1e942c29260a1bf415b2861
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 8918777168de0ab3564673d7e4cb4287328ee812cf569e6e85ba756ce2a6b692
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -824,6 +824,13 @@ const I18N = {
     numbers_none: "Keine Rufnummern von der FRITZ!Box gelesen.",
     numbers_no_internal: "Keine internen Nummern gelesen.",
     numbers_out: "ausgehend",
+    popup_connection: "Anschluss",
+    popup_outgoing: "Rufnummer ausgehend",
+    popup_incoming: "Rufnummer ankommend",
+    popup_internal: "Interne Rufnummer",
+    popup_close: "Schließen",
+    popup_all: "alle",
+    popup_title_hint: "Details zum Gerät",
     numbers_in: "ankommend",
     numbers_unverified: "ungeprüft",
     numbers_note: "Interne Nummern von IP-Telefonen/Apps kommen per TR-064. Bei analogen und DECT-Telefonen stammen sie aus der Web-Oberfläche der FRITZ!Box (nicht an echter Hardware bestätigt) und fehlen, wenn die Box sie nicht liefert.",
@@ -899,6 +906,13 @@ const I18N = {
     numbers_none: "No phone numbers read from the FRITZ!Box.",
     numbers_no_internal: "No internal numbers read.",
     numbers_out: "outgoing",
+    popup_connection: "Connection",
+    popup_outgoing: "Outgoing number",
+    popup_incoming: "Incoming number",
+    popup_internal: "Internal number",
+    popup_close: "Close",
+    popup_all: "all",
+    popup_title_hint: "Device details",
     numbers_in: "incoming",
     numbers_unverified: "unverified",
     numbers_note: "Internal numbers of IP phones/apps come via TR-064. For analog and DECT phones they come from the FRITZ!Box web interface (not confirmed on real hardware) and are missing if the box does not provide them.",
@@ -974,6 +988,13 @@ const I18N = {
     numbers_none: "Geen telefoonnummers van de FRITZ!Box gelezen.",
     numbers_no_internal: "Geen interne nummers gelezen.",
     numbers_out: "uitgaand",
+    popup_connection: "Aansluiting",
+    popup_outgoing: "Uitgaand nummer",
+    popup_incoming: "Inkomend nummer",
+    popup_internal: "Intern nummer",
+    popup_close: "Sluiten",
+    popup_all: "alle",
+    popup_title_hint: "Apparaatdetails",
     numbers_in: "inkomend",
     numbers_unverified: "niet gecontroleerd",
     numbers_note: "Interne nummers van IP-telefoons/apps komen via TR-064. Bij analoge en DECT-telefoons komen ze uit de webinterface van de FRITZ!Box (niet bevestigd op echte hardware) en ontbreken als de box ze niet levert.",
@@ -1255,6 +1276,8 @@ const BASE_CARD_STYLES = `
   .device-tam-toggle.on { color: var(--fba-color-answered, var(--success-color, #43a047)); }
   .device-tam-toggle[disabled] { opacity: 0.4; cursor: default; }
   /* Detail-Popup (seit v1.3.0b2) */
+  .settings-row.clickable { cursor: pointer; }
+  .settings-row.clickable:hover { background: var(--secondary-background-color, rgba(127,127,127,0.1)); }
   .settings-popup-backdrop {
     position: fixed;
     inset: 0;
@@ -1787,6 +1810,7 @@ class FritzboxAnrufeCard extends HTMLElement {
     this._alarmEdit = null;
     this._alarmDraft = null;
     this._deflConfirm = null;
+    this._devPopup = null;
     this._hass = null;
     this._config = null;
     this._objectUrls = [];
@@ -2757,6 +2781,39 @@ class FritzboxAnrufeCard extends HTMLElement {
     }
   }
 
+  _bindDevicePopup() {
+    const root = this.shadowRoot;
+    const open = (name) => {
+      this._devPopup = name;
+      this._render();
+    };
+    root.querySelectorAll(".settings-row[data-dev]").forEach((row) => {
+      row.addEventListener("click", () => open(row.dataset.dev));
+      row.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          open(row.dataset.dev);
+        }
+      });
+    });
+    root.querySelectorAll("[data-popup-close]").forEach((el) => {
+      el.addEventListener("click", (ev) => {
+        if (el.dataset.popupClose === "backdrop" && ev.target !== el) return;
+        this._devPopup = null;
+        this._render();
+      });
+    });
+    if (!this._escBound) {
+      this._escBound = true;
+      window.addEventListener("keydown", (ev) => {
+        if (ev.key === "Escape" && this._devPopup && this.isConnected) {
+          this._devPopup = null;
+          this._render();
+        }
+      });
+    }
+  }
+
   _bindSettingsExtras() {
     const root = this.shadowRoot;
     // Zustand der Akkordeons merken (bewusst KEIN _render() im Handler).
@@ -2926,6 +2983,7 @@ class FritzboxAnrufeCard extends HTMLElement {
         ${section("Telefoniegeräte", listHtml)}
         ${this._renderSettingsExtras(attrs)}
         ${this._renderSettingsPhonebook(contacts)}
+        ${this._renderDevicePopup(phones)}
       </div>
     `;
   }
@@ -3014,12 +3072,44 @@ class FritzboxAnrufeCard extends HTMLElement {
     `;
   }
 
+  // Detail-Popup eines Telefoniegeräts (neu in v1.6.0): Anschluss, ausgehende,
+  // ankommende und interne Rufnummer. Zustand: this._devPopup = Gerätename.
+  _renderDevicePopup(phones) {
+    if (!this._devPopup) return "";
+    const dev = phones.find((d) => d && d.name === this._devPopup);
+    if (!dev) return "";
+    const line = (label, value) => `
+      <div class="settings-popup-line">
+        <span class="settings-popup-label">${escapeHtml(label)}</span>
+        <span class="settings-popup-value">${value ? escapeHtml(value) : "–"}</span>
+      </div>`;
+    const incoming = dev.incoming || (dev.ring_all ? this._t("popup_all") : "");
+    return `
+      <div class="settings-popup-backdrop" data-popup-close="backdrop">
+        <div class="settings-popup" role="dialog" aria-modal="true" aria-label="${escapeHtml(dev.name || "")}">
+          <div class="settings-popup-head">
+            <ha-icon icon="${this._deviceIcon(dev)}"></ha-icon>
+            <span class="settings-popup-title">${escapeHtml(dev.name || "")}</span>
+            <button class="settings-popup-close" type="button" data-popup-close="button" title="${escapeHtml(this._t("popup_close"))}">
+              <ha-icon icon="mdi:close"></ha-icon>
+            </button>
+          </div>
+          <div class="settings-popup-body">
+            ${line(this._t("popup_connection"), dev.anschluss || dev.type || "")}
+            ${line(this._t("popup_outgoing"), dev.outgoing || "")}
+            ${line(this._t("popup_incoming"), incoming)}
+            ${line(this._t("popup_internal"), dev.intern || "")}
+          </div>
+        </div>
+      </div>`;
+  }
+
   // Eine Telefoniegeräte-Zeile (Nicht-Anrufbeantworter): Symbol, Name, Anschluss.
   _renderSettingsDeviceRow(dev) {
     const name = dev.name || "";
     const anschluss = dev.anschluss || dev.type || "";
     return `
-      <div class="settings-row">
+      <div class="settings-row clickable" data-dev="${escapeHtml(name)}" role="button" tabindex="0" title="${escapeHtml(this._t("popup_title_hint"))}">
         <ha-icon class="settings-row-icon" icon="${this._deviceIcon(dev)}"></ha-icon>
         <span class="settings-row-name">${escapeHtml(name)}</span>
         <span class="settings-row-meta">${escapeHtml(anschluss)}</span>
@@ -3595,6 +3685,7 @@ class FritzboxAnrufeCard extends HTMLElement {
     }
 
     this._bindSettingsExtras();
+    this._bindDevicePopup();
 
     // Live-AB-Regler (seit v1.2.0, siehe _renderTamPicker()) - anders als
     // der Akkordeon-Toggle oben MUSS dies einen echten Re-Render auslösen,

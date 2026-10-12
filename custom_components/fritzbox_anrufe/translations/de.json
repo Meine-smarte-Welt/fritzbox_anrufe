@@ -389,6 +389,16 @@
           "description": "Nur bei mehreren FRITZ!Box-Einträgen nötig."
         }
       }
+    },
+    "collect_diagnostics": {
+      "name": "Diagnose sammeln",
+      "description": "Liest (nur lesend) die rohen Antworten der FRITZ!Box zu Telefonen, Rufumleitungen und Weckruf aus und gibt sie als Antwort zurück. Für Fehlermeldungen. Nur für Administratoren.",
+      "fields": {
+        "entry_id": {
+          "name": "Eintrag",
+          "description": "Nur bei mehreren FRITZ!Box-Einträgen nötig."
+        }
+      }
     }
   }
 }

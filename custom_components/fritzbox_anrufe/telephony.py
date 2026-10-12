@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 8c1faec0cb58d198a68d133689b564516ca95680b71869af927d4730ee92762a
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 7796cf8c1d6642229f2a42894bd81911236f10b0e30ff34f7ae2e5681606e9ed
 """TR-064-Hilfen für Telefonie-Daten (Rufnummern, Telefone, Weckruf, Rufumleitung).
 
 Neu in v1.6.0. Dieses Modul importiert bewusst NICHT Home Assistant, damit sich
@@ -244,3 +244,43 @@ def read_clients(fc: Any) -> list[dict[str, str]]:
                 clients.append(client)
             break
     return clients
+
+
+_DIAG_KEYWORDS = ("deflection", "alarm", "client", "numbers", "numberof", "calllist")
+
+
+def diagnostics(fc: Any) -> dict[str, Any]:
+    """Rohe TR-064-Antworten zu Rufnummern/Telefonen/Umleitungen/Weckruf einsammeln.
+
+    Nur lesende Aktionen. Fehler werden als Text festgehalten statt ausgelöst.
+    Gedacht für Fehlermeldungen (Service ``collect_diagnostics``).
+    """
+    result: dict[str, Any] = {"actions": {}, "calls": {}}
+    for service_name, service in _services(fc).items():
+        names = sorted(
+            name
+            for name in (getattr(service, "actions", None) or {})
+            if any(word in name.lower() for word in _DIAG_KEYWORDS)
+        )
+        if names:
+            result["actions"][service_name] = names
+    plan: list[tuple[str, dict[str, object]]] = [
+        ("GetNumbers", {}),
+        ("GetNumberOfClients", {}),
+        ("GetClients", {}),
+        ("GetNumberOfDeflections", {}),
+        ("GetDeflections", {}),
+        ("GetNumberOfAlarmClocks", {}),
+    ]
+    plan += [("GetDeflection", {"DeflectionId": i}) for i in range(3)]
+    plan += [("GetAlarmClock", {"Index": i}) for i in range(4)]
+    plan += [("GetClient3", {"Index": i}) for i in range(3)]
+    for action, values in plan:
+        key = action + (str(sorted(values.items())) if values else "")
+        try:
+            result["calls"][key] = call(fc, action, **values)
+        except TelephonyUnavailable as ex:
+            result["calls"][key] = f"nicht verfügbar/Fehler: {ex}"
+        except Exception as ex:  # noqa: BLE001 - Diagnose darf nie abbrechen
+            result["calls"][key] = f"Fehler: {ex!r}"
+    return result

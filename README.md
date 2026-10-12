@@ -536,12 +536,14 @@ Installationen werden automatisch migriert, siehe
 ## Neu in Version 1.6.0
 
 **Teststand vorab, ehrlich:** Alles unten ist gegen eine *simulierte*
-FRITZ!Box getestet (19 automatische Tests) und die Karte mit Testdaten im
+FRITZ!Box getestet (23 automatische Tests) und die Karte mit Testdaten im
 Browser geprüft. **Nicht an echter FRITZ!Box-Hardware geprüft** - die
 Funktionen sind deshalb ausdrücklich als „ungeprüft an echter Hardware“ zu
 verstehen. Rückmeldungen sind willkommen.
 
 ### Rufnummern (extern und intern)
+
+**Geräte-Popup:** Ein Tipp auf ein Telefoniegerät im Einstellungen-Tab öffnet ein Popup mit Anschluss, ausgehender und ankommender sowie interner Rufnummer (Schließen per Knopf, Hintergrund oder Escape). „alle“ heißt: das Gerät klingelt bei allen Nummern.
 
 Im Einstellungen-Tab der Karte (Akkordeon „Rufnummern“, abschaltbar mit
 `show_settings_numbers`) stehen die **externen Rufnummern** der Box (per
@@ -549,7 +551,12 @@ TR-064 `GetNumbers`) und die **internen Nummern** je Gerät.
 Interne Nummern von IP-Telefonen und Apps (620-629) kommen per TR-064, die
 von analogen und DECT-Telefonen weiterhin aus der Web-Oberfläche der Box
 (`data.lua`) und sind mit „ungeprüft“ markiert. Fehlt eine Nummer, zeigt die
-Karte „–“ statt zu raten. Ob FHEM interne Nummern zeigt, ließ sich nicht
+Karte „–“ statt zu raten. Interne Nummern erscheinen wie an der Box gewählt
+(`**610`). **Nachbesserung:** Auf FRITZ!OS 8 liefert die Seite `telDev` (nicht
+`telDevices`) HTML mit eingebetteter Geräteliste statt JSON; das wird jetzt
+gelesen. Die Struktur wurde an einer echten FRITZ!Box 5690 Pro (FRITZ!OS 8.40)
+eingesehen und der Parser damit getestet; der vollständige Lauf in Home
+Assistant steht noch aus. Ob FHEM interne Nummern zeigt, ließ sich nicht
 belegen; die Umsetzung stützt sich auf die AVM-Dokumentation.
 
 ### Weckruf
@@ -571,6 +578,11 @@ nur Administratoren, mit Zurücklesen). **Neue Umleitungen anlegen und die
 Zielnummer ändern ist bewusst nicht umgesetzt:** AVM bietet dafür keine
 Schnittstelle, und geratene Formularfelder könnten falsche Umleitungen
 anlegen. Das geht weiter in der FRITZ!Box unter Telefonie → Rufbehandlung.
+
+Ist auf der Box keine Umleitung eingerichtet (Telefonie → Rufbehandlung →
+Rufumleitung), bleibt die Liste leer - so war es bei der eingesehenen
+FRITZ!Box (Seite `callRedi`, leere Regelliste). Die Integration kann
+Umleitungen nicht selbst anlegen.
 
 ### Anrufstatistik
 
@@ -598,8 +610,18 @@ läuft alles normal weiter.
 | `fritzbox_anrufe.set_alarm_clock` | Uhrzeit/Wochentage/Name/Status setzen (experimentell) |
 | `fritzbox_anrufe.set_deflection_enabled` | Umleitung ein-/ausschalten (`deflection_id`, `enabled`) |
 | `fritzbox_anrufe.check_for_update` | GitHub-Versionsprüfung sofort ausführen |
+| `fritzbox_anrufe.collect_diagnostics` | Rohdaten der Box (nur lesend) für Fehlermeldungen; liefert eine Antwort, siehe unten |
 
 Bei mehreren FRITZ!Boxen optional `entry_id` angeben.
+
+### Diagnose bei falschen Nummern oder Umleitungen
+
+Werden interne Nummern oder Rufumleitungen nicht (richtig) angezeigt, hilft
+*Entwicklerwerkzeuge → Aktionen → `fritzbox_anrufe.collect_diagnostics` →
+Aktion ausführen*. Die Antwort enthält die rohen Box-Antworten (TR-064 sowie
+die Web-Seiten `telDevices` und `callHan`, gekürzt, ohne Sitzungs-ID) und
+gehört in ein GitHub-Issue. Sie enthält deine Rufnummern - vorher prüfen und
+ggf. schwärzen. Fehler beim Lesen stehen außerdem als Warnung im Log.
 
 ### Neue Karten-Schlüssel
 
@@ -1308,7 +1330,7 @@ die dortigen Maintainer den Fehler beheben.
   anzeigen, ein-/ausschalten und experimentell ändern; Rufumleitungen
   anzeigen und ein-/ausschalten; Anrufstatistik (zwei Sensoren, Statistik-Tab);
   Versionsanzeige mit GitHub-Update-Hinweis (Karte, Editor, Optionen);
-  vier neue Admin-Services; neue Karten-Texte in Deutsch/Englisch/
+  fünf neue Admin-Services (inkl. `collect_diagnostics`); Web-Seite `telDevices` (Telefoniegeräte) wird zuerst abgefragt; neue Karten-Texte in Deutsch/Englisch/
   Niederländisch; neue README `README.en.md` und `README.nl.md`. Nicht an
   echter Hardware geprüft, siehe [Neu in Version 1.6.0](#neu-in-version-160).
 
@@ -1689,31 +1711,31 @@ die komplette Datei, z. B. `sha256sum manifest.json`).
 
 | Datei | SHA256 (Version 1.6.0) |
 | --- | --- |
-| `__init__.py` | `208eb4a9910087daf8a2dc7001bc38ce84a76d83d12ef5a7713c117cb6e0c8b2` |
+| `__init__.py` | `175083c221ce117dc56b1ec81787715434ce8752d3294719b0e2d855c0a60238` |
 | `alarm.py` | `83388a40874baafbe11646aabcbc2916eb6f539a6e34b38c347f649bb2cda01a` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
 | `call_log.py` | `06375eae8516c56b35582eb2b12f7ae09910fc908458d7a90912a45edc19c9d5` |
 | `call_stats.py` | `1f22199430beba85d4856f64da1c092ebe3b27b800d1b5bc47e9d0ac6a41476b` |
 | `config_flow.py` | `05f952f04180995f565d3efd765ee2781948e11b725bc620427d319b820879d4` |
-| `const.py` | `cef8a0326ca6dcf343b8ec1eabc020dc8317e716f2acbeed76c70c805b557cbb` |
+| `const.py` | `ff1101d0673cf8387356d4bf4a074653868eba56437da13b9824456217416ee7` |
 | `deflection.py` | `3949dfa6993bc5a6d43c17c635784b19c96d5414c70e44088813be37e5d55e98` |
 | `http.py` | `4d98f8fb1236eb7960d0d3470f0eef1a0e3a45e48e713fe121faa1481a6b70df` |
 | `sensor.py` | `77de2f6e7e1a085ae3ef12232faefefbfae8e8ab9c14ff13e03ae491d42f11d2` |
-| `settings_data.py` | `28bd262ad9c688caec2d99866c36e0b4cd49bc3d0b7fd54571f3eabd317387a8` |
+| `settings_data.py` | `325562d167a9724398986bf2663df20c07243558d4c43596639fe5c72e04964b` |
 | `spam.py` | `026ae8bc8890be324f074d17f5fce1269d87edbb420566bdfc1aae18cf3eea11` |
 | `switch.py` | `7cdbb0e5d3c5d1c8fa3cc5cad1cba6fa1f666b6c7eb1e034fbed40861b0e73c2` |
 | `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
-| `telephony.py` | `8c1faec0cb58d198a68d133689b564516ca95680b71869af927d4730ee92762a` |
+| `telephony.py` | `7796cf8c1d6642229f2a42894bd81911236f10b0e30ff34f7ae2e5681606e9ed` |
 | `update_check.py` | `119559a29413fd478bb94053336f6e90e150a3c2737d2966371b7800e4e508c6` |
 | `voicemail.py` | `564dc067bc31355e96e5521884969f228cf27bba73cae7bfb1b6d8ac9633a7f0` |
-| `services.yaml` | `2f3c794bf601f4e765950e72a1f261c8819c7384187280a4b04c57706026c941` |
-| `www/fritzbox-anrufe-card.js` | `0f09b0cefd3c83f0bbe38cdf09aefb687d56b21ba1e942c29260a1bf415b2861` |
+| `services.yaml` | `bc3fca98612f5cb52069de8274a0725cda09e9f34e6f80cc81214e2af23d137d` |
+| `www/fritzbox-anrufe-card.js` | `8918777168de0ab3564673d7e4cb4287328ee812cf569e6e85ba756ce2a6b692` |
 | `manifest.json` | `b3f4ed0a2a922bdcc2c67699116f1261aba317d463b0011fe9d1f902005223a3` |
-| `strings.json` | `2aaa2e8a4a8f6c71f438bfef33fa1b93252cf4bf7b692f72a274c1a8f112d407` |
-| `translations/de.json` | `4bd7cf62ba3a6216754fb28e5653440970ced12cf1e169f0c5962091fb763b64` |
-| `translations/en.json` | `2aaa2e8a4a8f6c71f438bfef33fa1b93252cf4bf7b692f72a274c1a8f112d407` |
-| `translations/nl.json` | `c4c1a621e53677648e1c433300b1784db8e286a1a5a939ed95acf186f845b426` |
-| `icons.json` | `8b2283029eee6310b46153248f2261bbf5cf1f42a84f56e2da8544fbc743515d` |
+| `strings.json` | `6ef41cb18f96fce6e893cd5142d86f2524d057fdd49123c03125655c1257bd87` |
+| `translations/de.json` | `f68566f21ee5369ab18f14dacd27136b987e22b42ea5d869156b521727379408` |
+| `translations/en.json` | `6ef41cb18f96fce6e893cd5142d86f2524d057fdd49123c03125655c1257bd87` |
+| `translations/nl.json` | `ae7fab14c49f67277199e43ef32c48816777991ac6de61b99cab40cecb2df64c` |
+| `icons.json` | `b1c68f3fb98e25154fec7bb8840dcedeb47832a969eb93c5fe22c8f588931ca3` |
 
 Der Ordner `custom_components/fritzbox_anrufe/brand/` enthält die Logo-/
 Icon-Dateien (`icon.png`, `icon@2x.png`, `logo.png`, `logo@2x.png`); diese

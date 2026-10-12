@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 208eb4a9910087daf8a2dc7001bc38ce84a76d83d12ef5a7713c117cb6e0c8b2
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 175083c221ce117dc56b1ec81787715434ce8752d3294719b0e2d855c0a60238
 """The fritzbox_anrufe integration."""
 
 from dataclasses import dataclass, field
@@ -16,7 +16,7 @@ from homeassistant.components.lovelace.const import LOVELACE_DATA
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
-from homeassistant.core import ServiceCall
+from homeassistant.core import ServiceCall, SupportsResponse
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryNotReady,
@@ -48,6 +48,7 @@ from .const import (
     PLATFORMS,
     SERIAL_NUMBER,
     SERVICE_CHECK_FOR_UPDATE,
+    SERVICE_COLLECT_DIAGNOSTICS,
     SERVICE_SET_ALARM_CLOCK,
     SERVICE_SET_ALARM_CLOCK_ENABLED,
     SERVICE_SET_DEFLECTION_ENABLED,
@@ -396,6 +397,10 @@ def _async_register_services(hass: HomeAssistant) -> None:
         if runtime.settings_coordinator is not None:
             await runtime.settings_coordinator.async_request_refresh()
 
+    async def _collect_diagnostics(call: ServiceCall) -> dict:
+        settings = _settings(_resolve_runtime(hass, call))
+        return await settings.async_collect_diagnostics()
+
     entry_id = {vol.Optional(_ATTR_ENTRY_ID): cv.string}
     async_register_admin_service(
         hass,
@@ -437,6 +442,14 @@ def _async_register_services(hass: HomeAssistant) -> None:
     )
     async_register_admin_service(
         hass, DOMAIN, SERVICE_CHECK_FOR_UPDATE, _check_update, vol.Schema({**entry_id})
+    )
+    async_register_admin_service(
+        hass,
+        DOMAIN,
+        SERVICE_COLLECT_DIAGNOSTICS,
+        _collect_diagnostics,
+        vol.Schema({**entry_id}),
+        supports_response=SupportsResponse.ONLY,
     )
 
 
