@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 325562d167a9724398986bf2663df20c07243558d4c43596639fe5c72e04964b
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): d6ca7cf1a947cbb1ea77291a8bb8f5ef53313980f6a75989f8342afc522b660e
 """Telefonie-/Gerätedaten für die Einstellungen-Kategorie.
 
 EXPERIMENTELL (seit v1.3.0b0) - siehe README. Diese Daten füttern den optionalen
@@ -64,6 +64,14 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .alarm import AlarmError, read_alarm_clocks, set_alarm_clock, set_alarm_enabled
 from .base import FritzBoxPhonebook
+from .call_forwarding import (
+    ForwardingError,
+    create_rule,
+    delete_rule,
+    read_options as read_forward_options,
+    read_rules,
+    set_rule_enabled,
+)
 from .deflection import DeflectionError, read_deflections, set_deflection_enabled
 from .const import VERSION
 from .telephony import diagnostics as telephony_diagnostics, read_clients, read_numbers
@@ -686,6 +694,8 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
         contacts = self._fetch_contacts()
         alarms = self._fetch_alarms()
         deflections = self._fetch_deflections()
+        forwardings = self._fetch_forwardings()
+        forward_options = self._fetch_forward_options() if forwardings is not None else None
         # Nur wenn ALLES leer ist, gilt die Aktualisierung als gescheitert.
         if not (numbers or dect or devices or contacts or clients or alarms or deflections):
             raise UpdateFailed(
@@ -707,6 +717,8 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
             # Neu in v1.6.0 (siehe alarm.py/deflection.py).
             "alarms": alarms,
             "deflections": deflections,
+            "forwardings": forwardings,
+            "forward_options": forward_options,
         }
 
     # --- Schreibzugriffe (Executor); nur über Services für Administratoren ----
@@ -767,6 +779,73 @@ class FritzSettingsCoordinator(DataUpdateCoordinator[dict]):
             if response.status_code == 200:
                 return True
         return False
+
+    def _post_data_lua(self, form: dict[str, str]) -> dict | None:
+        """Formular an ``/data.lua`` senden und die JSON-Antwort liefern (oder ``None``)."""
+        try:
+            origin = self._http.router_url
+        except Exception as ex:  # noqa: BLE001
+            _LOGGER.debug("Rufumleitung: FRITZ!Box-Webadresse unklar (%s)", ex)
+            return None
+        session = self._phonebook.fph.fc.session
+        for sid in self._sid_candidates():
+            if not sid:
+                continue
+            try:
+                response = session.post(
+                    f"{origin}/data.lua", data={"lang": "de", **form, "sid": sid}, timeout=20
+                )
+                if response.status_code != 200:
+                    continue
+                return response.json()
+            except Exception as ex:  # noqa: BLE001
+                _LOGGER.debug("data.lua (%s) fehlgeschlagen: %s", form.get("page"), ex)
+        return None
+
+    def _fetch_forwardings(self) -> list[dict[str, object]] | None:
+        try:
+            return read_rules(self._post_data_lua)
+        except Exception as ex:  # noqa: BLE001 - unbestätigter Weg, nie ein Setup-Fehler
+            _LOGGER.debug("Rufumleitungen (Web-Oberfläche) nicht lesbar: %s", ex)
+            return None
+
+    def _fetch_forward_options(self) -> dict | None:
+        try:
+            return read_forward_options(self._post_data_lua)
+        except Exception as ex:  # noqa: BLE001
+            _LOGGER.debug("Auswahllisten der Rufumleitung nicht lesbar: %s", ex)
+            return None
+
+    def _sync_forward_options(self) -> dict:
+        return read_forward_options(self._post_data_lua)
+
+    def _sync_create_forwarding(self, **kwargs) -> dict:
+        return create_rule(self._post_data_lua, **kwargs)
+
+    def _sync_set_forwarding_enabled(self, uid: str, enabled: bool) -> dict:
+        return set_rule_enabled(self._post_data_lua, uid, enabled)
+
+    def _sync_delete_forwarding(self, uid: str) -> None:
+        delete_rule(self._post_data_lua, uid)
+
+    async def _async_forwarding_call(self, func, *args, **kwargs):
+        try:
+            return await self.hass.async_add_executor_job(lambda: func(*args, **kwargs))
+        finally:
+            await self.async_request_refresh()
+
+    async def async_forward_options(self) -> dict:
+        return await self.hass.async_add_executor_job(self._sync_forward_options)
+
+    async def async_create_forwarding(self, **kwargs) -> dict:
+        """Rufumleitung anlegen (EXPERIMENTELL, mit Rücklese-Prüfung)."""
+        return await self._async_forwarding_call(self._sync_create_forwarding, **kwargs)
+
+    async def async_set_forwarding_enabled(self, uid: str, enabled: bool) -> dict:
+        return await self._async_forwarding_call(self._sync_set_forwarding_enabled, uid, enabled)
+
+    async def async_delete_forwarding(self, uid: str) -> None:
+        await self._async_forwarding_call(self._sync_delete_forwarding, uid)
 
     def _sync_set_alarm_enabled(self, index: int, enabled: bool) -> None:
         set_alarm_enabled(self._phonebook.fph.fc, index, enabled)

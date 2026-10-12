@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): ff1101d0673cf8387356d4bf4a074653868eba56437da13b9824456217416ee7
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): f02111bd8c0ad74171d9aead1f275af858144ef438f09e1228662c2445aba7ae
 """Constants for the AVM Fritz!Box call monitor integration."""
 
 from collections.abc import Mapping
@@ -374,3 +374,6 @@ SERVICE_SET_ALARM_CLOCK = "set_alarm_clock"
 SERVICE_SET_DEFLECTION_ENABLED = "set_deflection_enabled"
 SERVICE_CHECK_FOR_UPDATE = "check_for_update"
 SERVICE_COLLECT_DIAGNOSTICS = "collect_diagnostics"
+SERVICE_CREATE_CALL_FORWARDING = "create_call_forwarding"
+SERVICE_SET_CALL_FORWARDING_ENABLED = "set_call_forwarding_enabled"
+SERVICE_DELETE_CALL_FORWARDING = "delete_call_forwarding"

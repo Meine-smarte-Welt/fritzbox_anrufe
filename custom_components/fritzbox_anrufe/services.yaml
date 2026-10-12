@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): bc3fca98612f5cb52069de8274a0725cda09e9f34e6f80cc81214e2af23d137d
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): f046d12934a2d82e765de54e3f59543b39812e39330ff3c7e990a3a205afad29
 delete_voicemail_message:
   target:
     entity:
@@ -97,6 +97,82 @@ set_deflection_enabled:
       example: true
       selector:
         boolean:
+
+create_call_forwarding:
+  fields:
+    entry_id:
+      required: false
+      example: "01J..."
+      selector:
+        text:
+    mode:
+      required: true
+      example: "all"
+      selector:
+        select:
+          options: ["to", "from", "all"]
+    target:
+      required: false
+      example: "SIP0"
+      selector:
+        text:
+    from_number:
+      required: false
+      example: "0123456789"
+      selector:
+        text:
+    dest_type:
+      required: true
+      example: "number"
+      selector:
+        select:
+          options: ["number", "answering_machine", "phone"]
+    dest:
+      required: true
+      example: "015112345678"
+      selector:
+        text:
+    own_number:
+      required: false
+      example: "*"
+      selector:
+        text:
+    kind:
+      required: false
+      example: "NOW"
+      selector:
+        text:
+
+set_call_forwarding_enabled:
+  fields:
+    entry_id:
+      required: false
+      example: "01J..."
+      selector:
+        text:
+    uid:
+      required: true
+      example: "rul0"
+      selector:
+        text:
+    enabled:
+      required: true
+      example: true
+      selector:
+        boolean:
+
+delete_call_forwarding:
+  fields:
+    entry_id:
+      required: false
+      example: "01J..."
+      selector:
+        text:
+    uid:
+      required: true
+      example: "rul0"
+      selector:
+        text:
 
 check_for_update:
   fields:

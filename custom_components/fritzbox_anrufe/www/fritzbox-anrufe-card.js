@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 8918777168de0ab3564673d7e4cb4287328ee812cf569e6e85ba756ce2a6b692
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 534b7576db15f9e740b637d813c8af1d6de3510a0b3b32955cde59a6e420b143
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -868,6 +868,32 @@ const I18N = {
     defl_mode_immediately: "sofort",
     defl_mode_busy: "bei Besetzt",
     defl_mode_off: "aus",
+    fwd_note: "Rufumleitungen werden über die Web-Oberfläche der FRITZ!Box verwaltet (experimentell; nach dem Speichern wird zurückgelesen). Beim Umleiten auf externe Rufnummern können Kosten entstehen.",
+    fwd_new: "Neue Rufumleitung",
+    fwd_mode: "Welche Anrufe",
+    fwd_mode_to: "Anrufe an eine eigene Nummer/ein Gerät",
+    fwd_mode_from: "Anrufe von einer Nummer",
+    fwd_mode_all: "Alle Anrufe",
+    fwd_target: "Eigene Nummer/Gerät",
+    fwd_choose: "Bitte wählen …",
+    fwd_from: "Nummer des Anrufers (leer = anonym)",
+    fwd_dest_type: "Umleiten an",
+    fwd_dest_number: "Zielrufnummer",
+    fwd_dest_tam: "Anrufbeantworter",
+    fwd_dest_phone: "Telefon",
+    fwd_dest: "Ziel",
+    fwd_own: "Über eigene Rufnummer",
+    fwd_kind: "Art der Umleitung",
+    fwd_create: "Anlegen",
+    fwd_cancel: "Abbrechen",
+    fwd_confirm_create: "Wirklich anlegen?",
+    fwd_delete: "Löschen",
+    fwd_confirm_delete: "Wirklich löschen?",
+    fwd_created: "Rufumleitung angelegt.",
+    fwd_deleted: "Rufumleitung gelöscht.",
+    fwd_incomplete: "Bitte alle Felder ausfüllen.",
+    fwd_auto: "Automatisch",
+    fwd_all_numbers: "alle Rufnummern",
     defl_note: "Bestehende Umleitungen lassen sich ein-/ausschalten. Anlegen und Zielnummer ändern geht nur in der FRITZ!Box selbst (Telefonie → Rufbehandlung), weil die Schnittstelle das nicht anbietet.",
     toast_error: "Fehlgeschlagen: {msg}",
     toast_update_checked: "Versionsprüfung abgeschlossen.",
@@ -950,6 +976,32 @@ const I18N = {
     defl_mode_immediately: "immediately",
     defl_mode_busy: "when busy",
     defl_mode_off: "off",
+    fwd_note: "Call forwarding is managed via the FRITZ!Box web interface (experimental; the result is read back after saving). Forwarding to external numbers may cost extra.",
+    fwd_new: "New call forwarding",
+    fwd_mode: "Which calls",
+    fwd_mode_to: "Calls to an own number/device",
+    fwd_mode_from: "Calls from a number",
+    fwd_mode_all: "All calls",
+    fwd_target: "Own number/device",
+    fwd_choose: "Please choose …",
+    fwd_from: "Caller number (empty = anonymous)",
+    fwd_dest_type: "Forward to",
+    fwd_dest_number: "Destination number",
+    fwd_dest_tam: "Answering machine",
+    fwd_dest_phone: "Phone",
+    fwd_dest: "Destination",
+    fwd_own: "Via own number",
+    fwd_kind: "Kind of forwarding",
+    fwd_create: "Create",
+    fwd_cancel: "Cancel",
+    fwd_confirm_create: "Really create?",
+    fwd_delete: "Delete",
+    fwd_confirm_delete: "Really delete?",
+    fwd_created: "Call forwarding created.",
+    fwd_deleted: "Call forwarding deleted.",
+    fwd_incomplete: "Please fill in all fields.",
+    fwd_auto: "Automatic",
+    fwd_all_numbers: "all numbers",
     defl_note: "Existing rules can be switched on/off. Creating rules and changing the target number is only possible in the FRITZ!Box itself (Telephony → Call handling), because the interface does not offer it.",
     toast_error: "Failed: {msg}",
     toast_update_checked: "Version check finished.",
@@ -1032,6 +1084,32 @@ const I18N = {
     defl_mode_immediately: "direct",
     defl_mode_busy: "bij bezet",
     defl_mode_off: "uit",
+    fwd_note: "Doorschakelingen worden beheerd via de webinterface van de FRITZ!Box (experimenteel; na het opslaan wordt teruggelezen). Doorschakelen naar externe nummers kan extra kosten geven.",
+    fwd_new: "Nieuwe doorschakeling",
+    fwd_mode: "Welke gesprekken",
+    fwd_mode_to: "Gesprekken naar een eigen nummer/toestel",
+    fwd_mode_from: "Gesprekken van een nummer",
+    fwd_mode_all: "Alle gesprekken",
+    fwd_target: "Eigen nummer/toestel",
+    fwd_choose: "Kies …",
+    fwd_from: "Nummer beller (leeg = anoniem)",
+    fwd_dest_type: "Doorschakelen naar",
+    fwd_dest_number: "Doelnummer",
+    fwd_dest_tam: "Antwoordapparaat",
+    fwd_dest_phone: "Telefoon",
+    fwd_dest: "Bestemming",
+    fwd_own: "Via eigen nummer",
+    fwd_kind: "Soort doorschakeling",
+    fwd_create: "Aanmaken",
+    fwd_cancel: "Annuleren",
+    fwd_confirm_create: "Echt aanmaken?",
+    fwd_delete: "Verwijderen",
+    fwd_confirm_delete: "Echt verwijderen?",
+    fwd_created: "Doorschakeling aangemaakt.",
+    fwd_deleted: "Doorschakeling verwijderd.",
+    fwd_incomplete: "Vul alle velden in.",
+    fwd_auto: "Automatisch",
+    fwd_all_numbers: "alle nummers",
     defl_note: "Bestaande regels kunnen in-/uitgeschakeld worden. Aanmaken en doelnummer wijzigen kan alleen in de FRITZ!Box zelf (Telefonie → Oproepafhandeling), omdat de interface dat niet aanbiedt.",
     toast_error: "Mislukt: {msg}",
     toast_update_checked: "Versiecontrole afgerond.",
@@ -1870,7 +1948,7 @@ class FritzboxAnrufeCard extends HTMLElement {
       return;
     }
     // v1.6.0: nicht neu zeichnen, solange ein Weckruf bearbeitet wird (Eingaben gingen verloren).
-    if (this._isEditingAlarm()) return;
+    if (this._isEditingAlarm() || this._isEditingForward()) return;
     // Bugfix (seit v1.0.5b4, `auto_mark_read`): der Options-Flow-Schalter
     // löst NACH JEDER Wiedergabe absichtlich eine Coordinator-Aktualisierung
     // aus, um den "Neu"-Status zeitnah zu löschen (siehe voicemail.py:
@@ -2675,6 +2753,8 @@ class FritzboxAnrufeCard extends HTMLElement {
   }
 
   _renderSettingsDeflections(attrs) {
+    const web = Array.isArray(attrs.forwardings) ? attrs.forwardings : null;
+    if (web) return this._renderSettingsForwardings(web, attrs.forward_options);
     const list = Array.isArray(attrs.deflections) ? attrs.deflections : [];
     const rows = list
       .map((df) => {
@@ -2705,6 +2785,107 @@ class FritzboxAnrufeCard extends HTMLElement {
       <div class="settings-note">${escapeHtml(this._t("defl_note"))}</div>
     `;
     return this._accordion("deflections", "mdi:phone-forward", this._t("acc_deflections"), String(list.length || ""), body, "", false);
+  }
+
+  // Rufumleitungen der Web-Oberfläche (seit v1.6.0, EXPERIMENTELL): Liste mit
+  // Ein/Aus und Löschen (je Zwei-Klick-Bestätigung) sowie Formular „Neu“.
+  _renderSettingsForwardings(list, opts) {
+    const rows = list
+      .map((r) => {
+        const tPending = this._fwdConfirm === "t:" + r.uid;
+        const dPending = this._fwdConfirm === "d:" + r.uid;
+        const label = tPending
+          ? this._t(r.active ? "defl_confirm_off" : "defl_confirm_on")
+          : this._t(r.active ? "alarm_on" : "alarm_off");
+        const title = [r.from, r.to].filter(Boolean).join(" → ");
+        const detail = [r.over, r.mode].filter(Boolean).join(" · ");
+        return `
+          <div class="alarm-item${r.active ? " enabled" : ""}">
+            <div class="alarm-head">
+              <ha-icon icon="mdi:phone-forward"></ha-icon>
+              <span class="alarm-name">${escapeHtml(title || r.uid)}</span>
+              <span class="grow"></span>
+              ${
+                r.switchable
+                  ? `<button class="btn small fwd-toggle${tPending ? " danger" : ""}" data-uid="${escapeHtml(r.uid)}" data-enabled="${r.active ? "1" : "0"}">${escapeHtml(label)}</button>`
+                  : ""
+              }
+              <button class="btn small fwd-delete${dPending ? " danger" : ""}" data-uid="${escapeHtml(r.uid)}">${escapeHtml(this._t(dPending ? "fwd_confirm_delete" : "fwd_delete"))}</button>
+            </div>
+            ${detail ? `<div class="alarm-days"><span class="settings-row-meta">${escapeHtml(detail)}</span></div>` : ""}
+          </div>`;
+      })
+      .join("");
+    const body = `
+      ${rows || `<div class="empty">${escapeHtml(this._t("defl_none"))}</div>`}
+      ${
+        this._fwdDraft && opts
+          ? this._renderForwardForm(opts)
+          : opts && opts.editable !== false
+          ? `<div class="btn-row"><button class="btn small primary fwd-new">${escapeHtml(this._t("fwd_new"))}</button></div>`
+          : ""
+      }
+      <div class="settings-note">${escapeHtml(this._t("fwd_note"))}</div>
+    `;
+    return this._accordion("deflections", "mdi:phone-forward", this._t("acc_deflections"), String(list.length || ""), body, "", false);
+  }
+
+  _fwdSelect(field, items, value, withChoose, rerender) {
+    const opt = (v, text) => `<option value="${escapeHtml(v)}"${v === value ? " selected" : ""}>${escapeHtml(text)}</option>`;
+    return `<select class="fwd-in" data-f="${field}"${rerender ? ' data-rerender="1"' : ""}>${withChoose ? opt("", this._t("fwd_choose")) : ""}${(items || [])
+      .map((i) => opt(i.value, i.display + (i.display !== i.value ? " (" + i.value + ")" : "")))
+      .join("")}</select>`;
+  }
+
+  _renderForwardForm(opts) {
+    const d = this._fwdDraft;
+    const field = (label, inner) => `<label class="alarm-field"><span>${escapeHtml(label)}</span>${inner}</label>`;
+    const isPort = String(d.target || "").startsWith("FON");
+    let html = field(
+      this._t("fwd_mode"),
+      `<select class="fwd-in" data-f="mode" data-rerender="1">
+        <option value="to"${d.mode === "to" ? " selected" : ""}>${escapeHtml(this._t("fwd_mode_to"))}</option>
+        <option value="from"${d.mode === "from" ? " selected" : ""}>${escapeHtml(this._t("fwd_mode_from"))}</option>
+        <option value="all"${d.mode === "all" ? " selected" : ""}>${escapeHtml(this._t("fwd_mode_all"))}</option>
+      </select>`
+    );
+    if (d.mode === "to") {
+      html += field(this._t("fwd_target"), this._fwdSelect("target", opts.targets, d.target, true, true));
+    }
+    if (d.mode === "from") {
+      html += field(this._t("fwd_from"), `<input type="text" class="fwd-in" data-f="from_number" maxlength="20" value="${escapeHtml(d.from_number)}" />`);
+    }
+    html += field(
+      this._t("fwd_dest_type"),
+      `<select class="fwd-in" data-f="dest_type" data-rerender="1">
+        <option value="number"${d.dest_type === "number" ? " selected" : ""}>${escapeHtml(this._t("fwd_dest_number"))}</option>
+        ${(opts.answering_machines || []).length ? `<option value="answering_machine"${d.dest_type === "answering_machine" ? " selected" : ""}>${escapeHtml(this._t("fwd_dest_tam"))}</option>` : ""}
+        ${(opts.phones || []).length ? `<option value="phone"${d.dest_type === "phone" ? " selected" : ""}>${escapeHtml(this._t("fwd_dest_phone"))}</option>` : ""}
+      </select>`
+    );
+    if (d.dest_type === "number") {
+      html += field(this._t("fwd_dest"), `<input type="text" class="fwd-in" data-f="dest" maxlength="20" inputmode="tel" value="${escapeHtml(d.dest)}" />`);
+    } else {
+      const items = d.dest_type === "answering_machine" ? opts.answering_machines : opts.phones;
+      html += field(this._t("fwd_dest"), this._fwdSelect("dest", items, d.dest, true));
+    }
+    if (!isPort && d.dest_type !== "answering_machine") {
+      const own = (opts.own_numbers || []).map((o) => (o.value === "*" ? { value: "*", display: this._t("fwd_auto") } : o));
+      html += field(this._t("fwd_own"), this._fwdSelect("own_number", own, d.own_number || "*", false));
+    }
+    if (d.mode === "to" && d.target) {
+      const kinds = isPort ? opts.kinds_port : opts.kinds_msn;
+      html += field(this._t("fwd_kind"), this._fwdSelect("kind", kinds, d.kind || "NOW", false));
+    }
+    const confirming = this._fwdConfirm === "create";
+    return `<div class="alarm-form fwd-form">
+      <div class="settings-section-title">${escapeHtml(this._t("fwd_new"))}</div>
+      ${html}
+      <div class="btn-row">
+        <button class="btn small primary fwd-create${confirming ? " danger" : ""}">${escapeHtml(this._t(confirming ? "fwd_confirm_create" : "fwd_create"))}</button>
+        <button class="btn small fwd-cancel">${escapeHtml(this._t("fwd_cancel"))}</button>
+      </div>
+    </div>`;
   }
 
   // --- Rückmeldung (Toast) und Service-Aufrufe ---------------------------
@@ -2744,6 +2925,58 @@ class FritzboxAnrufeCard extends HTMLElement {
     if (this._alarmEdit === null || !this.shadowRoot) return false;
     const active = this.shadowRoot.activeElement;
     return Boolean(active && active.closest && active.closest(".alarm-form"));
+  }
+
+  _isEditingForward() {
+    if (!this._fwdDraft || !this.shadowRoot) return false;
+    const active = this.shadowRoot.activeElement;
+    return Boolean(active && active.closest && active.closest(".fwd-form"));
+  }
+
+  _fwdReset() {
+    clearTimeout(this._fwdTimer);
+    this._fwdConfirm = null;
+    this._lastSignature = null;
+  }
+
+  _fwdArm(token) {
+    this._fwdConfirm = token;
+    clearTimeout(this._fwdTimer);
+    this._fwdTimer = setTimeout(() => {
+      this._fwdReset();
+      this._render();
+    }, 5000);
+    this._lastSignature = null;
+    this._render();
+  }
+
+  async _fwdCreate() {
+    const d = this._fwdDraft;
+    if (!d) return;
+    const missing =
+      (d.mode === "to" && !d.target) || !String(d.dest || "").trim();
+    if (missing) {
+      this._fwdReset();
+      this._toast(this._t("fwd_incomplete"), true);
+      this._render();
+      return;
+    }
+    if (this._fwdConfirm !== "create") {
+      this._fwdArm("create");
+      return;
+    }
+    this._fwdReset();
+    const data = { mode: d.mode, dest_type: d.dest_type, dest: String(d.dest).trim() };
+    if (d.mode === "to") {
+      data.target = d.target;
+      data.kind = d.kind || "NOW";
+    }
+    if (d.mode === "from" && String(d.from_number || "").trim()) data.from_number = d.from_number.trim();
+    if (d.own_number && d.own_number !== "*") data.own_number = d.own_number;
+    const ok = await this._adminService("create_call_forwarding", data, "fwd_created");
+    if (ok) this._fwdDraft = null;
+    this._lastSignature = null;
+    this._render();
   }
 
   _startAlarmEdit(index) {
@@ -2871,6 +3104,69 @@ class FritzboxAnrufeCard extends HTMLElement {
         else set.delete(box.dataset.day);
         this._alarmDraft.weekdays = Array.from(set);
       });
+    });
+    // Rufumleitungen der Web-Oberfläche (v1.6.0, experimentell).
+    root.querySelectorAll(".fwd-toggle").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const token = "t:" + btn.dataset.uid;
+        if (this._fwdConfirm !== token) {
+          this._fwdArm(token);
+          return;
+        }
+        this._fwdReset();
+        await this._adminService(
+          "set_call_forwarding_enabled",
+          { uid: btn.dataset.uid, enabled: btn.dataset.enabled !== "1" },
+          "defl_toggled"
+        );
+        this._render();
+      });
+    });
+    root.querySelectorAll(".fwd-delete").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const token = "d:" + btn.dataset.uid;
+        if (this._fwdConfirm !== token) {
+          this._fwdArm(token);
+          return;
+        }
+        this._fwdReset();
+        await this._adminService("delete_call_forwarding", { uid: btn.dataset.uid }, "fwd_deleted");
+        this._render();
+      });
+    });
+    root.querySelectorAll(".fwd-new").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._fwdDraft = { mode: "all", target: "", from_number: "", dest_type: "number", dest: "", own_number: "*", kind: "NOW" };
+        this._fwdReset();
+        this._render();
+      });
+    });
+    root.querySelectorAll(".fwd-cancel").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._fwdDraft = null;
+        this._fwdReset();
+        this._render();
+      });
+    });
+    root.querySelectorAll(".fwd-create").forEach((btn) => {
+      btn.addEventListener("click", () => this._fwdCreate());
+    });
+    root.querySelectorAll(".fwd-in").forEach((el) => {
+      const handler = () => {
+        if (!this._fwdDraft) return;
+        this._fwdDraft[el.dataset.f] = el.value;
+        if (el.dataset.f === "dest_type") this._fwdDraft.dest = "";
+        if (el.dataset.f === "target") this._fwdDraft.kind = "NOW";
+        if (this._fwdConfirm === "create") {
+          clearTimeout(this._fwdTimer);
+          this._fwdConfirm = null;
+        }
+        if (el.dataset.rerender) {
+          this._lastSignature = null;
+          this._render();
+        }
+      };
+      el.addEventListener(el.tagName === "SELECT" ? "change" : "input", handler);
     });
     // Zwei-Klick-Bestätigung für Rufumleitungen (Design-Master Regel 8): erster
     // Klick fragt nach, zweiter schaltet; nach 5 s verfällt die Rückfrage.

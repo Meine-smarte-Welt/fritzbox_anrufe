@@ -399,6 +399,76 @@
           "description": "Nur bei mehreren FRITZ!Box-Einträgen nötig."
         }
       }
+    },
+    "create_call_forwarding": {
+      "name": "Rufumleitung anlegen (experimentell)",
+      "description": "Legt über die Web-Oberfläche der FRITZ!Box eine Rufumleitung an und prüft danach, ob sie in der Liste steht. Nur für Administratoren.",
+      "fields": {
+        "entry_id": {
+          "name": "Eintrag",
+          "description": "Nur bei mehreren FRITZ!Box-Einträgen nötig."
+        },
+        "mode": {
+          "name": "Welche Anrufe",
+          "description": "to = Anrufe an eine eigene Rufnummer/ein Gerät, from = Anrufe von einer Nummer (leer = anonym), all = alle Anrufe."
+        },
+        "target": {
+          "name": "Eigene Rufnummer/Gerät",
+          "description": "Nur bei mode=to: Wert aus der Box, z. B. SIP0, SIP1 oder FON1 (siehe Attribut forward_options)."
+        },
+        "from_number": {
+          "name": "Anrufer-Nummer",
+          "description": "Nur bei mode=from. Leer lassen für anonyme Anrufe."
+        },
+        "dest_type": {
+          "name": "Ziel-Art",
+          "description": "number, answering_machine oder phone."
+        },
+        "dest": {
+          "name": "Ziel",
+          "description": "Rufnummer (number) bzw. Wert aus forward_options (z. B. 600 für den Anrufbeantworter, 610 für ein Mobilteil)."
+        },
+        "own_number": {
+          "name": "Über eigene Rufnummer",
+          "description": "Wert aus forward_options; Standard * = automatisch."
+        },
+        "kind": {
+          "name": "Art der Umleitung",
+          "description": "z. B. NOW, DELAY, BUSY, PARALLEL (nur bei mode=to; Standard NOW)."
+        }
+      }
+    },
+    "set_call_forwarding_enabled": {
+      "name": "Rufumleitung ein-/ausschalten (Web-Oberfläche)",
+      "description": "Schaltet eine Rufumleitung aus der Liste der Web-Oberfläche ein oder aus. Nur für Administratoren.",
+      "fields": {
+        "entry_id": {
+          "name": "Eintrag",
+          "description": "Nur bei mehreren FRITZ!Box-Einträgen nötig."
+        },
+        "uid": {
+          "name": "Kennung",
+          "description": "Kennung aus dem Attribut forwardings."
+        },
+        "enabled": {
+          "name": "Aktiv",
+          "description": "Ein oder aus."
+        }
+      }
+    },
+    "delete_call_forwarding": {
+      "name": "Rufumleitung löschen",
+      "description": "Löscht eine Rufumleitung auf der FRITZ!Box (nicht rückgängig zu machen). Nur für Administratoren.",
+      "fields": {
+        "entry_id": {
+          "name": "Eintrag",
+          "description": "Nur bei mehreren FRITZ!Box-Einträgen nötig."
+        },
+        "uid": {
+          "name": "Kennung",
+          "description": "Kennung aus dem Attribut forwardings."
+        }
+      }
     }
   }
 }

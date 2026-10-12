@@ -1,17 +1,13 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 3949dfa6993bc5a6d43c17c635784b19c96d5414c70e44088813be37e5d55e98
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 3d41277ea2d68fcc428493a14c926cc1b0f1ae3fb8c6b08c8404f7665bb2a3e9
 """Rufumleitungen („Rufbehandlung“) der FRITZ!Box lesen und ein-/ausschalten.
 
 Neu in v1.6.0. Grundlage sind die dokumentierten TR-064-Aktionen des Dienstes
 ``X_AVM-DE_OnTel``: ``GetNumberOfDeflections``, ``GetDeflection``,
 ``GetDeflections`` und ``SetDeflectionEnable``.
 
-Bewusste Grenze: **Anlegen neuer Umleitungen und Ändern der Zielnummer sind NICHT
-umgesetzt.** AVM bietet dafür keine TR-064-Aktion, und für die
-Web-Oberfläche gibt es keine belegbaren Formularfelder. Ein auf geratenen
-Feldnamen beruhender Schreibzugriff könnte falsche Umleitungen in der
-Telefonie-Konfiguration anlegen - das ist riskanter als bei einem Weckruf und
-wird deshalb nicht angeboten. Bestehende Umleitungen lassen sich lesen und
-ein-/ausschalten.
+Dieses Modul bleibt bei TR-064: Umleitungen lesen und ein-/ausschalten. Das
+Anlegen und Löschen läuft über die Web-Oberfläche und steht in
+``call_forwarding.py``.
 
 Dieses Modul importiert Home Assistant nicht (testbar ohne).
 """

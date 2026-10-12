@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 77de2f6e7e1a085ae3ef12232faefefbfae8e8ab9c14ff13e03ae491d42f11d2
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): c0207946ab76fae2f5071c3d6260f2e056f8bb78edc850a1fa43b13810654832
 """Sensor to monitor incoming/outgoing phone calls on a Fritz!Box router."""
 
 from collections.abc import Mapping
@@ -687,6 +687,8 @@ class FritzBoxSettingsSensor(CoordinatorEntity[FritzSettingsCoordinator], Sensor
             "clients": data.get("clients", []),
             "alarms": data.get("alarms", []),
             "deflections": data.get("deflections", []),
+            "forwardings": data.get("forwardings"),
+            "forward_options": data.get("forward_options"),
             "app": data.get("app", {}),
         }
 

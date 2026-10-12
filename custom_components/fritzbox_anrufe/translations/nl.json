@@ -399,6 +399,76 @@
           "description": "Alleen nodig bij meerdere FRITZ!Box-invoeren."
         }
       }
+    },
+    "create_call_forwarding": {
+      "name": "Doorschakeling aanmaken (experimenteel)",
+      "description": "Maakt via de webinterface van de FRITZ!Box een doorschakeling aan en controleert daarna of die in de lijst staat. Alleen voor beheerders.",
+      "fields": {
+        "entry_id": {
+          "name": "Item",
+          "description": "Alleen nodig bij meerdere FRITZ!Box-items."
+        },
+        "mode": {
+          "name": "Welke gesprekken",
+          "description": "to = gesprekken naar een eigen nummer/toestel, from = gesprekken van een nummer (leeg = anoniem), all = alle gesprekken."
+        },
+        "target": {
+          "name": "Eigen nummer/toestel",
+          "description": "Alleen bij mode=to: waarde van de box, bv. SIP0, SIP1 of FON1 (zie attribuut forward_options)."
+        },
+        "from_number": {
+          "name": "Nummer beller",
+          "description": "Alleen bij mode=from. Leeg laten voor anonieme gesprekken."
+        },
+        "dest_type": {
+          "name": "Soort bestemming",
+          "description": "number, answering_machine of phone."
+        },
+        "dest": {
+          "name": "Bestemming",
+          "description": "Telefoonnummer (number) of waarde uit forward_options (bv. 600 voor het antwoordapparaat, 610 voor een handset)."
+        },
+        "own_number": {
+          "name": "Via eigen nummer",
+          "description": "Waarde uit forward_options; standaard * = automatisch."
+        },
+        "kind": {
+          "name": "Soort doorschakeling",
+          "description": "bv. NOW, DELAY, BUSY, PARALLEL (alleen bij mode=to; standaard NOW)."
+        }
+      }
+    },
+    "set_call_forwarding_enabled": {
+      "name": "Doorschakeling aan/uit (webinterface)",
+      "description": "Schakelt een doorschakeling uit de lijst van de webinterface aan of uit. Alleen voor beheerders.",
+      "fields": {
+        "entry_id": {
+          "name": "Item",
+          "description": "Alleen nodig bij meerdere FRITZ!Box-items."
+        },
+        "uid": {
+          "name": "ID",
+          "description": "ID uit het attribuut 'forwardings'."
+        },
+        "enabled": {
+          "name": "Actief",
+          "description": "Aan of uit."
+        }
+      }
+    },
+    "delete_call_forwarding": {
+      "name": "Doorschakeling verwijderen",
+      "description": "Verwijdert een doorschakeling op de FRITZ!Box (niet ongedaan te maken). Alleen voor beheerders.",
+      "fields": {
+        "entry_id": {
+          "name": "Item",
+          "description": "Alleen nodig bij meerdere FRITZ!Box-items."
+        },
+        "uid": {
+          "name": "ID",
+          "description": "ID uit het attribuut 'forwardings'."
+        }
+      }
     }
   }
 }

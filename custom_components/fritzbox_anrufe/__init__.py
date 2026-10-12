@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 175083c221ce117dc56b1ec81787715434ce8752d3294719b0e2d855c0a60238
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): db312fb577762bcb4372d2723c2956271fac43b201e0e73ce2ce776138f8420e
 """The fritzbox_anrufe integration."""
 
 from dataclasses import dataclass, field
@@ -29,6 +29,7 @@ from homeassistant.loader import async_get_integration
 
 from .alarm import AlarmError
 from .base import FritzBoxPhonebook
+from .call_forwarding import ForwardingError
 from .deflection import DeflectionError
 from .call_log import FritzCallLogCoordinator
 from .settings_data import FritzSettingsCoordinator
@@ -49,6 +50,9 @@ from .const import (
     SERIAL_NUMBER,
     SERVICE_CHECK_FOR_UPDATE,
     SERVICE_COLLECT_DIAGNOSTICS,
+    SERVICE_CREATE_CALL_FORWARDING,
+    SERVICE_DELETE_CALL_FORWARDING,
+    SERVICE_SET_CALL_FORWARDING_ENABLED,
     SERVICE_SET_ALARM_CLOCK,
     SERVICE_SET_ALARM_CLOCK_ENABLED,
     SERVICE_SET_DEFLECTION_ENABLED,
@@ -390,6 +394,35 @@ def _async_register_services(hass: HomeAssistant) -> None:
         except DeflectionError as ex:
             raise HomeAssistantError(str(ex)) from ex
 
+    async def _create_forwarding(call: ServiceCall) -> None:
+        settings = _settings(_resolve_runtime(hass, call))
+        try:
+            await settings.async_create_forwarding(
+                mode=call.data["mode"],
+                target=call.data.get("target"),
+                from_number=call.data.get("from_number"),
+                dest_type=call.data["dest_type"],
+                dest=call.data["dest"],
+                own_number=call.data.get("own_number"),
+                kind=call.data.get("kind"),
+            )
+        except ForwardingError as ex:
+            raise HomeAssistantError(str(ex)) from ex
+
+    async def _forwarding_enabled(call: ServiceCall) -> None:
+        settings = _settings(_resolve_runtime(hass, call))
+        try:
+            await settings.async_set_forwarding_enabled(call.data["uid"], call.data[_ATTR_ENABLED])
+        except ForwardingError as ex:
+            raise HomeAssistantError(str(ex)) from ex
+
+    async def _delete_forwarding(call: ServiceCall) -> None:
+        settings = _settings(_resolve_runtime(hass, call))
+        try:
+            await settings.async_delete_forwarding(call.data["uid"])
+        except ForwardingError as ex:
+            raise HomeAssistantError(str(ex)) from ex
+
     async def _check_update(call: ServiceCall) -> None:
         runtime = _resolve_runtime(hass, call)
         if runtime.update_checker is not None:
@@ -426,6 +459,38 @@ def _async_register_services(hass: HomeAssistant) -> None:
                 vol.Optional(_ATTR_ENABLED): cv.boolean,
             }
         ),
+    )
+    async_register_admin_service(
+        hass,
+        DOMAIN,
+        SERVICE_CREATE_CALL_FORWARDING,
+        _create_forwarding,
+        vol.Schema(
+            {
+                **entry_id,
+                vol.Required("mode"): vol.In(["to", "from", "all"]),
+                vol.Optional("target"): cv.string,
+                vol.Optional("from_number"): cv.string,
+                vol.Required("dest_type"): vol.In(["number", "answering_machine", "phone"]),
+                vol.Required("dest"): cv.string,
+                vol.Optional("own_number"): cv.string,
+                vol.Optional("kind"): cv.string,
+            }
+        ),
+    )
+    async_register_admin_service(
+        hass,
+        DOMAIN,
+        SERVICE_SET_CALL_FORWARDING_ENABLED,
+        _forwarding_enabled,
+        vol.Schema({**entry_id, vol.Required("uid"): cv.string, vol.Required(_ATTR_ENABLED): cv.boolean}),
+    )
+    async_register_admin_service(
+        hass,
+        DOMAIN,
+        SERVICE_DELETE_CALL_FORWARDING,
+        _delete_forwarding,
+        vol.Schema({**entry_id, vol.Required("uid"): cv.string}),
     )
     async_register_admin_service(
         hass,

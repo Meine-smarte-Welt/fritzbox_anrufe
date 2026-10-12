@@ -87,7 +87,7 @@ mitgelieferte Dashboard-Karte.
 - **Neu in Version 1.6.0** (Details: [Neu in Version 1.6.0](#neu-in-version-160)):
   interne und externe Rufnummern im Einstellungen-Tab, Weckruf anzeigen,
   ein-/ausschalten und (experimentell) ändern, Rufumleitungen anzeigen und
-  ein-/ausschalten, Anrufstatistik (Sensor und Statistik-Tab), Versionsanzeige
+  ein-/ausschalten, löschen und (experimentell) anlegen, Anrufstatistik (Sensor und Statistik-Tab), Versionsanzeige
   mit Update-Hinweis und Karte/Texte in Deutsch, Englisch und Niederländisch.
 - Alternative: einfache YAML-Tabellenkarte auf Basis von `flex-table-card`
   (siehe [`examples/dashboard_flex_table.yaml`](examples/dashboard_flex_table.yaml)).
@@ -574,15 +574,27 @@ Administratoren.
 
 Akkordeon „Rufumleitung“ (`show_settings_deflections`): bestehende Umleitungen
 werden angezeigt und lassen sich ein-/ausschalten (Zwei-Klick-Bestätigung,
-nur Administratoren, mit Zurücklesen). **Neue Umleitungen anlegen und die
-Zielnummer ändern ist bewusst nicht umgesetzt:** AVM bietet dafür keine
-Schnittstelle, und geratene Formularfelder könnten falsche Umleitungen
-anlegen. Das geht weiter in der FRITZ!Box unter Telefonie → Rufbehandlung.
+nur Administratoren, mit Zurücklesen), **löschen** und **neu anlegen**
+(Button „Neue Rufumleitung“: welche Anrufe - an eine eigene Nummer/ein Gerät,
+von einer Nummer bzw. anonym oder alle -, Ziel Rufnummer/Anrufbeantworter/
+Telefon, eigene Rufnummer und Art der Umleitung). Auswahllisten stammen von
+der Box.
 
-Ist auf der Box keine Umleitung eingerichtet (Telefonie → Rufbehandlung →
-Rufumleitung), bleibt die Liste leer - so war es bei der eingesehenen
-FRITZ!Box (Seite `callRedi`, leere Regelliste). Die Integration kann
-Umleitungen nicht selbst anlegen.
+**Experimentell:** AVM bietet dafür keine TR-064-Schnittstelle. Die
+Integration nutzt dieselben Formularfelder wie die Web-Oberfläche der
+FRITZ!Box (Seiten `callRedi` und `rul_edit`, gespeichert per `data.lua`).
+Feldnamen und Werte wurden an einer FRITZ!Box 5690 Pro (FRITZ!OS 8.x) aus den
+Seitenskripten gelesen; das eigentliche **Speichern wurde noch nicht an echter
+Hardware getestet.** Schutz: Eingaben werden gegen die Listen der Box geprüft,
+nach dem Speichern wird die Liste zurückgelesen (kein Treffer = Fehlermeldung),
+anlegen und löschen brauchen eine Zwei-Klick-Bestätigung, eine
+Zwei-Faktor-Rückfrage der Box wird nicht umgangen. Die Zeitsteuerung der
+Rufumleitung und „Wichtiger Anrufer“-Regeln werden nicht verändert. Kann die
+Seite nicht gelesen werden, zeigt die Karte wie zuvor die TR-064-Liste
+(nur Ein-/Ausschalten).
+
+Services: `create_call_forwarding`, `set_call_forwarding_enabled`,
+`delete_call_forwarding` (siehe Tabelle).
 
 ### Anrufstatistik
 
@@ -608,7 +620,10 @@ läuft alles normal weiter.
 | --- | --- |
 | `fritzbox_anrufe.set_alarm_clock_enabled` | Weckruf ein-/ausschalten (`index`, `enabled`) |
 | `fritzbox_anrufe.set_alarm_clock` | Uhrzeit/Wochentage/Name/Status setzen (experimentell) |
-| `fritzbox_anrufe.set_deflection_enabled` | Umleitung ein-/ausschalten (`deflection_id`, `enabled`) |
+| `fritzbox_anrufe.set_deflection_enabled` | Umleitung ein-/ausschalten über TR-064 (`deflection_id`, `enabled`) |
+| `fritzbox_anrufe.create_call_forwarding` | Rufumleitung anlegen (experimentell): `mode` (`to`/`from`/`all`), `target`, `from_number`, `dest_type` (`number`/`answering_machine`/`phone`), `dest`, `own_number`, `kind` |
+| `fritzbox_anrufe.set_call_forwarding_enabled` | Rufumleitung der Web-Oberfläche ein-/ausschalten (`uid`, `enabled`; Kennungen im Attribut `forwardings`) |
+| `fritzbox_anrufe.delete_call_forwarding` | Rufumleitung löschen (`uid`) |
 | `fritzbox_anrufe.check_for_update` | GitHub-Versionsprüfung sofort ausführen |
 | `fritzbox_anrufe.collect_diagnostics` | Rohdaten der Box (nur lesend) für Fehlermeldungen; liefert eine Antwort, siehe unten |
 
@@ -1133,8 +1148,10 @@ die dortigen Maintainer den Fehler beheben.
   simulierte FRITZ!Box getestet. Weckruf-Uhrzeit/-Wochentage schreiben über die
   Web-Oberfläche der Box (kein dokumentierter Weg, Formularfelder nicht
   belegt); die Integration prüft per Zurücklesen und meldet Abweichungen.
-- Rufumleitungen lassen sich nicht anlegen und ihre Zielnummer nicht ändern
-  (keine Schnittstelle bei AVM); nur Anzeigen und Ein-/Ausschalten.
+- Rufumleitungen anlegen/löschen läuft über die Web-Oberfläche der Box
+  (keine AVM-Schnittstelle) und ist **nicht an echter Hardware getestet**;
+  bestehende Umleitungen lassen sich nicht bearbeiten, nur ein-/ausschalten
+  oder löschen und neu anlegen.
 - Interne Nummern analoger/DECT-Telefone stammen aus der Web-Oberfläche und
   können je nach FRITZ!OS fehlen; per TR-064 liefert die Box nur IP-Telefone
   und Apps.
@@ -1328,9 +1345,9 @@ die dortigen Maintainer den Fehler beheben.
 
 - **1.6.0**: Interne und externe Rufnummern im Einstellungen-Tab; Weckruf
   anzeigen, ein-/ausschalten und experimentell ändern; Rufumleitungen
-  anzeigen und ein-/ausschalten; Anrufstatistik (zwei Sensoren, Statistik-Tab);
+  anzeigen, ein-/ausschalten, löschen und (experimentell) anlegen; Anrufstatistik (zwei Sensoren, Statistik-Tab);
   Versionsanzeige mit GitHub-Update-Hinweis (Karte, Editor, Optionen);
-  fünf neue Admin-Services (inkl. `collect_diagnostics`); Web-Seite `telDevices` (Telefoniegeräte) wird zuerst abgefragt; neue Karten-Texte in Deutsch/Englisch/
+  acht neue Admin-Services (inkl. `collect_diagnostics`); Web-Seite `telDevices` (Telefoniegeräte) wird zuerst abgefragt; neue Karten-Texte in Deutsch/Englisch/
   Niederländisch; neue README `README.en.md` und `README.nl.md`. Nicht an
   echter Hardware geprüft, siehe [Neu in Version 1.6.0](#neu-in-version-160).
 
@@ -1711,31 +1728,32 @@ die komplette Datei, z. B. `sha256sum manifest.json`).
 
 | Datei | SHA256 (Version 1.6.0) |
 | --- | --- |
-| `__init__.py` | `175083c221ce117dc56b1ec81787715434ce8752d3294719b0e2d855c0a60238` |
+| `__init__.py` | `db312fb577762bcb4372d2723c2956271fac43b201e0e73ce2ce776138f8420e` |
 | `alarm.py` | `83388a40874baafbe11646aabcbc2916eb6f539a6e34b38c347f649bb2cda01a` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
+| `call_forwarding.py` | `64ccd3a25fbe5256339016884ec4ad80ab1e408369b029b8d9eab6a003d15aa9` |
 | `call_log.py` | `06375eae8516c56b35582eb2b12f7ae09910fc908458d7a90912a45edc19c9d5` |
 | `call_stats.py` | `1f22199430beba85d4856f64da1c092ebe3b27b800d1b5bc47e9d0ac6a41476b` |
 | `config_flow.py` | `05f952f04180995f565d3efd765ee2781948e11b725bc620427d319b820879d4` |
-| `const.py` | `ff1101d0673cf8387356d4bf4a074653868eba56437da13b9824456217416ee7` |
-| `deflection.py` | `3949dfa6993bc5a6d43c17c635784b19c96d5414c70e44088813be37e5d55e98` |
+| `const.py` | `f02111bd8c0ad74171d9aead1f275af858144ef438f09e1228662c2445aba7ae` |
+| `deflection.py` | `3d41277ea2d68fcc428493a14c926cc1b0f1ae3fb8c6b08c8404f7665bb2a3e9` |
 | `http.py` | `4d98f8fb1236eb7960d0d3470f0eef1a0e3a45e48e713fe121faa1481a6b70df` |
-| `sensor.py` | `77de2f6e7e1a085ae3ef12232faefefbfae8e8ab9c14ff13e03ae491d42f11d2` |
-| `settings_data.py` | `325562d167a9724398986bf2663df20c07243558d4c43596639fe5c72e04964b` |
+| `sensor.py` | `c0207946ab76fae2f5071c3d6260f2e056f8bb78edc850a1fa43b13810654832` |
+| `settings_data.py` | `d6ca7cf1a947cbb1ea77291a8bb8f5ef53313980f6a75989f8342afc522b660e` |
 | `spam.py` | `026ae8bc8890be324f074d17f5fce1269d87edbb420566bdfc1aae18cf3eea11` |
 | `switch.py` | `7cdbb0e5d3c5d1c8fa3cc5cad1cba6fa1f666b6c7eb1e034fbed40861b0e73c2` |
 | `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
 | `telephony.py` | `7796cf8c1d6642229f2a42894bd81911236f10b0e30ff34f7ae2e5681606e9ed` |
 | `update_check.py` | `119559a29413fd478bb94053336f6e90e150a3c2737d2966371b7800e4e508c6` |
 | `voicemail.py` | `564dc067bc31355e96e5521884969f228cf27bba73cae7bfb1b6d8ac9633a7f0` |
-| `services.yaml` | `bc3fca98612f5cb52069de8274a0725cda09e9f34e6f80cc81214e2af23d137d` |
-| `www/fritzbox-anrufe-card.js` | `8918777168de0ab3564673d7e4cb4287328ee812cf569e6e85ba756ce2a6b692` |
+| `services.yaml` | `f046d12934a2d82e765de54e3f59543b39812e39330ff3c7e990a3a205afad29` |
+| `www/fritzbox-anrufe-card.js` | `534b7576db15f9e740b637d813c8af1d6de3510a0b3b32955cde59a6e420b143` |
 | `manifest.json` | `b3f4ed0a2a922bdcc2c67699116f1261aba317d463b0011fe9d1f902005223a3` |
-| `strings.json` | `6ef41cb18f96fce6e893cd5142d86f2524d057fdd49123c03125655c1257bd87` |
-| `translations/de.json` | `f68566f21ee5369ab18f14dacd27136b987e22b42ea5d869156b521727379408` |
-| `translations/en.json` | `6ef41cb18f96fce6e893cd5142d86f2524d057fdd49123c03125655c1257bd87` |
-| `translations/nl.json` | `ae7fab14c49f67277199e43ef32c48816777991ac6de61b99cab40cecb2df64c` |
-| `icons.json` | `b1c68f3fb98e25154fec7bb8840dcedeb47832a969eb93c5fe22c8f588931ca3` |
+| `strings.json` | `fe5a76cccf739b06844dd6f95cc5a488c08ca881428a5b7b5c72c0401bf29b5b` |
+| `translations/de.json` | `766ae36e1326b0f5fe1d42889b38b9006bd9fd55110b0e39ebf261f646809bc2` |
+| `translations/en.json` | `fe5a76cccf739b06844dd6f95cc5a488c08ca881428a5b7b5c72c0401bf29b5b` |
+| `translations/nl.json` | `f1f5ad1a7b6b8312369227c74b2e590881f372d7493afdfaa5005f2600773ef2` |
+| `icons.json` | `02d3f66ee5b0422973449b912573166b921745c8cbf05f8e78487227ce82d669` |
 
 Der Ordner `custom_components/fritzbox_anrufe/brand/` enthält die Logo-/
 Icon-Dateien (`icon.png`, `icon@2x.png`, `logo.png`, `logo@2x.png`); diese

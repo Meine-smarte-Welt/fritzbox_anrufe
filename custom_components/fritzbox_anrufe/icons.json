@@ -76,6 +76,15 @@
     },
     "collect_diagnostics": {
       "service": "mdi:clipboard-text-search-outline"
+    },
+    "create_call_forwarding": {
+      "service": "mdi:phone-forward"
+    },
+    "set_call_forwarding_enabled": {
+      "service": "mdi:phone-forward"
+    },
+    "delete_call_forwarding": {
+      "service": "mdi:phone-forward"
     }
   }
 }

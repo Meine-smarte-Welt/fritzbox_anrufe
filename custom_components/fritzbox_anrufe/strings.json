@@ -399,6 +399,76 @@
           "description": "Only needed with several FRITZ!Box entries."
         }
       }
+    },
+    "create_call_forwarding": {
+      "name": "Create call forwarding (experimental)",
+      "description": "Creates a call forwarding rule via the FRITZ!Box web interface and then verifies that it appears in the list. Administrators only.",
+      "fields": {
+        "entry_id": {
+          "name": "Entry",
+          "description": "Only needed with several FRITZ!Box entries."
+        },
+        "mode": {
+          "name": "Which calls",
+          "description": "to = calls to an own number/device, from = calls from a number (empty = anonymous), all = all calls."
+        },
+        "target": {
+          "name": "Own number/device",
+          "description": "Only for mode=to: value from the box, e.g. SIP0, SIP1 or FON1 (see attribute forward_options)."
+        },
+        "from_number": {
+          "name": "Caller number",
+          "description": "Only for mode=from. Leave empty for anonymous calls."
+        },
+        "dest_type": {
+          "name": "Destination type",
+          "description": "number, answering_machine or phone."
+        },
+        "dest": {
+          "name": "Destination",
+          "description": "Phone number (number) or value from forward_options (e.g. 600 for the answering machine, 610 for a handset)."
+        },
+        "own_number": {
+          "name": "Via own number",
+          "description": "Value from forward_options; default * = automatic."
+        },
+        "kind": {
+          "name": "Kind of forwarding",
+          "description": "e.g. NOW, DELAY, BUSY, PARALLEL (only for mode=to; default NOW)."
+        }
+      }
+    },
+    "set_call_forwarding_enabled": {
+      "name": "Switch call forwarding on/off (web interface)",
+      "description": "Switches a call forwarding rule from the web interface list on or off. Administrators only.",
+      "fields": {
+        "entry_id": {
+          "name": "Entry",
+          "description": "Only needed with several FRITZ!Box entries."
+        },
+        "uid": {
+          "name": "ID",
+          "description": "ID from the 'forwardings' attribute."
+        },
+        "enabled": {
+          "name": "Active",
+          "description": "On or off."
+        }
+      }
+    },
+    "delete_call_forwarding": {
+      "name": "Delete call forwarding",
+      "description": "Deletes a call forwarding rule on the FRITZ!Box (cannot be undone). Administrators only.",
+      "fields": {
+        "entry_id": {
+          "name": "Entry",
+          "description": "Only needed with several FRITZ!Box entries."
+        },
+        "uid": {
+          "name": "ID",
+          "description": "ID from the 'forwardings' attribute."
+        }
+      }
     }
   }
 }
