@@ -250,6 +250,14 @@
         "count": "Aantal oproepen",
         "days": "Aantal dagen"
       }
+    },
+    "nc_types": {
+      "options": {
+        "connection_lost": "Verbinding met de FRITZ!Box verloren",
+        "missed_call": "Gemiste oproep",
+        "new_voicemail": "Nieuw bericht op het antwoordapparaat",
+        "update_available": "Update voor FRITZ!Box Oproepen beschikbaar"
+      }
     }
   },
   "options": {
@@ -261,7 +269,8 @@
         "title": "FRITZ!Box Anrufe configureren",
         "menu_options": {
           "general_settings": "Basisinstellingen",
-          "manage_tams": "Antwoordapparaten beheren"
+          "manage_tams": "Antwoordapparaten beheren",
+          "notification_center": "Notification Center"
         },
         "description": "Geïnstalleerde versie: {version}\n{update_info}"
       },
@@ -299,6 +308,14 @@
           "add_tam": "Nog een antwoordapparaat toevoegen",
           "remove_tam": "Antwoordapparaat verwijderen",
           "tams_done": "Klaar"
+        }
+      },
+      "notification_center": {
+        "title": "Notification Center",
+        "description": "Stuurt meldingen naar de optionele integratie Notification Center. Zonder die integratie wordt niets verstuurd en gaat niets stuk. De meldingen zijn gesorteerd op urgentie.",
+        "data": {
+          "nc_enabled": "Meldingen naar het Notification Center sturen",
+          "nc_types": "Te versturen meldingstypen"
         }
       }
     }
@@ -467,6 +484,38 @@
         "uid": {
           "name": "ID",
           "description": "ID uit het attribuut 'forwardings'."
+        }
+      }
+    },
+    "set_notification_center": {
+      "name": "Notification Center aan/uit",
+      "description": "Schakelt het versturen van meldingen naar het Notification Center in of uit. Alleen voor beheerders.",
+      "fields": {
+        "entry_id": {
+          "name": "Item",
+          "description": "Alleen nodig bij meerdere FRITZ!Box-items."
+        },
+        "enabled": {
+          "name": "Meldingen sturen",
+          "description": "Meldingen naar het Notification Center sturen."
+        }
+      }
+    },
+    "set_notification_type": {
+      "name": "Meldingstype aan/uit",
+      "description": "Schakelt één meldingstype voor het Notification Center in of uit. Alleen voor beheerders.",
+      "fields": {
+        "entry_id": {
+          "name": "Item",
+          "description": "Alleen nodig bij meerdere FRITZ!Box-items."
+        },
+        "nc_type": {
+          "name": "Meldingstype",
+          "description": "Het te schakelen meldingstype."
+        },
+        "enabled": {
+          "name": "Versturen",
+          "description": "Dit meldingstype versturen."
         }
       }
     }

@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): db312fb577762bcb4372d2723c2956271fac43b201e0e73ce2ce776138f8420e
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 75e7a86719935258d2db5076821e287e5285f65124b048fec3370aed9c72c029
 """The fritzbox_anrufe integration."""
 
 from dataclasses import dataclass, field
@@ -32,6 +32,7 @@ from .base import FritzBoxPhonebook
 from .call_forwarding import ForwardingError
 from .deflection import DeflectionError
 from .call_log import FritzCallLogCoordinator
+from .notifications import NC_TYPE_IDS, FritzNotifications
 from .settings_data import FritzSettingsCoordinator
 from .update_check import UpdateChecker
 from .const import (
@@ -56,6 +57,8 @@ from .const import (
     SERVICE_SET_ALARM_CLOCK,
     SERVICE_SET_ALARM_CLOCK_ENABLED,
     SERVICE_SET_DEFLECTION_ENABLED,
+    SERVICE_SET_NC_ENABLED,
+    SERVICE_SET_NC_TYPE,
     SETTINGS_SENSOR_KEY,
     SWITCH_TRANSLATION_KEYS_VOICEMAIL,
     TAM_MEDIA_URL_BASES,
@@ -430,6 +433,18 @@ def _async_register_services(hass: HomeAssistant) -> None:
         if runtime.settings_coordinator is not None:
             await runtime.settings_coordinator.async_request_refresh()
 
+    def _notifications(call: ServiceCall) -> FritzNotifications:
+        runtime = _resolve_runtime(hass, call)
+        if runtime.notifications is None:
+            raise HomeAssistantError("Die Notification-Center-Anbindung ist nicht verfügbar.")
+        return runtime.notifications
+
+    async def _nc_enabled(call: ServiceCall) -> None:
+        _notifications(call).async_set_master(call.data[_ATTR_ENABLED])
+
+    async def _nc_type(call: ServiceCall) -> None:
+        _notifications(call).async_set_type(call.data["nc_type"], call.data[_ATTR_ENABLED])
+
     async def _collect_diagnostics(call: ServiceCall) -> dict:
         settings = _settings(_resolve_runtime(hass, call))
         return await settings.async_collect_diagnostics()
@@ -506,6 +521,26 @@ def _async_register_services(hass: HomeAssistant) -> None:
         ),
     )
     async_register_admin_service(
+        hass,
+        DOMAIN,
+        SERVICE_SET_NC_ENABLED,
+        _nc_enabled,
+        vol.Schema({**entry_id, vol.Required(_ATTR_ENABLED): cv.boolean}),
+    )
+    async_register_admin_service(
+        hass,
+        DOMAIN,
+        SERVICE_SET_NC_TYPE,
+        _nc_type,
+        vol.Schema(
+            {
+                **entry_id,
+                vol.Required("nc_type"): vol.In(NC_TYPE_IDS),
+                vol.Required(_ATTR_ENABLED): cv.boolean,
+            }
+        ),
+    )
+    async_register_admin_service(
         hass, DOMAIN, SERVICE_CHECK_FOR_UPDATE, _check_update, vol.Schema({**entry_id})
     )
     async_register_admin_service(
@@ -541,6 +576,8 @@ class FritzBoxRuntimeData:
     settings_coordinator: FritzSettingsCoordinator | None = None
     # Versionsprüfung gegen GitHub (seit v1.6.0), geteilt mit dem Settings-Coordinator.
     update_checker: UpdateChecker | None = None
+    # Anbindung an das optionale Notification Center (seit v1.6.1).
+    notifications: FritzNotifications | None = None
 
 
 type FritzBoxCallMonitorConfigEntry = ConfigEntry[FritzBoxRuntimeData]
@@ -647,15 +684,22 @@ async def async_setup_entry(
     unique_id = f"{config_entry.data[SERIAL_NUMBER]}-{config_entry.data[CONF_PHONEBOOK]}"
     _async_reserve_entity_ids(hass, config_entry, unique_id, tam_count=tam_count)
 
+    notifications = FritzNotifications(
+        hass, config_entry, call_log_coordinator, settings_coordinator
+    )
+
     config_entry.runtime_data = FritzBoxRuntimeData(
         phonebook=fritzbox_phonebook,
         call_log_coordinator=call_log_coordinator,
         tam_coordinators=tam_coordinators,
         settings_coordinator=settings_coordinator,
         update_checker=update_checker,
+        notifications=notifications,
     )
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
     _async_register_services(hass)
+    # Erst nach dem ersten Datenabruf und dem Laden der Plattformen anmelden.
+    notifications.async_start()
 
     return True
 

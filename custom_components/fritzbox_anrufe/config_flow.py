@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 05f952f04180995f565d3efd765ee2781948e11b725bc620427d319b820879d4
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 8ac23232ffa3d6150e381308ce0a45d86e8c5fa45681db10e2df9fcc73cc86a6
 """Config flow for fritzbox_anrufe."""
 
 from __future__ import annotations
@@ -24,6 +24,8 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .base import FritzBoxPhonebook
+from .notification_bridge import OPT_ENABLED, OPT_TYPES
+from .notifications import NC_CATALOG, NC_TYPE_IDS
 from .const import (
     CALL_LOG_COUNT_PRESETS,
     CALL_LOG_LIMIT_COUNT,
@@ -651,7 +653,7 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
         """Show the top-level menu: Grundeinstellungen vs. Anrufbeantworter verwalten."""
         return self.async_show_menu(
             step_id="init",
-            menu_options=["general_settings", "manage_tams"],
+            menu_options=["general_settings", "manage_tams", "notification_center"],
             description_placeholders=self._version_placeholders(),
         )
 
@@ -700,6 +702,42 @@ class FritzBoxCallMonitorOptionsFlowHandler(OptionsFlowWithReload):
                 CONF_SPAM_NUMBERS: self._get_list_of_prefixes(spam_numbers_input) or [],
                 CONF_SPAM_NAME_PREFIXES: self._get_list_of_prefixes(spam_name_input) or [],
                 **_parse_history_input(user_input),
+            },
+        )
+
+    async def async_step_notification_center(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Notification Center: Hauptschalter und Meldungsarten (seit v1.6.1)."""
+        options = self.config_entry.options
+        chosen = options.get(OPT_TYPES, {})
+        severity_order = {"critical": 0, "warning": 1, "info": 2, "ok": 3}
+        ordered = sorted(NC_CATALOG, key=lambda item: severity_order[item["severity"]])
+        enabled_now = [
+            item["type"] for item in ordered if chosen.get(item["type"], item["enabled_default"])
+        ]
+        if user_input is None:
+            schema = vol.Schema(
+                {
+                    vol.Required(OPT_ENABLED, default=options.get(OPT_ENABLED, True)): selector.BooleanSelector(),
+                    vol.Required(OPT_TYPES, default=enabled_now): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[item["type"] for item in ordered],
+                            multiple=True,
+                            translation_key="nc_types",
+                            mode=selector.SelectSelectorMode.LIST,
+                        )
+                    ),
+                }
+            )
+            return self.async_show_form(step_id="notification_center", data_schema=schema)
+        picked = set(user_input.get(OPT_TYPES) or [])
+        return self.async_create_entry(
+            title="",
+            data={
+                **options,
+                OPT_ENABLED: bool(user_input.get(OPT_ENABLED, True)),
+                OPT_TYPES: {type_id: type_id in picked for type_id in NC_TYPE_IDS},
             },
         )
 

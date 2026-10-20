@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 119559a29413fd478bb94053336f6e90e150a3c2737d2966371b7800e4e508c6
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 00ba17b9ebc578835bbad6ae119b23385377b92e956a28b8e98cfa49621e9461
 """Versionsabfrage gegen GitHub (neu in v1.6.0).
 
 Fragt beim ersten Aufruf und danach höchstens alle 12 Stunden
@@ -25,13 +25,29 @@ _LOGGER = logging.getLogger(__name__)
 
 CHECK_INTERVAL = timedelta(hours=12)
 _API = "https://api.github.com/repos/{repo}"
-_VERSION_RE = re.compile(r"^v?(\d+(?:\.\d+)*)")
+_VERSION_RE = re.compile(r"^v?(\d+(?:\.\d+)*)(?:(a|b|rc)(\d+))?")
+_STAGE = {"a": 0, "b": 1, "rc": 2}
 
 
 def version_tuple(text: str | None) -> tuple[int, ...]:
-    """``"v1.6.0"`` → ``(1, 6, 0)``; unlesbar → ``()``."""
+    """``"v1.6.1"`` → ``(1, 6, 1, 3, 0)``; unlesbar → ``()``.
+
+    Beta/Release-Candidate (``1.0.0b1``, ``1.0.0rc1``) sortieren vor dem
+    fertigen Release (seit v1.6.1).
+    """
     match = _VERSION_RE.match((text or "").strip())
-    return tuple(int(part) for part in match.group(1).split(".")) if match else ()
+    if not match:
+        return ()
+    numbers = [int(part) for part in match.group(1).split(".")]
+    numbers = (numbers + [0, 0, 0])[: max(3, len(numbers))]
+    stage = (_STAGE[match.group(2)], int(match.group(3))) if match.group(2) else (3, 0)
+    return (*numbers, *stage)
+
+
+def is_prerelease_version(text: str | None) -> bool:
+    """True bei Versionen mit Beta-/RC-Kennung (z. B. ``1.0.0b1``)."""
+    match = _VERSION_RE.match((text or "").strip())
+    return bool(match and match.group(2))
 
 
 def is_newer(latest: str | None, current: str | None) -> bool:
@@ -87,6 +103,12 @@ class UpdateChecker:
                     data = await response.json()
                     latest = str(data.get("tag_name") or "") or None
                     url = data.get("html_url")
+                    if is_prerelease_version(VERSION):
+                        # ``releases/latest`` liefert keine Pre-releases: wer selbst eine
+                        # Beta/RC nutzt, bekommt zusätzlich die Liste der letzten Releases.
+                        pre_latest, pre_url = await self._async_latest_release(session, base, headers)
+                        if pre_latest and version_tuple(pre_latest) > version_tuple(latest):
+                            latest, url = pre_latest, pre_url
                 elif response.status == 404:
                     latest, url = await self._async_latest_tag(session, base, headers)
                 else:
@@ -103,6 +125,21 @@ class UpdateChecker:
                 "check_failed": failed or latest is None,
             }
         )
+
+    @staticmethod
+    async def _async_latest_release(session, base: str, headers: dict[str, str]):
+        """Höchstes Release der letzten fünf (auch Pre-releases, keine Entwürfe)."""
+        async with session.get(
+            f"{base}/releases?per_page=5", headers=headers, timeout=aiohttp.ClientTimeout(total=15)
+        ) as response:
+            if response.status != 200:
+                return None, None
+            releases = [r for r in await response.json() if not r.get("draft")]
+        releases = [r for r in releases if version_tuple(str(r.get("tag_name", "")))]
+        if not releases:
+            return None, None
+        best = max(releases, key=lambda r: version_tuple(str(r["tag_name"])))
+        return str(best["tag_name"]), best.get("html_url")
 
     @staticmethod
     async def _async_latest_tag(session, base: str, headers: dict[str, str]):

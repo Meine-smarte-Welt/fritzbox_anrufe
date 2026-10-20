@@ -250,6 +250,14 @@
         "count": "Number of calls",
         "days": "Number of days"
       }
+    },
+    "nc_types": {
+      "options": {
+        "connection_lost": "Connection to the FRITZ!Box lost",
+        "missed_call": "Missed call",
+        "new_voicemail": "New answering machine message",
+        "update_available": "Update for FRITZ!Box Calls available"
+      }
     }
   },
   "options": {
@@ -261,7 +269,8 @@
         "title": "Configure FRITZ!Box Anrufe",
         "menu_options": {
           "general_settings": "General settings",
-          "manage_tams": "Manage answering machines"
+          "manage_tams": "Manage answering machines",
+          "notification_center": "Notification Center"
         },
         "description": "Installed version: {version}\n{update_info}"
       },
@@ -299,6 +308,14 @@
           "add_tam": "Add another answering machine",
           "remove_tam": "Remove an answering machine",
           "tams_done": "Done"
+        }
+      },
+      "notification_center": {
+        "title": "Notification Center",
+        "description": "Sends messages to the optional Notification Center integration. Without it, nothing is sent and nothing breaks. Messages are sorted by urgency.",
+        "data": {
+          "nc_enabled": "Send messages to the Notification Center",
+          "nc_types": "Message types to send"
         }
       }
     }
@@ -467,6 +484,38 @@
         "uid": {
           "name": "ID",
           "description": "ID from the 'forwardings' attribute."
+        }
+      }
+    },
+    "set_notification_center": {
+      "name": "Switch Notification Center on/off",
+      "description": "Switches sending of messages to the Notification Center on or off. Administrators only.",
+      "fields": {
+        "entry_id": {
+          "name": "Entry",
+          "description": "Only needed with several FRITZ!Box entries."
+        },
+        "enabled": {
+          "name": "Send messages",
+          "description": "Send messages to the Notification Center."
+        }
+      }
+    },
+    "set_notification_type": {
+      "name": "Switch message type on/off",
+      "description": "Switches one message type for the Notification Center on or off. Administrators only.",
+      "fields": {
+        "entry_id": {
+          "name": "Entry",
+          "description": "Only needed with several FRITZ!Box entries."
+        },
+        "nc_type": {
+          "name": "Message type",
+          "description": "Message type to switch."
+        },
+        "enabled": {
+          "name": "Send",
+          "description": "Send this message type."
         }
       }
     }

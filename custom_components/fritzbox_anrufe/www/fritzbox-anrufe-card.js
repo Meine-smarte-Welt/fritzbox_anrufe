@@ -1,4 +1,4 @@
-// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 534b7576db15f9e740b637d813c8af1d6de3510a0b3b32955cde59a6e420b143
+// SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): b65125ded927ca5177afffeae7ffe9fe40742cea7296afc889b7addfd4034e00
 /**
  * fritzbox-anrufe-card
  * ---------------------
@@ -787,7 +787,7 @@ function escapeHtml(value) {
 // v1.6.0 existierten (Anrufliste, Anrufbeantworter, Telefoniegeräte), sind noch
 // deutsch hartkodiert und werden schrittweise umgestellt - siehe README
 // "Bekannte Einschränkungen".
-const CARD_VERSION = "1.6.0";
+const CARD_VERSION = "1.6.1";
 
 const I18N = {
   de: {
@@ -856,6 +856,20 @@ const I18N = {
     day_sat: "Sa",
     day_sun: "So",
     acc_deflections: "Rufumleitung",
+    nc_acc: "Notification Center",
+    nc_found: "Notification Center: erkannt",
+    nc_missing: "Notification Center: nicht installiert",
+    nc_hint: "Meldungen werden gesendet, sobald das Notification Center installiert ist.",
+    nc_master: "Meldungen an das Notification Center senden",
+    nc_on: "An",
+    nc_off: "Aus",
+    nc_note: "Nach Dringlichkeit sortiert. Ausgeschaltete Meldungsarten werden nicht gesendet.",
+    nc_saved: "Gespeichert.",
+    nc_sev_critical: "Kritisch",
+    nc_sev_warning: "Warnung",
+    nc_sev_info: "Info",
+    nc_sev_ok: "OK",
+    nc_ro: "Nur Anzeige (read_only).",
     defl_none: "Die FRITZ!Box meldet keine Rufumleitungen.",
     defl_confirm_on: "Wirklich einschalten?",
     defl_confirm_off: "Wirklich ausschalten?",
@@ -964,6 +978,20 @@ const I18N = {
     day_sat: "Sat",
     day_sun: "Sun",
     acc_deflections: "Call forwarding",
+    nc_acc: "Notification Center",
+    nc_found: "Notification Center: detected",
+    nc_missing: "Notification Center: not installed",
+    nc_hint: "Messages will be sent as soon as the Notification Center is installed.",
+    nc_master: "Send messages to the Notification Center",
+    nc_on: "On",
+    nc_off: "Off",
+    nc_note: "Sorted by urgency. Switched-off message types are not sent.",
+    nc_saved: "Saved.",
+    nc_sev_critical: "Critical",
+    nc_sev_warning: "Warning",
+    nc_sev_info: "Info",
+    nc_sev_ok: "OK",
+    nc_ro: "Display only (read_only).",
     defl_none: "The FRITZ!Box reports no call forwarding rules.",
     defl_confirm_on: "Really switch on?",
     defl_confirm_off: "Really switch off?",
@@ -1072,6 +1100,20 @@ const I18N = {
     day_sat: "Za",
     day_sun: "Zo",
     acc_deflections: "Oproepdoorschakeling",
+    nc_acc: "Notification Center",
+    nc_found: "Notification Center: gevonden",
+    nc_missing: "Notification Center: niet geïnstalleerd",
+    nc_hint: "Meldingen worden verstuurd zodra het Notification Center is geïnstalleerd.",
+    nc_master: "Meldingen naar het Notification Center sturen",
+    nc_on: "Aan",
+    nc_off: "Uit",
+    nc_note: "Gesorteerd op urgentie. Uitgeschakelde meldingstypen worden niet verstuurd.",
+    nc_saved: "Opgeslagen.",
+    nc_sev_critical: "Kritiek",
+    nc_sev_warning: "Waarschuwing",
+    nc_sev_info: "Info",
+    nc_sev_ok: "OK",
+    nc_ro: "Alleen weergave (read_only).",
     defl_none: "De FRITZ!Box meldt geen doorschakelregels.",
     defl_confirm_on: "Echt inschakelen?",
     defl_confirm_off: "Echt uitschakelen?",
@@ -1276,6 +1318,10 @@ const BASE_CARD_STYLES = `
   .settings-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .settings-row-meta { color: var(--secondary-text-color, #727272); font-size: 0.9em; }
   .settings-more { padding: 6px 0; color: var(--secondary-text-color, #727272); font-size: 0.9em; }
+  .nc-line .label { display: flex; align-items: center; gap: 8px; }
+  .nc-line .label ha-icon { --mdc-icon-size: 18px; flex: none; }
+  .nc-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .nc-line.nc-off { opacity: 0.55; }
   .settings-note {
     margin-top: 8px;
     font-size: 0.82em;
@@ -2594,6 +2640,7 @@ class FritzboxAnrufeCard extends HTMLElement {
       cfg.show_settings_numbers !== false ? this._renderSettingsNumbers(attrs) : "",
       cfg.show_settings_alarms !== false ? this._renderSettingsAlarms(attrs) : "",
       cfg.show_settings_deflections !== false ? this._renderSettingsDeflections(attrs) : "",
+      this._renderSettingsNotifications(attrs.nc),
     ].join("");
   }
 
@@ -2637,6 +2684,53 @@ class FritzboxAnrufeCard extends HTMLElement {
       update || mismatch ? "update" : "",
       true
     );
+  }
+
+  // Notification Center (seit v1.6.1): Hauptschalter und Meldungsarten, nach
+  // Dringlichkeit sortiert. Ohne Sensor-Attribut "nc" (ältere Integration) entfällt der Bereich.
+  _renderSettingsNotifications(nc) {
+    if (!nc || typeof nc !== "object") return "";
+    const readOnly = this._config.read_only === true;
+    const lang = String((this._hass && this._hass.language) || "en").split("-")[0];
+    const types = Array.isArray(nc.types) ? nc.types : [];
+    const sevColor = { critical: "error", warning: "warning", info: "info", ok: "success" };
+    const sevOrder = { critical: 0, warning: 1, info: 2, ok: 3 };
+    const sorted = [...types].sort((a, b) => (sevOrder[a.severity] ?? 9) - (sevOrder[b.severity] ?? 9));
+    const masterOn = nc.enabled !== false;
+    const switchHtml = (on, attrs, disabled) =>
+      readOnly
+        ? `<span class="value">${escapeHtml(this._t(on ? "nc_on" : "nc_off"))}</span>`
+        : `<button class="btn small${on ? " primary" : ""}" ${attrs}${disabled ? " disabled" : ""}>${escapeHtml(
+            this._t(on ? "nc_on" : "nc_off")
+          )}</button>`;
+    const rows = sorted
+      .map((t) => {
+        const labels = t.labels || {};
+        const label = labels[lang] || labels.en || t.type;
+        const color = sevColor[t.severity] || "info";
+        const sev = this._t("nc_sev_" + (sevColor[t.severity] ? t.severity : "info"));
+        return `<div class="settings-line nc-line${masterOn ? "" : " nc-off"}" data-nc-row="${escapeHtml(t.type)}">
+          <span class="label"><span class="nc-dot" style="background:var(--fba-color-${color}, var(--${color}-color, #039be5))" title="${escapeHtml(sev)}"></span>${
+            t.icon ? `<ha-icon icon="${escapeHtml(t.icon)}"></ha-icon>` : ""
+          }${escapeHtml(label)}</span>
+          ${switchHtml(t.enabled === true, `data-nc-type="${escapeHtml(t.type)}" data-enabled="${t.enabled ? "1" : "0"}"`, !masterOn)}
+        </div>`;
+      })
+      .join("");
+    const body = `
+      ${this._line(
+        this._t(nc.available ? "nc_found" : "nc_missing"),
+        nc.available ? '<span class="ok">✓</span>' : "–"
+      )}
+      ${nc.available ? "" : `<div class="settings-note">${escapeHtml(this._t("nc_hint"))}</div>`}
+      <div class="settings-line">
+        <span class="label">${escapeHtml(this._t("nc_master"))}</span>
+        ${switchHtml(masterOn, 'data-nc-master="1" data-enabled="' + (masterOn ? "1" : "0") + '"', false)}
+      </div>
+      ${rows}
+      <div class="settings-note">${escapeHtml(this._t("nc_note"))}${readOnly ? " " + escapeHtml(this._t("nc_ro")) : ""}</div>
+    `;
+    return this._accordion("nc", "mdi:bell-badge-outline", this._t("nc_acc"), "", body, "", false);
   }
 
   _renderSettingsNumbers(attrs) {
@@ -3059,6 +3153,27 @@ class FritzboxAnrufeCard extends HTMLElement {
       btn.addEventListener("click", async () => {
         btn.disabled = true;
         await this._adminService("check_for_update", {}, "toast_update_checked");
+        btn.disabled = false;
+      });
+    });
+    // Notification Center (seit v1.6.1): Hauptschalter und Meldungsarten.
+    root.querySelectorAll("[data-nc-master]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        await this._adminService("set_notification_center", { enabled: btn.dataset.enabled !== "1" }, "nc_saved");
+        this._lastSignature = null;
+        btn.disabled = false;
+      });
+    });
+    root.querySelectorAll("[data-nc-type]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        await this._adminService(
+          "set_notification_type",
+          { nc_type: btn.dataset.ncType, enabled: btn.dataset.enabled !== "1" },
+          "nc_saved"
+        );
+        this._lastSignature = null;
         btn.disabled = false;
       });
     });

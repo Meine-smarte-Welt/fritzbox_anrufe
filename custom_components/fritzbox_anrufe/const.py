@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): f02111bd8c0ad74171d9aead1f275af858144ef438f09e1228662c2445aba7ae
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 5e77e3fceb364fdbf519bc939557a5de49516ba59ec668ebceab74b63bd3a53d
 """Constants for the AVM Fritz!Box call monitor integration."""
 
 from collections.abc import Mapping
@@ -44,7 +44,7 @@ DOMAIN: Final = "fritzbox_anrufe"
 # Version dieser Integration (seit v1.6.0 hier zentral; manifest.json und
 # CARD_VERSION in der Karte werden beim Release identisch gesetzt) und
 # GitHub-Repository für die Versionsprüfung (update_check.py).
-VERSION: Final = "1.6.0"
+VERSION: Final = "1.6.1"
 GITHUB_REPO: Final = "Meine-smarte-Welt/fritzbox_anrufe"
 GITHUB_RELEASES_URL: Final = f"https://github.com/{GITHUB_REPO}/releases"
 MANUFACTURER: Final = "FRITZ!"
@@ -377,3 +377,6 @@ SERVICE_COLLECT_DIAGNOSTICS = "collect_diagnostics"
 SERVICE_CREATE_CALL_FORWARDING = "create_call_forwarding"
 SERVICE_SET_CALL_FORWARDING_ENABLED = "set_call_forwarding_enabled"
 SERVICE_DELETE_CALL_FORWARDING = "delete_call_forwarding"
+# Notification Center (seit v1.6.1)
+SERVICE_SET_NC_ENABLED = "set_notification_center"
+SERVICE_SET_NC_TYPE = "set_notification_type"

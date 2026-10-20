@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): c0207946ab76fae2f5071c3d6260f2e056f8bb78edc850a1fa43b13810654832
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 2e048f7708b1d98c204cc84509e34dcd3c66b2e2bd20b4e412eb09c2d9eb8fc9
 """Sensor to monitor incoming/outgoing phone calls on a Fritz!Box router."""
 
 from collections.abc import Mapping
@@ -397,6 +397,20 @@ class FritzBoxCallSensor(SensorEntity):
         self.hass.loop.call_soon_threadsafe(
             self.hass.bus.async_fire, EVENT_MISSED_CALL, data
         )
+        # Optional: Notification Center (seit v1.6.1), im Event-Loop.
+        self.hass.loop.call_soon_threadsafe(self._notify_missed_call, data)
+
+    @callback
+    def _notify_missed_call(self, data: dict[str, Any]) -> None:
+        """Verpassten Anruf ans Notification Center melden (Fehler stören nie)."""
+        entry = self.hass.config_entries.async_get_entry(self._config_entry_id)
+        notifications = getattr(getattr(entry, "runtime_data", None), "notifications", None)
+        if notifications is None:
+            return
+        try:
+            notifications.async_missed_call(data)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Meldung ans Notification Center fehlgeschlagen")
 
     def set_attributes(self, attributes: Mapping[str, str | bool]) -> None:
         """Set the state attributes."""
@@ -690,7 +704,14 @@ class FritzBoxSettingsSensor(CoordinatorEntity[FritzSettingsCoordinator], Sensor
             "forwardings": data.get("forwardings"),
             "forward_options": data.get("forward_options"),
             "app": data.get("app", {}),
+            # Neu in v1.6.1: Notification Center (Katalog + Schalterstand).
+            "nc": self._nc_snapshot(),
         }
+
+    def _nc_snapshot(self) -> dict[str, Any] | None:
+        entry = getattr(self.coordinator, "config_entry", None)
+        notifications = getattr(getattr(entry, "runtime_data", None), "notifications", None)
+        return notifications.snapshot() if notifications is not None else None
 
 
 class _VoicemailAggregateBase(SensorEntity):

@@ -20,6 +20,7 @@ mitgelieferte Dashboard-Karte.
 - [Anrufbeantworter Ein/Aus-Schalter](#anrufbeantworter-einaus-schalter-seit-version-110-experimentell)
 - [Einstellungen (Optionen)](#einstellungen-optionen)
 - [Neu in 1.6.0](#neu-in-version-160)
+- [Neu in 1.6.1](#neu-in-version-161)
 - [Dashboard-Karte](#dashboard-karte)
 - [Icon](#icon)
 - [Bekannte Einschränkungen](#bekannte-einschränkungen)
@@ -646,6 +647,56 @@ ggf. schwärzen. Fehler beim Lesen stehen außerdem als Warnung im Log.
 gibt es in Deutsch, Englisch und Niederländisch (nach `hass.language`); ältere
 Texte (Anrufliste, Anrufbeantworter, Telefoniegeräte) sind noch deutsch.
 
+## Neu in Version 1.6.1
+
+**Pre-release.** Version 1.6.1 ist als *Pre-release* auf GitHub markiert. In HACS
+erscheint sie nur, wenn du bei dieser Integration „Beta-Versionen anzeigen“
+aktivierst.
+
+**Teststand vorab, ehrlich:** Die Anbindung ist gegen einen *simulierten*
+Event-Bus getestet (23 automatische Tests) und die Karte mit Testdaten in einem
+simulierten Browser geprüft. **Nicht gegen ein echtes Notification Center und
+nicht an echter FRITZ!Box-Hardware geprüft.** Rückmeldungen sind ausdrücklich
+erwünscht.
+
+### Notification Center (optional)
+
+Die Integration kann ihre Meldungen an das **Notification Center** schicken, eine
+separate, optionale Integration, die Meldungen mehrerer Integrationen sammelt,
+nach Dringlichkeit sortiert und zustellt. Die Integration *meldet* nur; sie
+läuft vollständig ohne das Notification Center weiter (kein Fehler, kein
+Log-Spam). Der Transport ist der Home-Assistant-Event-Bus (kein MQTT, Schnittstelle
+„Schema 1“). Die bisherigen Ereignisse (`fritzbox_anrufe_missed_call`,
+`fritzbox_anrufe_new_voicemail_message`) bleiben unverändert.
+
+| Meldungsart | Dringlichkeit | Wann |
+| --- | --- | --- |
+| `connection_lost` | Warnung | Anrufliste **und** Einstellungen sind nicht abrufbar; schließt sich bei Wiederherstellung |
+| `missed_call` | Info | Verpasster Anruf (Live-Callmonitor), einmalig |
+| `new_voicemail` | Info | Neue Nachricht auf einem Anrufbeantworter, einmalig |
+| `update_available` | Info | Neuere Version dieser Integration auf GitHub; schließt sich nach dem Update |
+
+Rufnummern und Namen stehen nur als Platzhalter in den Meldungen und werden
+nie ins Log geschrieben. Beim Start werden vorhandene Zustände nur als
+Ausgangszustand gemeldet (ohne Push). Die Texte liegen in Deutsch, Englisch,
+Niederländisch, Französisch und Spanisch vor; das Notification Center wählt die Sprache.
+
+**Schalter:** Karte → Zahnrad → „Notification Center“ (Hauptschalter und ein
+Schalter je Meldungsart, nach Dringlichkeit sortiert) oder *Einstellungen → Geräte & Dienste →
+FRITZ!Box Anrufe → Konfigurieren → Notification Center*. Ausgeschaltete
+Meldungsarten werden nicht gesendet. Mit `read_only: true` in der Karten-
+Konfiguration blendet die Karte die Schalter dieses Bereichs aus und zeigt nur den Stand.
+
+| Service | Zweck |
+| --- | --- |
+| `fritzbox_anrufe.set_notification_center` | Hauptschalter (`enabled`) |
+| `fritzbox_anrufe.set_notification_type` | Meldungsart schalten (`nc_type`, `enabled`) |
+
+Beide nur für Administratoren, bei mehreren FRITZ!Boxen optional `entry_id`.
+
+Außerdem: Die Versionsprüfung kennt jetzt Beta-/RC-Kennungen (`1.0.0b1`,
+`1.0.0rc1`) und berücksichtigt bei einer installierten Beta/RC auch Pre-releases.
+
 ## Dashboard-Karte
 
 ### Variante 1: mitgelieferte Custom Card (empfohlen)
@@ -1143,6 +1194,9 @@ die dortigen Maintainer den Fehler beheben.
 
 ## Bekannte Einschränkungen
 
+- **Neu in 1.6.1 (Pre-release):** Die Notification-Center-Anbindung wurde nur
+  gegen einen simulierten Event-Bus getestet, nicht gegen ein echtes
+  Notification Center. `read_only` wirkt bisher nur auf diesen Bereich der Karte.
 - **Neu in 1.6.0, nicht an echter Hardware geprüft:** Rufnummern, Weckruf,
   Rufumleitung, Statistik und Versionsprüfung wurden nur gegen eine
   simulierte FRITZ!Box getestet. Weckruf-Uhrzeit/-Wochentage schreiben über die
@@ -1342,6 +1396,13 @@ die dortigen Maintainer den Fehler beheben.
   Bitte mit dem Ergebnis eines eigenen Tests als GitHub-Issue melden.
 
 ## Versionshistorie
+
+- **1.6.1** (Pre-release): Anbindung an das optionale Notification Center (Meldungsarten
+  verpasster Anruf, neue Anrufbeantworter-Nachricht, Verbindung verloren,
+  Update verfügbar; Hauptschalter und Schalter je Meldungsart in Karte und
+  Optionen; zwei neue Admin-Services); Versionsprüfung kennt Beta/RC.
+  Nicht gegen ein echtes Notification Center geprüft, siehe
+  [Neu in Version 1.6.1](#neu-in-version-161).
 
 - **1.6.0**: Interne und externe Rufnummern im Einstellungen-Tab; Weckruf
   anzeigen, ein-/ausschalten und experimentell ändern; Rufumleitungen
@@ -1726,33 +1787,35 @@ unterstützen technisch keine Kommentare und bleiben deshalb unverändert -
 ihre Hashes stehen stattdessen in der Tabelle unten (dort ganz normal über
 die komplette Datei, z. B. `sha256sum manifest.json`).
 
-| Datei | SHA256 (Version 1.6.0) |
+| Datei | SHA256 (Version 1.6.1) |
 | --- | --- |
-| `__init__.py` | `db312fb577762bcb4372d2723c2956271fac43b201e0e73ce2ce776138f8420e` |
+| `__init__.py` | `75e7a86719935258d2db5076821e287e5285f65124b048fec3370aed9c72c029` |
 | `alarm.py` | `83388a40874baafbe11646aabcbc2916eb6f539a6e34b38c347f649bb2cda01a` |
 | `base.py` | `8b263a8dd288006c4461a00b5d120548f1b1f7add1e3b7c9faa5f9fc1cd45986` |
 | `call_forwarding.py` | `64ccd3a25fbe5256339016884ec4ad80ab1e408369b029b8d9eab6a003d15aa9` |
 | `call_log.py` | `06375eae8516c56b35582eb2b12f7ae09910fc908458d7a90912a45edc19c9d5` |
 | `call_stats.py` | `1f22199430beba85d4856f64da1c092ebe3b27b800d1b5bc47e9d0ac6a41476b` |
-| `config_flow.py` | `05f952f04180995f565d3efd765ee2781948e11b725bc620427d319b820879d4` |
-| `const.py` | `f02111bd8c0ad74171d9aead1f275af858144ef438f09e1228662c2445aba7ae` |
+| `config_flow.py` | `8ac23232ffa3d6150e381308ce0a45d86e8c5fa45681db10e2df9fcc73cc86a6` |
+| `const.py` | `5e77e3fceb364fdbf519bc939557a5de49516ba59ec668ebceab74b63bd3a53d` |
 | `deflection.py` | `3d41277ea2d68fcc428493a14c926cc1b0f1ae3fb8c6b08c8404f7665bb2a3e9` |
 | `http.py` | `4d98f8fb1236eb7960d0d3470f0eef1a0e3a45e48e713fe121faa1481a6b70df` |
-| `sensor.py` | `c0207946ab76fae2f5071c3d6260f2e056f8bb78edc850a1fa43b13810654832` |
+| `notification_bridge.py` | `92a92c75fe1ebc345a644069f84b250c5f08a8b2dbbd29757fa514324e19194d` |
+| `notifications.py` | `f79cbec5112878d23f7b532488daf9463e2c05967989284e0663dea431b9d27a` |
+| `sensor.py` | `2e048f7708b1d98c204cc84509e34dcd3c66b2e2bd20b4e412eb09c2d9eb8fc9` |
 | `settings_data.py` | `d6ca7cf1a947cbb1ea77291a8bb8f5ef53313980f6a75989f8342afc522b660e` |
 | `spam.py` | `026ae8bc8890be324f074d17f5fce1269d87edbb420566bdfc1aae18cf3eea11` |
 | `switch.py` | `7cdbb0e5d3c5d1c8fa3cc5cad1cba6fa1f666b6c7eb1e034fbed40861b0e73c2` |
 | `tam.py` | `b569e1109b1dbc84a552dd36835fb912aa3ae5b47a29a516c523783e799e09c6` |
 | `telephony.py` | `7796cf8c1d6642229f2a42894bd81911236f10b0e30ff34f7ae2e5681606e9ed` |
-| `update_check.py` | `119559a29413fd478bb94053336f6e90e150a3c2737d2966371b7800e4e508c6` |
-| `voicemail.py` | `564dc067bc31355e96e5521884969f228cf27bba73cae7bfb1b6d8ac9633a7f0` |
-| `services.yaml` | `f046d12934a2d82e765de54e3f59543b39812e39330ff3c7e990a3a205afad29` |
-| `www/fritzbox-anrufe-card.js` | `534b7576db15f9e740b637d813c8af1d6de3510a0b3b32955cde59a6e420b143` |
-| `manifest.json` | `b3f4ed0a2a922bdcc2c67699116f1261aba317d463b0011fe9d1f902005223a3` |
-| `strings.json` | `fe5a76cccf739b06844dd6f95cc5a488c08ca881428a5b7b5c72c0401bf29b5b` |
-| `translations/de.json` | `766ae36e1326b0f5fe1d42889b38b9006bd9fd55110b0e39ebf261f646809bc2` |
-| `translations/en.json` | `fe5a76cccf739b06844dd6f95cc5a488c08ca881428a5b7b5c72c0401bf29b5b` |
-| `translations/nl.json` | `f1f5ad1a7b6b8312369227c74b2e590881f372d7493afdfaa5005f2600773ef2` |
+| `update_check.py` | `00ba17b9ebc578835bbad6ae119b23385377b92e956a28b8e98cfa49621e9461` |
+| `voicemail.py` | `235fe1702db39c702d54fd7e8da3d3b9e6fdfa9aed4b877c0f425f01525052c1` |
+| `services.yaml` | `ec01b97d3df7d0950cc29bf131acc099e7d7183341d389ea7805a4ae831249af` |
+| `www/fritzbox-anrufe-card.js` | `b65125ded927ca5177afffeae7ffe9fe40742cea7296afc889b7addfd4034e00` |
+| `manifest.json` | `ca370ff049d940e9c3d941ab02691a6eaec851b06c3c030d9d9058c9a5210c14` |
+| `strings.json` | `695cf986dd8eed37f7c5eb2a5191bccf6ab5e86db57dd35921526a9a49349343` |
+| `translations/de.json` | `167b377ed501a7a5b425c2ec2322827848d398ab53230babdfb2e915b75411b9` |
+| `translations/en.json` | `695cf986dd8eed37f7c5eb2a5191bccf6ab5e86db57dd35921526a9a49349343` |
+| `translations/nl.json` | `4366dac7fa63acc24c6e33778f5a73f34ae2eef550cae527f52f1105f2bf72a3` |
 | `icons.json` | `02d3f66ee5b0422973449b912573166b921745c8cbf05f8e78487227ce82d669` |
 
 Der Ordner `custom_components/fritzbox_anrufe/brand/` enthält die Logo-/

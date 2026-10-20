@@ -1,4 +1,4 @@
-# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 564dc067bc31355e96e5521884969f228cf27bba73cae7bfb1b6d8ac9633a7f0
+# SHA256 (Inhalt ab Zeile 2, d.h. dieser Datei ohne diese erste Zeile): 235fe1702db39c702d54fd7e8da3d3b9e6fdfa9aed4b877c0f425f01525052c1
 """Coordinator + audio access for the FRITZ!Box answering machine (TAM).
 
 EXPERIMENTAL - see the module docstring in :mod:`.tam` for details on what
@@ -168,6 +168,14 @@ class FritzTamCoordinator(DataUpdateCoordinator[list[TamMessage]]):
                 "spam": getattr(message, "spam", False),
             },
         )
+        # Optional: Notification Center (seit v1.6.1).
+        notifications = getattr(
+            getattr(self.config_entry, "runtime_data", None), "notifications", None
+        )
+        if notifications is not None:
+            notifications.async_new_voicemail(
+                message.Index, message.Name or message.Number or None, self._tam_label
+            )
 
     def get_message(self, message_id: str) -> TamMessage | None:
         """Look up one currently-known message by its raw ``Index`` string."""

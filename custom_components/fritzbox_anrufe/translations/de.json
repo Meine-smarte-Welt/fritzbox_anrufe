@@ -250,6 +250,14 @@
         "count": "Anzahl Anrufe",
         "days": "Anzahl Tage"
       }
+    },
+    "nc_types": {
+      "options": {
+        "connection_lost": "Verbindung zur FRITZ!Box verloren",
+        "missed_call": "Verpasster Anruf",
+        "new_voicemail": "Neue Nachricht auf dem Anrufbeantworter",
+        "update_available": "Update für FRITZ!Box Anrufe verfügbar"
+      }
     }
   },
   "options": {
@@ -261,7 +269,8 @@
         "title": "FRITZ!Box Anrufe konfigurieren",
         "menu_options": {
           "general_settings": "Grundeinstellungen",
-          "manage_tams": "Anrufbeantworter verwalten"
+          "manage_tams": "Anrufbeantworter verwalten",
+          "notification_center": "Notification Center"
         },
         "description": "Installierte Version: {version}\n{update_info}"
       },
@@ -299,6 +308,14 @@
           "add_tam": "Weiteren Anrufbeantworter hinzufügen",
           "remove_tam": "Anrufbeantworter entfernen",
           "tams_done": "Fertig"
+        }
+      },
+      "notification_center": {
+        "title": "Notification Center",
+        "description": "Sendet Meldungen an die optionale Integration Notification Center. Ohne sie wird nichts gesendet und nichts geht kaputt. Die Meldungen sind nach Dringlichkeit sortiert.",
+        "data": {
+          "nc_enabled": "Meldungen an das Notification Center senden",
+          "nc_types": "Gesendete Meldungsarten"
         }
       }
     }
@@ -467,6 +484,38 @@
         "uid": {
           "name": "Kennung",
           "description": "Kennung aus dem Attribut forwardings."
+        }
+      }
+    },
+    "set_notification_center": {
+      "name": "Notification Center ein-/ausschalten",
+      "description": "Schaltet das Senden von Meldungen an das Notification Center ein oder aus. Nur für Administratoren.",
+      "fields": {
+        "entry_id": {
+          "name": "Eintrag",
+          "description": "Nur bei mehreren FRITZ!Box-Einträgen nötig."
+        },
+        "enabled": {
+          "name": "Meldungen senden",
+          "description": "Meldungen an das Notification Center senden."
+        }
+      }
+    },
+    "set_notification_type": {
+      "name": "Meldungsart ein-/ausschalten",
+      "description": "Schaltet eine Meldungsart für das Notification Center ein oder aus. Nur für Administratoren.",
+      "fields": {
+        "entry_id": {
+          "name": "Eintrag",
+          "description": "Nur bei mehreren FRITZ!Box-Einträgen nötig."
+        },
+        "nc_type": {
+          "name": "Meldungsart",
+          "description": "Die zu schaltende Meldungsart."
+        },
+        "enabled": {
+          "name": "Senden",
+          "description": "Diese Meldungsart senden."
         }
       }
     }
