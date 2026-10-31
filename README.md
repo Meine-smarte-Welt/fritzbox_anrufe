@@ -8,6 +8,10 @@ integrierten "FRITZ!Box Call Monitor"-Komponente, erweitert um historische
 Anruflisten-Sensoren, konfigurierbare Verlaufstiefe je Sensor und eine
 mitgelieferte Dashboard-Karte.
 
+<p>
+  <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=Meine-smarte-Welt&amp;repository=fritzbox_anrufe&amp;category=integration"><img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Repository in Home Assistant öffnen" height="32"></a>
+</p>
+
 ## Inhalt
 
 - [Funktionsumfang](#funktionsumfang)
